@@ -30,7 +30,7 @@
           {% for group_name, roles in ROLE_GROUPS.items() %}
           <optgroup label="{{ group_name }}">
             {% for role_key in roles %}
-            <option value="{{ role_key }}">{{ ROLE_LABELS[role_key] }}</option>
+            <option value="{{ role_key }}">{{ role_labels[role_key] }}</option>
             {% endfor %}
           </optgroup>
           {% endfor %}
@@ -77,8 +77,17 @@
           </td>
           <td>
             {% set role_label = role_labels.get(user.role, user.role) %}
-            {% set role_class = 'primary' if user.role == 'admin' else 'success' if user.role == 'qa_manager' else 'info' if user.role == 'equipment_engineer' else 'warning' if user.role == 'metrology_engineer' else 'neutral' %}
-            <span class="status-badge" style="background: var(--color-{{ role_class }}-light); color: var(--color-{{ role_class }});">
+            {% if user.role == 'admin' %}
+            <span class="status-badge" style="background: var(--color-primary-light); color: var(--color-primary);">
+            {% elif user.role == 'qa_manager' %}
+            <span class="status-badge" style="background: var(--color-success-light); color: var(--color-success);">
+            {% elif user.role == 'equipment_engineer' %}
+            <span class="status-badge" style="background: var(--color-info-light); color: var(--color-info);">
+            {% elif user.role == 'metrology_engineer' %}
+            <span class="status-badge" style="background: var(--color-warning-light); color: var(--color-warning);">
+            {% else %}
+            <span class="status-badge">
+            {% endif %}
               {{ role_label }}
             </span>
           </td>

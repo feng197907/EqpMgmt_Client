@@ -3,7 +3,7 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from werkzeug.security import generate_password_hash
 
-from config import ROLES, ROLE_LABELS, get_role_label, is_valid_role
+from config import ROLES, ROLE_LABELS, ROLE_GROUPS, get_role_label, is_valid_role
 from database import get_db
 from utils.audit import log_action
 from utils.decorators import admin_required
@@ -28,7 +28,7 @@ def user_list():
         }
         for user in users
     ]
-    return render_template("users.html", users=users_with_labels, role_labels=ROLE_LABELS)
+    return render_template("users.html", users=users_with_labels, role_labels=ROLE_LABELS, ROLE_GROUPS=ROLE_GROUPS)
 
 
 @users_bp.route("/users/create", methods=["POST"])

@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% block content %}
+{# 设备维护历史页面 #}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-1">{{ device.device_name }} - 维护历史</h3>
+    <div class="text-muted">{{ device.device_code }}</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('maintenance.maintenance_plans', device_id=device.id) }}">返回维护计划</a>
+</div>
+
+{# 筛选栏 #}
+<div class="filter-bar">
+  <form class="d-flex flex-wrap gap-3 align-items-center" method="get" action="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">
+    <div class="form-group mb-0" style="min-width: 150px;">
+      <select class="form-select" name="type">
+        <option value="">全部类型</option>
+        {% for type, label in maintenance_types %}
+        <option value="{{ type }}" {% if selected_type == type %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group mb-0" style="min-width: 150px;">
+      <select class="form-select" name="year">
+        <option value="">全部年份</option>
+        {% for year in range(2024, 2027) %}
+        <option value="{{ year }}" {% if selected_year == year|string %}selected{% endif %}>{{ year }}年</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-bar-actions">
+      <button class="btn btn-primary" type="submit">
+        <i data-lucide="search"></i>
+        筛选
+      </button>
+      <a class="btn btn-secondary" href="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">
+        <i data-lucide="rotate-ccw"></i>
+        重置
+      </a>
+    </div>
+  </form>
+</div>
+
+{# 维护记录列表 #}
+<div class="card">
+  <div class="card-header">
+    <span>维护记录</span>
+    <span class="text-muted" style="font-weight: 400;">共 {{ pagination.total }} 条记录</span>
+  </div>
+  <div class="table-wrapper">
+    {% if records %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>维护时间</th>
+          <th>类型</th>
+          <th>维护内容摘要</th>
+          <th>结果</th>
+          <th>执行人</th>
+          <th>下次到期日</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records %}
+        <tr>
+          <td>{{ record.performed_at[:10] if record.performed_at else '-' }}</td>
+          <td>{{ record.maintenance_type_label }}</td>
+          <td class="text-truncate" style="max-width: 300px;" title="{{ record.content }}">
+            {{ record.content[:50] }}{% if record.content|length > 50 %}...{% endif %}
+          </td>
+          <td>
+            {% if record.result == 'qualified' %}
+            <span class="badge badge-success">{{ result_labels[record.result] }}</span>
+            {% elif record.result == 'unqualified' %}
+            <span class="badge badge-danger">{{ result_labels[record.result] }}</span>
+            {% else %}
+            <span class="badge badge-warning">{{ result_labels[record.result] }}</span>
+            {% endif %}
+          </td>
+          <td>{{ record.performed_by }}</td>
+          <td>{{ record.next_due_date }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {# 分页 #}
+    {% if pagination.pages > 1 %}
+    <div class="d-flex justify-content-between align-items-center p-3">
+      <div class="text-muted">
+        第 {{ pagination.page }} 页 / 共 {{ pagination.pages }} 页
+      </div>
+      <div class="d-flex gap-2">
+        {% if pagination.page > 1 %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ url_for('maintenance.maintenance_history', device_id=device.id, type=selected_type, year=selected_year, page=pagination.page-1) }}">
+          上一页
+        </a>
+        {% endif %}
+        {% if pagination.page < pagination.pages %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ url_for('maintenance.maintenance_history', device_id=device.id, type=selected_type, year=selected_year, page=pagination.page+1) }}">
+          下一页
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center text-muted p-4">
+      <p>暂无维护记录</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

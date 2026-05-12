@@ -512,6 +512,83 @@ textarea.form-control {
   margin-left: auto;
 }
 
+/* ==================== 自定义模态框 ==================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal, 1050);
+  padding: 1rem;
+}
+
+.modal-overlay .modal {
+  background: #fff;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 500px;
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-overlay .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-overlay .modal-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0;
+}
+
+.modal-overlay .modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius);
+}
+
+.modal-overlay .modal-close:hover {
+  background: var(--color-gray-100);
+  color: var(--text-primary);
+}
+
+.modal-overlay .modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-overlay .modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
 /* ==================== 分页 ==================== */
 .pagination-wrapper {
   display: flex;

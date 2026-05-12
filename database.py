@@ -148,6 +148,45 @@ def init_db():
         """
     )
 
+    # 维护计划表
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS maintenance_plan (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_id INTEGER NOT NULL,
+            maintenance_type TEXT NOT NULL,
+            interval_days INTEGER NOT NULL,
+            next_due_date TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (device_id) REFERENCES devices(id)
+        )
+        """
+    )
+
+    # 维护记录表
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS maintenance_record (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            plan_id INTEGER NOT NULL,
+            device_id INTEGER NOT NULL,
+            maintenance_type TEXT NOT NULL,
+            content TEXT NOT NULL,
+            result TEXT NOT NULL,
+            performed_by TEXT NOT NULL,
+            performed_at TEXT NOT NULL DEFAULT (datetime('now')),
+            next_due_date TEXT NOT NULL,
+            parts_used TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (plan_id) REFERENCES maintenance_plan(id),
+            FOREIGN KEY (device_id) REFERENCES devices(id)
+        )
+        """
+    )
+
     # 对旧数据库执行增量结构升级。
     conn.commit()
 

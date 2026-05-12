@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+{# 全局维护计划列表页 #}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">维护计划总览</h1>
+    <p class="page-subtitle">查看所有设备的维护计划与到期情况</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span>全部维护计划</span>
+    <span class="text-muted" style="font-weight: 400;">共 {{ plans|length }} 个计划</span>
+  </div>
+  <div class="table-wrapper">
+    {% if plans %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>设备编码</th>
+          <th>设备名称</th>
+          <th>维护类型</th>
+          <th>周期</th>
+          <th>下次到期日</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for plan in plans %}
+        <tr>
+          <td><code class="text-primary fw-medium">{{ plan['device_code'] }}</code></td>
+          <td>{{ plan['device_name'] }}</td>
+          <td>
+            {% if plan['maintenance_type'] == 'calibration' %}校准
+            {% elif plan['maintenance_type'] == 'maintenance' %}保养
+            {% elif plan['maintenance_type'] == 'inspection' %}巡检
+            {% else %}{{ plan['maintenance_type'] }}{% endif %}
+          </td>
+          <td>{{ plan['interval_days'] }} 天</td>
+          <td>{{ plan['next_due_date'] }}</td>
+          <td>
+            <a class="btn btn-sm btn-outline-primary"
+               href="{{ url_for('maintenance.maintenance_plans', device_id=plan['device_id']) }}">查看</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted p-4">暂无维护计划</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

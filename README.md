@@ -47,6 +47,166 @@ http://127.0.0.1:5000
 
 测试会使用临时数据库文件，不会影响本地的 `dms.db`。
 
+## 云服务器部署
+
+### 环境要求
+
+- CentOS 7 / Ubuntu 20.04+
+- Python 3.10+（腾讯云 CentOS 7 默认 Python 3.6，需升级或使用兼容密码）
+
+### 部署步骤
+
+1. 上传项目到服务器：
+
+```bash
+# 本地打包（排除 .venv, .git, docs 等）
+zip -r dms.zip . -x "*.git*" -x "*.venv*" -x "__pycache__/*" -x "*.pyc" -x ".pytest_cache/*" -x "docs/*" -x "*.md"
+
+# 上传到服务器
+scp dms.zip root@你的服务器IP:/data/EquipmentManagement/
+```
+
+2. 服务器上解压并安装依赖：
+
+```bash
+cd /data/EquipmentManagement
+unzip dms.zip
+
+# 安装 Python 依赖
+pip3 install flask flask-login werkzeug gunicorn
+```
+
+3. 启动服务：
+
+```bash
+cd /data/EquipmentManagement
+nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > gunicorn.log 2>&1 &
+```
+
+4. 开放端口（腾讯云控制台 → 安全组 → 添加入站规则）：
+
+- 协议：TCP
+- 端口：5000
+
+### 服务管理命令
+
+```bash
+# 查看进程
+ps aux | grep gunicorn
+
+# 查看日志
+tail -f /data/EquipmentManagement/gunicorn.log
+
+# 停止
+pkill -f gunicorn
+
+# 重启
+cd /data/EquipmentManagement
+nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > gunicorn.log 2>&1 &
+```
+
+### 配置开机自启
+
+```bash
+cat > /etc/systemd/system/dms.service << 'EOF'
+[Unit]
+Description=DMS Equipment Management System
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/data/EquipmentManagement
+ExecStart=/usr/bin/gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable dms
+systemctl start dms
+```
+
+### GitHub Webhook 自动部署
+
+代码 push 到 main 分支后自动更新服务器。
+
+#### 1. 服务器上初始化 Git 仓库
+
+```bash
+cd /data/EquipmentManagement
+git init
+git remote add origin https://github.com/你的用户名/你的仓库名.git
+git config credential.helper store
+git pull origin main
+```
+
+#### 2. 创建部署脚本
+
+```bash
+cat > /data/EquipmentManagement/deploy-webhook.sh << 'EOF'
+#!/bin/bash
+cd /data/EquipmentManagement
+pkill -f gunicorn || true
+git pull origin main
+nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > gunicorn.log 2>&1 &
+echo "部署完成: $(date)" >> deploy.log
+EOF
+
+chmod +x /data/EquipmentManagement/deploy-webhook.sh
+```
+
+#### 3. 创建 Webhook 监听服务
+
+```bash
+cat > /usr/local/bin/webhook-listener.py << 'EOF'
+#!/usr/bin/env python3
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import subprocess
+
+class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        if self.path == '/webhook':
+            subprocess.run(['/data/EquipmentManagement/deploy-webhook.sh'], shell=True)
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'OK')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+HTTPServer(('0.0.0.0', 5001), Handler).serve_forever()
+EOF
+
+chmod +x /usr/local/bin/webhook-listener.py
+nohup python3 /usr/local/bin/webhook-listener.py > webhook.log 2>&1 &
+```
+
+#### 4. 开放 5001 端口
+
+腾讯云安全组添加 5001 端口入站规则。
+
+#### 5. GitHub 配置 Webhook
+
+- 仓库 → Settings → Webhooks → Add webhook
+- Payload URL: `http://你的服务器IP:5001/webhook`
+- Content type: `application/json`
+- Events: Just push events
+- Add webhook
+
+#### 6. 日常更新
+
+```bash
+git add .
+git commit -m "更新内容"
+git push origin main
+# 服务器自动拉取并重启
+```
+
+---
+
 ## 默认账号
 
 - admin / admin123

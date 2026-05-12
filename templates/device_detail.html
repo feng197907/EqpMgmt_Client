@@ -17,6 +17,16 @@
   </div>
 </div>
 
+{# 标签页导航 #}
+<div class="nav-tabs-custom mb-3">
+  <a class="nav-tab {% if request.endpoint == 'devices.device_detail' %}active{% endif %}"
+     href="{{ url_for('devices.device_detail', device_id=device.id) }}">设备详情</a>
+  <a class="nav-tab {% if request.endpoint == 'maintenance.maintenance_plans' %}active{% endif %}"
+     href="{{ url_for('maintenance.maintenance_plans', device_id=device.id) }}">维护计划</a>
+  <a class="nav-tab {% if request.endpoint == 'maintenance.maintenance_history' %}active{% endif %}"
+     href="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">维护历史</a>
+</div>
+
 {# 设备状态变更表单：所有用户可提交变更请求，关键状态需审批 #}
 <div class="card mb-3">
   <div class="card-body">

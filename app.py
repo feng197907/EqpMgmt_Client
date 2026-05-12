@@ -11,6 +11,7 @@ from blueprints import (
     device_changes_bp,
     devices_bp,
     documents_bp,
+    maintenance_bp,
     users_bp,
 )
 from config import SECRET_KEY, UPLOAD_FOLDER
@@ -44,6 +45,7 @@ def create_app():
     app.register_blueprint(device_changes_bp)  # /device_changes
     app.register_blueprint(users_bp)  # /users
     app.register_blueprint(dashboard_bp)  # dashboard, reminders, add_device 等
+    app.register_blueprint(maintenance_bp)  # 维护计划相关路由
 
     # 确保上传目录存在
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)

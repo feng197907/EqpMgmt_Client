@@ -1,5 +1,5 @@
 # 看板与提醒 Blueprint
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from config import DEVICE_STATUS_LABELS, DOC_STATUS_LABELS
@@ -7,6 +7,7 @@ from database import get_db
 from utils.audit import log_action
 from utils.decorators import admin_required
 from utils.helpers import build_calibration_reminders, get_document_rows
+from utils.maintenance import build_due_maintenance_reminders
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
@@ -198,6 +199,57 @@ def user_stories():
         calibration_reminders=calibration_reminders,
         doc_status_labels=DOC_STATUS_LABELS,
         device_total=device_total,
+    )
+
+
+@dashboard_bp.route("/api/dashboard/due-maintenance")
+@login_required
+def api_due_maintenance():
+    """获取到期维护看板数据（API）"""
+    maintenance_type = request.args.get("type", "").strip()
+    days = request.args.get("days", 7, type=int)
+    for_login_popup = request.args.get("for_login_popup", 0, type=int)
+
+    conn = get_db()
+    reminders = build_due_maintenance_reminders(conn, days=days)
+    conn.close()
+
+    # 如果指定了维护类型，进行筛选
+    if maintenance_type:
+        reminders["due_today"] = [r for r in reminders["due_today"] if r["maintenance_type"] == maintenance_type]
+        reminders["due_within_7days"] = [r for r in reminders["due_within_7days"] if r["maintenance_type"] == maintenance_type]
+        reminders["overdue"] = [r for r in reminders["overdue"] if r["maintenance_type"] == maintenance_type]
+        reminders["summary"] = {
+            "due_today_count": len(reminders["due_today"]),
+            "due_7days_count": len(reminders["due_within_7days"]),
+            "overdue_count": len(reminders["overdue"]),
+        }
+
+    return jsonify(reminders)
+
+
+@dashboard_bp.route("/maintenance/all")
+@login_required
+def maintenance_all():
+    """全局维护计划列表页（所有设备）"""
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 按紧迫度排序：逾期 > 今日到期 > 7日内 > 其余
+    cur.execute(
+        """SELECT mp.*, d.device_code, d.device_name, d.model
+           FROM maintenance_plan mp
+           JOIN devices d ON d.id = mp.device_id
+           WHERE mp.is_active = 1
+           AND (d.is_deleted IS NULL OR d.is_deleted = 0)
+           ORDER BY mp.next_due_date ASC"""
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    return render_template(
+        "maintenance_all.html",
+        plans=rows,
     )
 
 

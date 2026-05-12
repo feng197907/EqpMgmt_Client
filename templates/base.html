@@ -207,5 +207,101 @@
   </script>
   <!-- Custom JS -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+
+  {# 维护到期登录弹窗提醒 #}
+  {% if current_user.is_authenticated %}
+  <script>
+  (function() {
+    // 检查当天是否已关闭过提醒（每天只提醒一次）
+    var dismissed = localStorage.getItem('maintenance_reminder_dismissed');
+    if (dismissed) {
+      try {
+        var dismissTime = new Date(dismissed);
+        var now = new Date();
+        if (dismissTime.getFullYear() === now.getFullYear() && dismissTime.getMonth() === now.getMonth() && dismissTime.getDate() === now.getDate()) {
+          return; // 今天已经关闭过，不再弹出
+        }
+      } catch(e) {}
+    }
+
+    // 异步获取到期维护数据
+    fetch('/api/dashboard/due-maintenance?for_login_popup=1&days=3')
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        var total = data.summary.due_today_count + data.summary.due_7days_count + data.summary.overdue_count;
+        if (total === 0) return;
+
+        // 构建弹窗内容（居中遮罩、可滚动内容、锁定页面滚动）
+        var html = '<div class="modal-overlay" id="maintenanceReminderModal" style="display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);z-index:9999;">';
+        html += '<div class="maintenance-reminder-modal" style="max-width:800px;width:95%;background:#fff;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);margin:0;overflow:auto;max-height:85vh;">';
+        html += '<div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(0,0,0,0.06);">';
+        html += '<h3 class="modal-title" style="margin:0;font-size:1.125rem;">⚠️ 设备维护提醒</h3>';
+        html += '<button class="modal-close" onclick="closeMaintenanceReminder()" style="background:transparent;border:0;font-size:1.25rem;line-height:1;">&times;</button>';
+        html += '</div>';
+        html += '<div class="modal-body" style="padding:16px 20px;">';
+
+        if (data.overdue.length > 0) {
+          html += '<h5 class="text-danger mb-2">🔴 已逾期 (' + data.overdue.length + '台)</h5>';
+          html += '<ul class="list-group mb-3">';
+          data.overdue.forEach(function(item) {
+            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
+          });
+          html += '</ul>';
+        }
+
+        if (data.due_today.length > 0) {
+          html += '<h5 class="text-danger mb-2">🔴 今日到期 (' + data.due_today.length + '台)</h5>';
+          html += '<ul class="list-group mb-3">';
+          data.due_today.forEach(function(item) {
+            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
+          });
+          html += '</ul>';
+        }
+
+        if (data.due_within_7days.length > 0) {
+          html += '<h5 class="text-warning mb-2">🟡 7日内到期 (' + data.due_within_7days.length + '台)</h5>';
+          html += '<ul class="list-group mb-3">';
+          data.due_within_7days.forEach(function(item) {
+            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
+          });
+          html += '</ul>';
+        }
+
+        html += '</div>';
+        html += '<div class="modal-footer" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:12px 20px;border-top:1px solid rgba(0,0,0,0.04);">';
+        html += '<a class="btn btn-primary" href="/dashboard">查看详情</a>';
+        html += '<button class="btn btn-secondary" onclick="snoozeMaintenanceReminder()">稍后提醒</button>';
+        html += '<button class="btn btn-outline-secondary" onclick="closeMaintenanceReminder()">关闭</button>';
+        html += '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        // 如果已存在则不重复插入
+        if (!document.getElementById('maintenanceReminderModal')) {
+          document.body.insertAdjacentHTML('beforeend', html);
+          // 锁定页面滚动
+          document.body.style.overflow = 'hidden';
+        }
+        lucide.createIcons();
+      })
+      .catch(function(err) { console.error('获取维护提醒失败:', err); });
+
+    window.closeMaintenanceReminder = function() {
+      // 关闭时记录当天已关闭，避免当天再次弹出
+      try {
+        localStorage.setItem('maintenance_reminder_dismissed', new Date().toISOString());
+      } catch (e) {}
+      var modal = document.getElementById('maintenanceReminderModal');
+      if (modal) modal.remove();
+      document.body.style.overflow = '';
+    };
+
+    window.snoozeMaintenanceReminder = function() {
+      localStorage.setItem('maintenance_reminder_dismissed', new Date().toISOString());
+      closeMaintenanceReminder();
+    };
+  })();
+  </script>
+  {% endif %}
 </body>
 </html>

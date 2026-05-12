@@ -209,6 +209,36 @@ DEVICE_STATUS_LABELS = {
     "repair": "维修",
 }
 
+# ============================================================
+# 维护周期提醒配置
+# ============================================================
+
+# 维护类型定义
+MAINTENANCE_TYPES = [
+    ("calibration", "校准"),
+    ("maintenance", "保养"),
+    ("inspection", "巡检"),
+]
+MAINTENANCE_TYPE_LABELS = dict(MAINTENANCE_TYPES)
+
+# 固定周期选项
+FIXED_INTERVAL_OPTIONS = [7, 30, 90, 180, 365]
+FIXED_INTERVAL_LABELS = {
+    7: "7天（每周）",
+    30: "30天（每月）",
+    90: "90天（每季度）",
+    180: "180天（每半年）",
+    365: "365天（每年）",
+}
+
+# 维护结果
+MAINTENANCE_RESULTS = [
+    ("qualified", "合格"),
+    ("unqualified", "不合格"),
+    ("pending", "待处理"),
+]
+MAINTENANCE_RESULT_LABELS = dict(MAINTENANCE_RESULTS)
+
 # 关键状态（需要审批）
 CRITICAL_DEVICE_STATUSES = {"inactive", "retired"}
 

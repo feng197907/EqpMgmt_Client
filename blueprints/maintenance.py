@@ -8,7 +8,7 @@ from config import FIXED_INTERVAL_LABELS, FIXED_INTERVAL_OPTIONS, MAINTENANCE_RE
 from database import get_db
 from models.maintenance import MaintenancePlan, MaintenanceRecord
 from utils.audit import log_action
-from utils.decorators import permission_required
+from utils.decorators import admin_required, permission_required
 from utils.maintenance import calc_next_due_date, calc_urgency
 
 maintenance_bp = Blueprint("maintenance", __name__, url_prefix="/device/<int:device_id>/maintenance")
@@ -278,6 +278,41 @@ def submit_record(device_id, plan_id):
     return redirect(url_for("maintenance.maintenance_plans", device_id=device_id))
 
 
+@maintenance_bp.route("/record/<int:record_id>/delete", methods=["POST"])
+@admin_required
+def delete_record(device_id, record_id):
+    """删除维护记录（管理员）"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        """SELECT mr.id, mr.device_id, mr.plan_id, mr.maintenance_type, mr.content, mr.result,
+                  mp.maintenance_type AS plan_type
+           FROM maintenance_record mr
+           JOIN maintenance_plan mp ON mp.id = mr.plan_id
+           WHERE mr.id = ? AND mr.device_id = ?""",
+        (record_id, device_id),
+    )
+    record = cur.fetchone()
+    if record is None:
+        conn.close()
+        flash("维护记录不存在。", "warning")
+        return redirect(url_for("maintenance.maintenance_history", device_id=device_id))
+
+    cur.execute("DELETE FROM maintenance_record WHERE id = ?", (record_id,))
+    conn.commit()
+
+    log_action(
+        current_user.username,
+        "delete_maintenance_record",
+        "maintenance_record",
+        record_id,
+        f"删除设备 {device_id} 的维护记录：{record['content']}（结果：{record['result']}）",
+    )
+    conn.close()
+    flash("维护记录已删除。", "success")
+    return redirect(url_for("maintenance.maintenance_history", device_id=device_id))
+
+
 @maintenance_bp.route("/history", methods=["GET"])
 @login_required
 def maintenance_history(device_id):
@@ -308,12 +343,39 @@ def maintenance_history(device_id):
         year=year if year else None, page=page, per_page=per_page
     )
 
+    display_records = []
+    for record in records:
+        if record.result == "qualified":
+            result_text = "合格"
+            result_class = "bg-success"
+        elif record.result == "unqualified":
+            result_text = "不合格"
+            result_class = "bg-danger"
+        elif record.result == "pending":
+            result_text = "待处理"
+            result_class = "bg-warning text-dark"
+        else:
+            result_text = record.result if record.result else "-"
+            result_class = "bg-secondary"
+        display_records.append(
+            {
+                "id": record.id,
+                "performed_at": record.performed_at,
+                "maintenance_type_label": record.maintenance_type_label,
+                "content": record.content,
+                "result_text": result_text,
+                "result_class": result_class,
+                "performed_by": record.performed_by,
+                "next_due_date": record.next_due_date,
+            }
+        )
+
     conn.close()
 
     return render_template(
         "device_maintenance_history.html",
         device=device,
-        records=records,
+        records=display_records,
         pagination=pagination,
         maintenance_types=MAINTENANCE_TYPES,
         type_labels=MAINTENANCE_TYPE_LABELS,

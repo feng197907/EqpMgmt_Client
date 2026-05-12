@@ -58,6 +58,7 @@
           <th>结果</th>
           <th>执行人</th>
           <th>下次到期日</th>
+          <th>操作</th>
         </tr>
       </thead>
       <tbody>
@@ -69,16 +70,19 @@
             {{ record.content[:50] }}{% if record.content|length > 50 %}...{% endif %}
           </td>
           <td>
-            {% if record.result == 'qualified' %}
-            <span class="badge badge-success">{{ result_labels[record.result] }}</span>
-            {% elif record.result == 'unqualified' %}
-            <span class="badge badge-danger">{{ result_labels[record.result] }}</span>
-            {% else %}
-            <span class="badge badge-warning">{{ result_labels[record.result] }}</span>
-            {% endif %}
+            <span class="badge {{ record.result_class }}">{{ record.result_text }}</span>
           </td>
           <td>{{ record.performed_by }}</td>
           <td>{{ record.next_due_date }}</td>
+          <td>
+            {% if current_user.is_authenticated and current_user.is_admin %}
+            <form method="post" action="{{ url_for('maintenance.delete_record', device_id=device.id, record_id=record.id) }}" class="d-inline" onsubmit="return confirm('确定删除这条维护记录吗？此操作不可恢复。');">
+              <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+            </form>
+            {% else %}
+            -
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

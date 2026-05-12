@@ -103,7 +103,33 @@ pkill -f gunicorn
 # 重启
 cd /data/EquipmentManagement
 nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > gunicorn.log 2>&1 &
+
+
+# 云服务器更新代码，重新部署
+cd /data/EquipmentManagement
+git pull origin main
+pip3 install -r requirements.txt
+pkill -f gunicorn
+ps aux | grep gunicorn
+nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > gunicorn.log 2>&1 &
 ```
+
+cd /data/EquipmentManagement
+
+# 丢弃本地修改
+git checkout -- README.md app.py database.py templates/base.html templates/device_detail.html
+
+# 删除冲突文件
+rm -f requirements.txt
+
+# 重新拉取
+git pull origin main
+
+# 重启
+pkill -f gunicorn
+nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > gunicorn.log 2>&1 &
+
+
 
 ### 配置开机自启
 

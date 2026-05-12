@@ -1,7 +1,7 @@
 # 维护计划与记录模型
 from datetime import datetime, date
 
-from config import MAINTENANCE_TYPE_LABELS
+from config import MAINTENANCE_RESULT_LABELS, MAINTENANCE_TYPE_LABELS
 from database import get_db
 
 
@@ -25,6 +25,13 @@ class MaintenancePlan:
     def maintenance_type_label(self):
         """获取维护类型中文标签"""
         return MAINTENANCE_TYPE_LABELS.get(self.maintenance_type, self.maintenance_type)
+
+    @property
+    def result_label(self):
+        """获取维护结果中文标签，兼容旧数据中直接存储中文值的情况"""
+        if not self.result:
+            return "-"
+        return MAINTENANCE_RESULT_LABELS.get(self.result, self.result)
 
     @property
     def is_overdue(self):

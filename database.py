@@ -29,7 +29,8 @@ def init_db():
             username TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
             role TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'active'
+            status TEXT NOT NULL DEFAULT 'active',
+            permissions TEXT DEFAULT '[]'
         )
         """
     )
@@ -240,6 +241,12 @@ def init_db():
         "users",
         "status",
         "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'",
+    )
+    ensure_column(
+        conn,
+        "users",
+        "permissions",
+        "ALTER TABLE users ADD COLUMN permissions TEXT DEFAULT '[]'",
     )
     ensure_column(
         conn,

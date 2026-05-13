@@ -15,32 +15,52 @@
     <span>新增用户</span>
   </div>
   <div class="card-body">
-    <form class="row g-3" method="post" action="{{ url_for('users.create_user') }}">
-      <div class="col-md-3">
-        <label class="form-label required">用户名</label>
-        <input class="form-control" name="username" placeholder="输入用户名" required>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label required">密码</label>
-        <input class="form-control" type="password" name="password" placeholder="输入密码" required>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label required">角色</label>
-        <select class="form-select" name="role" required>
-          {% for group_name, roles in ROLE_GROUPS.items() %}
-          <optgroup label="{{ group_name }}">
-            {% for role_key in roles %}
-            <option value="{{ role_key }}">{{ role_labels[role_key] }}</option>
+    <form method="post" action="{{ url_for('users.create_user') }}">
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <label class="form-label required">用户名</label>
+          <input class="form-control" name="username" placeholder="输入用户名" required>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label required">密码</label>
+          <input class="form-control" type="password" name="password" placeholder="输入密码" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label required">角色</label>
+          <select class="form-select" name="role" required id="role-select">
+            {% for group_name, roles in ROLE_GROUPS.items() %}
+            <optgroup label="{{ group_name }}">
+              {% for role_key in roles %}
+              <option value="{{ role_key }}">{{ role_labels[role_key] }}</option>
+              {% endfor %}
+            </optgroup>
             {% endfor %}
-          </optgroup>
-          {% endfor %}
-        </select>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button class="btn btn-primary w-100" type="submit">
+            <i data-lucide="user-plus"></i>
+            创建用户
+          </button>
+        </div>
       </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <button class="btn btn-primary w-100" type="submit">
-          <i data-lucide="user-plus"></i>
-          创建用户
-        </button>
+
+      <!-- 菜单权限选择 -->
+      <div class="row">
+        <div class="col-12">
+          <label class="form-label">菜单权限 <span class="text-muted">(管理员角色自动拥有所有权限)</span></label>
+          <div class="permissions-grid" id="permissions-grid">
+            {% for perm_key, perm_info in MENU_PERMISSIONS.items() %}
+            <div class="form-check form-check-inline permission-item">
+              <input class="form-check-input" type="checkbox" name="menu_permissions" value="{{ perm_key }}" id="perm_{{ perm_key }}" checked>
+              <label class="form-check-label" for="perm_{{ perm_key }}">
+                <i data-lucide="{{ perm_info.icon }}"></i>
+                {{ perm_info.label }}
+              </label>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
       </div>
     </form>
   </div>
@@ -59,6 +79,7 @@
           <th>ID</th>
           <th>用户名</th>
           <th>角色</th>
+          <th>菜单权限</th>
           <th>状态</th>
           <th>操作</th>
         </tr>
@@ -92,6 +113,19 @@
             </span>
           </td>
           <td>
+            {% if user.role == 'admin' %}
+            <span class="text-muted">全部权限</span>
+            {% else %}
+            <div class="permission-tags">
+              {% for perm_key in user.menu_permissions %}
+                {% if perm_key in MENU_PERMISSIONS %}
+                <span class="permission-tag">{{ MENU_PERMISSIONS[perm_key].label }}</span>
+                {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          </td>
+          <td>
             {% if user.status == 'active' %}
             <span class="status-badge success">启用</span>
             {% else %}
@@ -99,29 +133,91 @@
             {% endif %}
           </td>
           <td>
-            {% if user.id != current_user.id %}
-            <form method="post" action="{{ url_for('users.toggle_user', user_id=user.id) }}" class="d-inline">
-              <button class="btn btn-sm {% if user.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %}" type="submit">
-                {% if user.status == 'active' %}
-                <i data-lucide="user-x"></i>
-                停用
-                {% else %}
-                <i data-lucide="user-check"></i>
-                启用
-                {% endif %}
+            <div class="d-flex gap-2">
+              {% if user.id != current_user.id %}
+              <!-- 权限编辑按钮 -->
+              <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#permModal{{ user.id }}">
+                <i data-lucide="shield"></i>
+                权限
               </button>
-            </form>
-            {% else %}
-            <span class="text-muted" style="font-size: 12px;">
-              <i data-lucide="user" style="width: 14px; height: 14px;"></i>
-              当前用户
-            </span>
-            {% endif %}
+
+              <!-- 停用/启用按钮 -->
+              <form method="post" action="{{ url_for('users.toggle_user', user_id=user.id) }}" class="d-inline">
+                <button class="btn btn-sm {% if user.status == 'active' %}btn-outline-warning{% else %}btn-outline-success{% endif %}" type="submit">
+                  {% if user.status == 'active' %}
+                  <i data-lucide="user-x"></i>
+                  停用
+                  {% else %}
+                  <i data-lucide="user-check"></i>
+                  启用
+                  {% endif %}
+                </button>
+              </form>
+
+              <!-- 删除按钮（仅 admin 对已停用用户显示） -->
+              {% if current_user.role == 'admin' and user.status == 'inactive' %}
+              <form method="post" action="{{ url_for('users.delete_user', user_id=user.id) }}" class="d-inline" onsubmit="return confirm('确定要删除用户 {{ user.username }} 吗？此操作不可恢复。');">
+                <button class="btn btn-sm btn-outline-danger" type="submit">
+                  <i data-lucide="trash-2"></i>
+                  删除
+                </button>
+              </form>
+              {% endif %}
+              {% else %}
+              <span class="text-muted" style="font-size: 12px;">
+                <i data-lucide="user" style="width: 14px; height: 14px;"></i>
+                当前用户
+              </span>
+              {% endif %}
+            </div>
           </td>
         </tr>
+
+        <!-- 权限编辑模态框 -->
+        {% if user.id != current_user.id %}
+        <div class="modal fade" id="permModal{{ user.id }}" tabindex="-1" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">编辑用户权限 - {{ user.username }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <form method="post" action="{{ url_for('users.update_user_permissions', user_id=user.id) }}">
+                <div class="modal-body">
+                  <p class="text-muted mb-3">选择该用户可以访问的菜单模块：</p>
+                  <div class="permissions-list">
+                    {% for perm_key, perm_info in MENU_PERMISSIONS.items() %}
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" name="menu_permissions" value="{{ perm_key }}" id="perm_{{ user.id }}_{{ perm_key }}"
+                        {% if user.role == 'admin' or perm_key in user.menu_permissions %}checked{% endif %}
+                        {% if user.role == 'admin' %}disabled{% endif %}>
+                      <label class="form-check-label" for="perm_{{ user.id }}_{{ perm_key }}">
+                        <i data-lucide="{{ perm_info.icon }}" style="width: 16px; height: 16px;"></i>
+                        <strong>{{ perm_info.label }}</strong>
+                        <span class="text-muted">- {{ perm_info.description }}</span>
+                      </label>
+                    </div>
+                    {% endfor %}
+                  </div>
+                  {% if user.role == 'admin' %}
+                  <div class="alert alert-info mt-3">
+                    <i data-lucide="info"></i>
+                    管理员角色自动拥有所有权限
+                  </div>
+                  {% endif %}
+                </div>
+                <div class="modal-footer">
+                  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                  <button type="submit" class="btn btn-primary">保存权限</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% endif %}
         {% else %}
         <tr>
-          <td colspan="5">
+          <td colspan="6">
             <div class="empty-state">
               <div class="empty-state-icon">
                 <i data-lucide="users-x"></i>
@@ -136,5 +232,65 @@
     </table>
   </div>
 </div>
+
+<style>
+.permissions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.permission-item {
+  background: var(--color-bg-tertiary);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  margin: 0;
+}
+.permission-item .form-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.permission-item .form-check-input {
+  margin-right: 4px;
+}
+.permission-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.permission-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.permissions-list .form-check-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.permissions-list .form-check-label i {
+  color: var(--color-primary);
+}
+</style>
+
+<script>
+// 角色选择变化时，如果是管理员则禁用权限选择
+document.getElementById('role-select').addEventListener('change', function() {
+  var isAdmin = this.value === 'admin';
+  var checkboxes = document.querySelectorAll('#permissions-grid input[type="checkbox"]');
+  checkboxes.forEach(function(cb) {
+    cb.disabled = isAdmin;
+    if (isAdmin) {
+      cb.checked = true;
+    }
+  });
+});
+</script>
 
 {% endblock %}

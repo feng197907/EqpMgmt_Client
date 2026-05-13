@@ -39,6 +39,7 @@
 
     <nav class="sidebar-nav">
       <!-- 数据看板 -->
+      {% if current_user.is_authenticated and current_user.has_menu_permission('dashboard') %}
       <div class="nav-group">
         <div class="nav-group-title">数据看板</div>
         <a href="{{ url_for('dashboard.dashboard') }}" class="nav-item {% if request.endpoint == 'dashboard.dashboard' %}active{% endif %}">
@@ -54,8 +55,10 @@
           <span>借阅记录</span>
         </a>
       </div>
+      {% endif %}
 
       <!-- 设备管理 -->
+      {% if current_user.is_authenticated and current_user.has_menu_permission('device_management') %}
       <div class="nav-group">
         <div class="nav-group-title">设备管理</div>
         <a href="{{ url_for('auth.index') }}" class="nav-item {% if request.endpoint == 'auth.index' %}active{% endif %}">
@@ -72,8 +75,10 @@
           {% if device_change_count > 0 %}<span class="nav-badge">{{ device_change_count }}</span>{% endif %}
         </a>
       </div>
+      {% endif %}
 
       <!-- 文档中心 -->
+      {% if current_user.is_authenticated and current_user.has_menu_permission('document_center') %}
       <div class="nav-group">
         <div class="nav-group-title">文档中心</div>
         <a href="{{ url_for('documents.document_search') }}" class="nav-item {% if 'document' in request.endpoint %}active{% endif %}">
@@ -86,9 +91,10 @@
           {% if pending_count > 0 %}<span class="nav-badge">{{ pending_count }}</span>{% endif %}
         </a>
       </div>
+      {% endif %}
 
-      <!-- 用户管理（管理员） -->
-      {% if current_user.is_authenticated and current_user.is_admin %}
+      <!-- 用户管理 -->
+      {% if current_user.is_authenticated and current_user.has_menu_permission('user_management') %}
       <div class="nav-group">
         <div class="nav-group-title">用户管理</div>
         <a href="{{ url_for('users.user_list') }}" class="nav-item {% if request.endpoint == 'users.user_list' %}active{% endif %}">
@@ -103,6 +109,13 @@
           <i data-lucide="key"></i>
           <span>密码重置</span>
         </a>
+      </div>
+      {% endif %}
+
+      <!-- 系统设置 -->
+      {% if current_user.is_authenticated and current_user.has_menu_permission('system_settings') %}
+      <div class="nav-group">
+        <div class="nav-group-title">系统设置</div>
         <a href="{{ url_for('settings.system_settings') }}" class="nav-item {% if request.endpoint == 'settings.system_settings' %}active{% endif %}">
           <i data-lucide="settings"></i>
           <span>系统设置</span>
@@ -111,6 +124,7 @@
       {% endif %}
 
       <!-- 提醒中心 -->
+      {% if current_user.is_authenticated and current_user.has_menu_permission('reminder_center') %}
       <div class="nav-group">
         <div class="nav-group-title">提醒中心</div>
         <a href="{{ url_for('dashboard.reminders') }}" class="nav-item {% if request.endpoint == 'dashboard.reminders' %}active{% endif %}">
@@ -118,14 +132,17 @@
           <span>校准提醒</span>
         </a>
       </div>
+      {% endif %}
     </nav>
 
+    {% if current_user.is_authenticated and current_user.has_menu_permission('dashboard') %}
     <div class="sidebar-footer">
       <a href="{{ url_for('dashboard.user_stories') }}" class="nav-item {% if request.endpoint == 'dashboard.user_stories' %}active{% endif %}">
         <i data-lucide="map"></i>
         <span>用户故事</span>
       </a>
     </div>
+    {% endif %}
   </aside>
 
   <!-- 主内容区 -->
@@ -154,8 +171,8 @@
       </div>
 
       <div class="topbar-right">
-        {# 密码重置请求提醒 - 仅对管理员显示 #}
-        {% if current_user.is_authenticated and current_user.is_admin %}
+        {# 密码重置请求提醒 - 对管理类角色显示 #}
+        {% if current_user.is_authenticated and current_user.role in ['admin', 'qa_manager', 'production_supervisor'] %}
         <a href="{{ url_for('password.admin_password_resets') }}" class="topbar-icon-btn" aria-label="密码重置请求" title="密码重置请求 ({{ password_reset_count if password_reset_count else 0 }})">
           <i data-lucide="key"></i>
           {% if password_reset_count and password_reset_count > 0 %}

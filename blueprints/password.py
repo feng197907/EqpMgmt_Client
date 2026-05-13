@@ -4,8 +4,12 @@ from flask_login import current_user
 from werkzeug.security import generate_password_hash
 
 from database import get_db
+from utils.decorators import admin_required
 
 password_bp = Blueprint("password", __name__)
+
+# 管理类角色列表
+MANAGEMENT_ROLES = {"admin", "qa_manager", "production_supervisor"}
 
 
 @password_bp.route("/forgot-password", methods=["GET", "POST"])
@@ -65,10 +69,11 @@ def forgot_password():
 
 
 @password_bp.route("/admin/password-resets", methods=["GET"])
+@admin_required
 def admin_password_resets():
-    """管理员查看密码重置请求列表"""
-    if not current_user.is_authenticated or not current_user.is_admin:
-        flash("需要管理员权限", "danger")
+    """管理类角色查看密码重置请求列表"""
+    if not current_user.is_authenticated or current_user.role not in MANAGEMENT_ROLES:
+        flash("需要管理类角色权限", "danger")
         return redirect(url_for("auth.login"))
 
     conn = get_db()
@@ -104,10 +109,11 @@ def admin_password_resets():
 
 
 @password_bp.route("/admin/password-resets/<int:request_id>/reset", methods=["POST"])
+@admin_required
 def admin_reset_password(request_id):
-    """管理员执行密码重置 - 为用户设置新密码"""
-    if not current_user.is_authenticated or not current_user.is_admin:
-        flash("需要管理员权限", "danger")
+    """管理类角色执行密码重置 - 为用户设置新密码"""
+    if not current_user.is_authenticated or current_user.role not in MANAGEMENT_ROLES:
+        flash("需要管理类角色权限", "danger")
         return redirect(url_for("auth.login"))
 
     new_password = request.form.get("new_password", "").strip()

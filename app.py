@@ -6,6 +6,8 @@ from flask import Flask
 from config import (
     DOC_STATUS_LABELS,
     DEVICE_STATUS_LABELS,
+    MENU_PERMISSIONS,
+    ROLE_GROUPS,
     SECRET_KEY,
     UPLOAD_FOLDER,
 )
@@ -93,17 +95,20 @@ def create_app():
         except Exception:
             pass
 
-        # 查询待处理的密码重置请求数量（仅管理员可见）
+        # 查询待处理的密码重置请求数量（管理类角色可见）
         password_reset_count = 0
         try:
             from flask_login import current_user
-            if current_user.is_authenticated and current_user.is_admin:
-                conn2 = get_db()
-                cur2 = conn2.cursor()
-                cur2.execute("SELECT COUNT(*) as total FROM password_reset_requests WHERE status = 'pending'")
-                result2 = cur2.fetchone()
-                password_reset_count = result2["total"] if result2 else 0
-                conn2.close()
+            if current_user.is_authenticated:
+                # 检查用户角色是否在管理类中
+                management_roles = ROLE_GROUPS.get("管理类", [])
+                if current_user.role in management_roles:
+                    conn2 = get_db()
+                    cur2 = conn2.cursor()
+                    cur2.execute("SELECT COUNT(*) as total FROM password_reset_requests WHERE status = 'pending'")
+                    result2 = cur2.fetchone()
+                    password_reset_count = result2["total"] if result2 else 0
+                    conn2.close()
         except Exception:
             pass
 
@@ -114,6 +119,7 @@ def create_app():
             password_reset_count=password_reset_count,
             doc_status_labels=DOC_STATUS_LABELS,
             device_status_labels=DEVICE_STATUS_LABELS,
+            MENU_PERMISSIONS=MENU_PERMISSIONS,
         )
 
     return app

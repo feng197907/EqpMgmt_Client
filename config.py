@@ -1,7 +1,79 @@
 # DMS 设备管理系统配置
 # 纯数据配置，不含 Flask API，可在任何时候导入
 
+import json
 import os
+
+# ============================================================
+# 菜单权限系统
+# ============================================================
+
+# 菜单权限定义（按一级导航菜单分配）
+MENU_PERMISSIONS = {
+    "dashboard": {
+        "key": "dashboard",
+        "label": "数据看板",
+        "icon": "layout-dashboard",
+        "description": "设备看板、文档检索、借阅记录",
+    },
+    "device_management": {
+        "key": "device_management",
+        "label": "设备管理",
+        "icon": "settings",
+        "description": "设备列表、新增设备、设备变更",
+    },
+    "document_center": {
+        "key": "document_center",
+        "label": "文档中心",
+        "icon": "file-text",
+        "description": "全部文档、待审批",
+    },
+    "user_management": {
+        "key": "user_management",
+        "label": "用户管理",
+        "icon": "users",
+        "description": "用户列表、审计日志、密码重置",
+    },
+    "system_settings": {
+        "key": "system_settings",
+        "label": "系统设置",
+        "icon": "settings-2",
+        "description": "系统配置",
+    },
+    "reminder_center": {
+        "key": "reminder_center",
+        "label": "提醒中心",
+        "icon": "bell",
+        "description": "用户故事、提醒通知",
+    },
+}
+
+# 默认权限（所有用户默认拥有的权限）
+DEFAULT_MENU_PERMISSIONS = ["dashboard", "device_management", "document_center", "reminder_center"]
+
+# 管理员默认拥有所有权限
+ADMIN_MENU_PERMISSIONS = list(MENU_PERMISSIONS.keys())
+
+
+def parse_permissions(permissions_str):
+    """解析权限字符串为列表"""
+    if not permissions_str:
+        return []
+    try:
+        perms = json.loads(permissions_str)
+        if isinstance(perms, list):
+            return perms
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return []
+
+
+def serialize_permissions(permissions_list):
+    """将权限列表序列化为字符串"""
+    if not permissions_list:
+        return '[]'
+    return json.dumps(permissions_list)
+
 
 # ============================================================
 # 角色权限系统

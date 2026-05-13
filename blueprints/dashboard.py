@@ -12,6 +12,13 @@ from utils.maintenance import build_due_maintenance_reminders
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
+@dashboard_bp.route("/")
+@login_required
+def home():
+    """默认首页，跳转到设备看板"""
+    return redirect(url_for("dashboard.dashboard"))
+
+
 @dashboard_bp.route("/dashboard")
 @login_required
 def dashboard():

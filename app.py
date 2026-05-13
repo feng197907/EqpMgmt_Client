@@ -3,8 +3,13 @@ import os
 
 from flask import Flask
 
-from database import get_db
-
+from config import (
+    DOC_STATUS_LABELS,
+    DEVICE_STATUS_LABELS,
+    SECRET_KEY,
+    UPLOAD_FOLDER,
+)
+from database import get_db, init_db
 from blueprints import (
     approvals_bp,
     auth_bp,
@@ -14,10 +19,9 @@ from blueprints import (
     devices_bp,
     documents_bp,
     maintenance_bp,
+    search_bp,
     users_bp,
 )
-from config import SECRET_KEY, UPLOAD_FOLDER
-from database import init_db
 from extensions import login_manager
 from models.user import load_user
 
@@ -48,6 +52,7 @@ def create_app():
     app.register_blueprint(users_bp)  # /users
     app.register_blueprint(dashboard_bp)  # dashboard, reminders, add_device 等
     app.register_blueprint(maintenance_bp)  # 维护计划相关路由
+    app.register_blueprint(search_bp)  # 全局搜索
 
     # 确保上传目录存在
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -55,10 +60,10 @@ def create_app():
     # 初始化数据库
     init_db()
 
-    # 全局上下文处理器 - 注入待审批数量
+    # 全局上下文处理器 - 注入变量到所有模板
     @app.context_processor
-    def inject_pending_count():
-        """向所有模板注入待审批数量"""
+    def inject_global_vars():
+        """向所有模板注入全局变量"""
         try:
             conn = get_db()
             cur = conn.cursor()
@@ -68,7 +73,11 @@ def create_app():
             conn.close()
         except Exception:
             pending_count = 0
-        return dict(pending_count=pending_count)
+        return dict(
+            pending_count=pending_count,
+            doc_status_labels=DOC_STATUS_LABELS,
+            device_status_labels=DEVICE_STATUS_LABELS,
+        )
 
     return app
 

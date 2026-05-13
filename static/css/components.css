@@ -225,6 +225,28 @@
   background: var(--color-gray-500);
 }
 
+/* 搜索结果类型徽章 */
+.status-badge.device {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.status-badge.document {
+  color: var(--color-success);
+  background: var(--color-success-light);
+}
+
+.status-badge.borrow {
+  color: var(--color-warning);
+  background: var(--color-warning-light);
+}
+
+.status-badge.device::before,
+.status-badge.document::before,
+.status-badge.borrow::before {
+  display: none;
+}
+
 /* ==================== 按钮 ==================== */
 .btn {
   display: inline-flex;

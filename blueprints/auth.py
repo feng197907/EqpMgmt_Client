@@ -15,6 +15,7 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        next_page = request.form.get("next", "").strip()
         conn = get_db()
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username = ?", (username,))
@@ -28,9 +29,11 @@ def login():
             user = User(row["id"], row["username"], row["role"], row["password"])
             login_user(user)
             log_action(user.username, "login", "user", user.id, "用户登录")
-            return redirect(url_for("auth.index"))
+            if next_page and next_page.startswith("/"):
+                return redirect(next_page)
+            return redirect(url_for("dashboard.dashboard"))
         flash("用户名或密码错误。", "danger")
-    return render_template("login.html")
+    return render_template("login.html", next=request.args.get("next", ""))
 
 
 @auth_bp.route("/logout")
@@ -42,7 +45,7 @@ def logout():
     return redirect(url_for("auth.login"))
 
 
-@auth_bp.route("/")
+@auth_bp.route("/devices")
 @login_required
 def index():
     """设备列表首页"""

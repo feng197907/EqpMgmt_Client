@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-container">
+  <!-- 页面标题 -->
+  <div class="page-hero">
+    <div>
+      <h1 class="page-hero-title">
+        <i data-lucide="search"></i>
+        搜索结果
+      </h1>
+      <p class="page-hero-subtitle">
+        {% if query %}
+          关键词 "<strong>{{ query }}</strong>" 的搜索结果 (共 {{ total }} 条)
+        {% else %}
+          请输入搜索关键词
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- 搜索表单 -->
+  <div class="search-card">
+    <div class="search-card-body">
+      <form method="get" action="{{ url_for('search.search_results') }}" class="search-row">
+        <div class="form-group mb-0" style="flex: 1;">
+          <input type="text" name="q" value="{{ query }}" class="form-control" placeholder="搜索设备、文档、借阅记录..." autofocus>
+        </div>
+        <div class="form-group mb-0 d-flex align-items-end gap-2">
+          <button class="btn btn-primary" type="submit">
+            <i data-lucide="search"></i>
+            搜索
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 筛选标签 -->
+  {% if query %}
+  <div class="filter-tags">
+    <a href="{{ url_for('search.search_results', q=query) }}" class="filter-tag {% if not filter_type %}active{% endif %}">
+      <i data-lucide="layers"></i>
+      <span>全部 ({{ total }})</span>
+    </a>
+    <a href="{{ url_for('search.search_results', q=query, type='device') }}" class="filter-tag {% if filter_type == 'device' %}active{% endif %}">
+      <i data-lucide="cpu"></i>
+      <span>设备</span>
+    </a>
+    <a href="{{ url_for('search.search_results', q=query, type='document') }}" class="filter-tag {% if filter_type == 'document' %}active{% endif %}">
+      <i data-lucide="file-text"></i>
+      <span>文档</span>
+    </a>
+    <a href="{{ url_for('search.search_results', q=query, type='borrow') }}" class="filter-tag {% if filter_type == 'borrow' %}active{% endif %}">
+      <i data-lucide="bookmark"></i>
+      <span>借阅</span>
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- 搜索结果列表 -->
+  {% if results %}
+  <div class="data-table-card">
+    <div class="data-table-header">
+      <h3 class="data-table-title">
+        <i data-lucide="list"></i>
+        搜索结果
+      </h3>
+      <span class="data-table-count">{{ total }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>类型</th>
+            <th>名称</th>
+            <th>编码/版本</th>
+            <th>描述</th>
+            <th>状态</th>
+            <th>日期</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in results %}
+          <tr>
+            <td>
+              <span class="status-badge {{ item.type }}">
+                <i data-lucide="{{ item.icon }}"></i>
+                {{ item.type_label }}
+              </span>
+            </td>
+            <td class="table-cell-primary">{{ item.title }}</td>
+            <td class="table-cell-mono">{{ item.code }}</td>
+            <td class="table-cell-secondary">{{ item.description }}</td>
+            <td>
+              <span class="status-pill {{ item.status }}">
+                {% if item.type == 'document' %}
+                  {% if item.status == 'draft' %}起草
+                  {% elif item.status == 'pending' %}审批中
+                  {% elif item.status == 'active' %}生效
+                  {% elif item.status == 'changing' %}变更中
+                  {% elif item.status == 'archived' %}归档
+                  {% elif item.status == 'deprecated' %}作废
+                  {% else %}{{ item.status }}
+                  {% endif %}
+                {% elif item.type == 'device' %}
+                  {% if item.status == 'active' %}运行
+                  {% elif item.status == 'maintenance' %}维护
+                  {% elif item.status == 'inactive' %}停用
+                  {% elif item.status == 'retired' %}报废
+                  {% elif item.status == 'debug' %}调试
+                  {% elif item.status == 'standby' %}待机
+                  {% elif item.status == 'repair' %}维修
+                  {% else %}{{ item.status }}
+                  {% endif %}
+                {% elif item.type == 'borrow' %}
+                  {% if item.status == 'pending' %}待审批
+                  {% elif item.status == 'approved' %}已批准
+                  {% elif item.status == 'rejected' %}已拒绝
+                  {% elif item.status == 'returned' %}已归还
+                  {% elif item.status == 'overdue' %}已逾期
+                  {% else %}{{ item.status }}
+                  {% endif %}
+                {% else %}
+                  {{ item.status }}
+                {% endif %}
+              </span>
+            </td>
+            <td class="table-cell-secondary">{{ item.date or '-' }}</td>
+            <td>
+              <a href="{{ item.url }}" class="btn btn-sm btn-primary">
+                <i data-lucide="arrow-right"></i>
+                查看
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% elif query %}
+  <!-- 空状态 -->
+  <div class="empty-state-box">
+    <div class="empty-state-icon">
+      <i data-lucide="search-x"></i>
+    </div>
+    <h3 class="empty-state-title">未找到结果</h3>
+    <p class="empty-state-desc">
+      没有找到与 "<strong>{{ query }}</strong>" 相关的内容<br>
+      请尝试其他关键词
+    </p>
+    <div class="empty-state-action">
+      <a href="{{ url_for('dashboard.dashboard') }}" class="btn btn-primary">
+        <i data-lucide="layout-dashboard"></i>
+        返回看板
+      </a>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

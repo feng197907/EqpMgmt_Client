@@ -129,7 +129,16 @@
                 <td>{{ row.device_code }}</td>
                 <td>{{ row.doc_name }} v{{ row.version }}</td>
                 <td>{{ row.borrower }}</td>
-                <td>{{ row.status }}</td>
+                <td>
+                  {% if row.status == 'pending' %}待审批
+                  {% elif row.status == 'approved' %}已批准
+                  {% elif row.status == 'rejected' %}已拒绝
+                  {% elif row.status == 'returned' %}已归还
+                  {% elif row.status == 'borrowed' %}借出中
+                  {% elif row.status == 'overdue' %}已逾期
+                  {% else %}{{ row.status }}
+                  {% endif %}
+                </td>
               </tr>
               {% else %}
               <tr><td colspan="4" class="text-center text-muted py-3">暂无借阅</td></tr>

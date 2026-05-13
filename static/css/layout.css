@@ -301,6 +301,7 @@
   border: 1px solid transparent;
   border-radius: var(--border-radius-lg);
   transition: all var(--transition-fast);
+  cursor: text;
 }
 
 .global-search:focus-within {
@@ -314,6 +315,7 @@
   height: 18px;
   color: var(--text-muted);
   margin-right: 0.75rem;
+  flex-shrink: 0;
 }
 
 .global-search .search-input {
@@ -323,6 +325,7 @@
   font-size: var(--text-sm);
   color: var(--text-primary);
   outline: none;
+  min-width: 0;
 }
 
 .global-search .search-input::placeholder {
@@ -337,6 +340,104 @@
   background: #fff;
   border: 1px solid var(--border-color);
   border-radius: 4px;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+}
+
+/* 搜索下拉框 */
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown, 1000);
+  max-height: 480px;
+  overflow-y: auto;
+  display: none;
+}
+
+.search-dropdown-group {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.search-dropdown-group:last-of-type {
+  border-bottom: none;
+}
+
+.search-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.search-dropdown-header svg {
+  width: 14px;
+  height: 14px;
+}
+
+.search-dropdown-item {
+  display: block;
+  padding: 0.625rem 1rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: background var(--transition-fast);
+}
+
+.search-dropdown-item:hover {
+  background: var(--color-gray-50);
+  text-decoration: none;
+}
+
+.search-dropdown-title {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-dropdown-subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.search-dropdown-footer {
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-color);
+  text-align: center;
+}
+
+.search-dropdown-footer a {
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.search-dropdown-footer a:hover {
+  text-decoration: underline;
+}
+
+.search-dropdown-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
 }
 
 /* 顶部栏右侧 */

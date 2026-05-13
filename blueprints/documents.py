@@ -43,14 +43,21 @@ def upload_doc(device_id):
             flash("文件类型不允许。", "danger")
             return redirect(url_for("documents.upload_doc", device_id=device_id))
         version = get_next_version(conn, device_id, doc_type)
-        original_name = secure_filename(file.filename)
+        original_name = file.filename
+        # 清理文件名中的危险字符，但保留中文等非ASCII字符
+        safe_name = original_name.replace("..", ".").replace("/", "_").replace("\\", "_")
         device_dir = ensure_upload_dir(device_id)
-        stored_name = f"{doc_type}_{version}_{original_name}"
+        # 存储文件名使用安全的ASCII版本（用于文件系统）
+        stored_name = secure_filename(f"{doc_type}_{version}_{safe_name}")
+        if not stored_name or stored_name == f"{doc_type}_{version}_":
+            # 如果secure_filename去掉了所有字符，使用原始扩展名
+            ext = safe_name.rsplit(".", 1)[-1] if "." in safe_name else "file"
+            stored_name = f"{doc_type}_{version}_document.{ext}"
         file_path = os.path.join(device_dir, stored_name)
         file.save(file_path)
         cur.execute(
             "INSERT INTO documents (device_id, doc_type, doc_name, version, file_path, uploaded_by, remarks, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (device_id, doc_type, original_name, version, file_path, current_user.username, remarks, "draft"),
+            (device_id, doc_type, safe_name, version, file_path, current_user.username, remarks, "draft"),
         )
         conn.commit()
         doc_id = cur.lastrowid

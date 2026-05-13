@@ -48,6 +48,9 @@
         {% endwith %}
 
         <form method="post" action="{{ url_for('auth.login') }}">
+          {% if next %}
+          <input type="hidden" name="next" value="{{ next }}">
+          {% endif %}
           <div class="form-group">
             <label class="form-label required" for="username">用户名</label>
             <input class="form-control" type="text" id="username" name="username" placeholder="请输入用户名" required autofocus>

@@ -252,6 +252,23 @@
   height: 16px;
 }
 
+/* 按钮内的span文字颜色 */
+.btn span {
+  color: inherit !important;
+}
+
+.btn i,
+.btn svg {
+  color: inherit !important;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
 .btn-sm {
   padding: 0.375rem 0.75rem;
   font-size: var(--text-xs);
@@ -264,17 +281,26 @@
 
 .btn-primary {
   background: var(--color-primary);
-  color: #fff;
+  color: #fff !important;
+}
+
+.btn-primary span {
+  color: inherit !important;
 }
 
 .btn-primary:hover {
   background: var(--color-primary-hover);
+  color: #fff !important;
 }
 
 .btn-secondary {
   background: #fff;
   border-color: var(--border-color);
   color: var(--text-primary);
+}
+
+.btn-secondary span {
+  color: inherit !important;
 }
 
 .btn-secondary:hover {
@@ -284,29 +310,44 @@
 
 .btn-success {
   background: var(--color-success);
-  color: #fff;
+  color: #fff !important;
+}
+
+.btn-success span {
+  color: inherit !important;
 }
 
 .btn-success:hover {
   background: #059669;
+  color: #fff !important;
 }
 
 .btn-danger {
   background: var(--color-danger);
-  color: #fff;
+  color: #fff !important;
+}
+
+.btn-danger span {
+  color: inherit !important;
 }
 
 .btn-danger:hover {
   background: #DC2626;
+  color: #fff !important;
 }
 
 .btn-warning {
   background: var(--color-warning);
-  color: #fff;
+  color: #fff !important;
+}
+
+.btn-warning span {
+  color: inherit !important;
 }
 
 .btn-warning:hover {
   background: #D97706;
+  color: #fff !important;
 }
 
 .btn-outline-primary {
@@ -315,26 +356,59 @@
   color: var(--color-primary);
 }
 
+.btn-outline-primary span {
+  color: inherit !important;
+}
+
 .btn-outline-primary:hover {
   background: var(--color-primary);
-  color: #fff;
+  color: #fff !important;
 }
 
 .btn-outline-secondary {
   background: transparent;
   border-color: var(--border-color);
-  color: var(--text-secondary);
+  color: var(--text-secondary) !important;
+}
+
+.btn-outline-secondary span {
+  color: inherit !important;
 }
 
 .btn-outline-secondary:hover {
   background: var(--color-gray-50);
   border-color: var(--color-gray-300);
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
+}
+
+.btn-outline-light {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff !important;
+}
+
+.btn-outline-light span {
+  color: inherit !important;
+}
+
+.btn-outline-light i,
+.btn-outline-light svg {
+  color: inherit !important;
+}
+
+.btn-outline-light:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #fff !important;
 }
 
 .btn-ghost {
   background: transparent;
   color: var(--text-secondary);
+}
+
+.btn-ghost span {
+  color: inherit !important;
 }
 
 .btn-ghost:hover {
@@ -510,6 +584,72 @@ textarea.form-control {
   align-items: center;
   gap: 0.5rem;
   margin-left: auto;
+}
+
+.filter-bar-actions .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.filter-bar-actions .btn-primary {
+  background: var(--color-primary);
+  color: #fff !important;
+}
+
+.filter-bar-actions .btn-primary span,
+.filter-bar-actions .btn-primary i,
+.filter-bar-actions .btn-primary svg {
+  color: inherit !important;
+}
+
+.filter-bar-actions .btn-secondary {
+  background: #fff;
+  border-color: var(--border-color);
+  color: var(--text-primary) !important;
+}
+
+.filter-bar-actions .btn-secondary span,
+.filter-bar-actions .btn-secondary i,
+.filter-bar-actions .btn-secondary svg {
+  color: inherit !important;
+}
+
+.filter-bar-actions .btn-secondary:hover {
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-300);
+  color: var(--text-primary) !important;
+}
+
+.filter-bar-actions .btn-primary:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: #fff !important;
+}
+
+.filter-bar-actions .btn-primary:hover span,
+.filter-bar-actions .btn-primary:hover i,
+.filter-bar-actions .btn-primary:hover svg {
+  color: inherit !important;
+}
+
+.filter-bar-actions .btn-secondary:hover,
+.filter-bar-actions .btn-outline-secondary:hover {
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-300);
+  color: var(--text-primary) !important;
+}
+
+.filter-bar-actions .btn-secondary:hover span,
+.filter-bar-actions .btn-secondary:hover i,
+.filter-bar-actions .btn-secondary:hover svg,
+.filter-bar-actions .btn-outline-secondary:hover span,
+.filter-bar-actions .btn-outline-secondary:hover i,
+.filter-bar-actions .btn-outline-secondary:hover svg {
+  color: inherit !important;
 }
 
 /* ==================== 自定义模态框 ==================== */

@@ -7,6 +7,7 @@ from config import (
     ALLOWED_EXTENSIONS,
     APPROVAL_STEPS,
     CRITICAL_DEVICE_STATUSES,
+    DEVICE_STATUS_LABELS,
     DOC_STATUS_LABELS,
     DOC_TYPE_LABELS,
     DOC_TYPES,
@@ -44,6 +45,7 @@ def device_detail(device_id):
         doc_types=DOC_TYPES,
         doc_type_labels=DOC_TYPE_LABELS,
         doc_status_labels=DOC_STATUS_LABELS,
+        device_status_labels=DEVICE_STATUS_LABELS,
     )
 
 

@@ -1,30 +1,201 @@
 {% extends 'base.html' %}
 {% block content %}
-{# 上传文档表单：选择类型、文件与备注 #}
-<h3 class="mb-3">上传文档 - {{ device.device_name }}</h3>
-<form class="card shadow-sm p-4" method="post" enctype="multipart/form-data">
-  <div class="row g-3">
-    <div class="col-md-6">
-      <label class="form-label">文档类型</label>
-      <select class="form-select" name="doc_type" required>
-        {# 文档类型下拉选项 #}
-        {% for value, label in doc_types %}
-        <option value="{{ value }}">{{ label }}</option>
-        {% endfor %}
-      </select>
+
+{# 文档上传页 - 现代化设计 #}
+<div class="upload-page">
+  {# 页面头部 #}
+  <div class="page-header">
+    <div class="header-content">
+      <a href="{{ url_for('devices.device_detail', device_id=device.id) }}" class="back-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+        返回设备详情
+      </a>
+      <h1 class="page-title">上传文档</h1>
+      <p class="page-subtitle">为 {{ device.device_name }} 添加新文档</p>
     </div>
-    <div class="col-md-6">
-      <label class="form-label">文件</label>
-      <input class="form-control" type="file" name="file" required>
-    </div>
-    <div class="col-12">
-      <label class="form-label">备注</label>
-      <textarea class="form-control" name="remarks" rows="3"></textarea>
+    <div class="device-info-badge">
+      <div class="device-info-item">
+        <span class="info-label">设备编号</span>
+        <span class="info-value">{{ device.device_code }}</span>
+      </div>
+      {% if device.model %}
+      <div class="device-info-item">
+        <span class="info-label">设备型号</span>
+        <span class="info-value">{{ device.model }}</span>
+      </div>
+      {% endif %}
     </div>
   </div>
-  <div class="mt-4">
-    <button class="btn btn-primary" type="submit">上传</button>
-    <a class="btn btn-outline-secondary" href="{{ url_for('devices.device_detail', device_id=device.id) }}">返回</a>
-  </div>
-</form>
+
+  {# 上传表单 #}
+  <form class="upload-form" method="post" enctype="multipart/form-data" id="uploadForm">
+    <div class="form-grid">
+      {# 左侧：上传区域 #}
+      <div class="form-section upload-section">
+        <h2 class="section-title">选择文件</h2>
+
+        {# 拖拽上传区域 #}
+        <div class="dropzone" id="dropzone">
+          <input type="file" name="file" id="fileInput" class="file-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png" required>
+          <div class="dropzone-content">
+            <div class="dropzone-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            </div>
+            <p class="dropzone-text">拖拽文件到此处，或<span class="highlight">点击选择</span></p>
+            <p class="dropzone-hint">支持 PDF、Word、Excel、PPT、图片等格式</p>
+          </div>
+
+          {# 文件预览 #}
+          <div class="file-preview" id="filePreview" style="display: none;">
+            <div class="file-icon" id="fileIcon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+            </div>
+            <div class="file-details">
+              <span class="file-name" id="fileName"></span>
+              <span class="file-size" id="fileSize"></span>
+            </div>
+            <button type="button" class="remove-file" id="removeFile" title="移除文件">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="upload-tips">
+          <div class="tip">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            最大支持 50MB
+          </div>
+          <div class="tip">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            文件将自动计算哈希值用于版本追踪
+          </div>
+        </div>
+      </div>
+
+      {# 右侧：表单信息 #}
+      <div class="form-section info-section">
+        <h2 class="section-title">文档信息</h2>
+
+        <div class="form-group">
+          <label class="form-label">
+            文档类型
+            <span class="required">*</span>
+          </label>
+          <div class="doc-type-grid" id="docTypeGrid">
+            {% for value, label in doc_types %}
+            <label class="doc-type-option {% if loop.first %}selected{% endif %}">
+              <input type="radio" name="doc_type" value="{{ value }}" {% if loop.first %}checked{% endif %} required>
+              <div class="type-icon doc-type-{{ value }}">
+                {% if value == 'manual' %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                {% elif value == 'certificate' %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+                {% elif value == 'calibration' %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                {% elif value == 'maintenance' %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                {% else %}
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+                {% endif %}
+              </div>
+              <span class="type-label">{{ label }}</span>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="remarks">备注说明</label>
+          <textarea class="form-textarea" name="remarks" id="remarks" rows="4" placeholder="可选：添加文档描述、版本信息或备注..."></textarea>
+          <span class="form-hint">提供更多信息有助于文档管理和检索</span>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-upload-submit" id="submitBtn">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            上传文档
+          </button>
+          <a href="{{ url_for('devices.device_detail', device_id=device.id) }}" class="btn btn-secondary">取消</a>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+// 拖拽上传功能
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const filePreview = document.getElementById('filePreview');
+const fileName = document.getElementById('fileName');
+const fileSize = document.getElementById('fileSize');
+const removeFile = document.getElementById('removeFile');
+
+// 拖拽效果
+['dragenter', 'dragover'].forEach(eventName => {
+  dropzone.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  dropzone.addEventListener(eventName, (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+  });
+});
+
+// 文件选择
+fileInput.addEventListener('change', handleFileSelect);
+dropzone.addEventListener('drop', (e) => {
+  const files = e.dataTransfer.files;
+  if (files.length > 0) {
+    fileInput.files = files;
+    handleFileSelect();
+  }
+});
+
+function handleFileSelect() {
+  const file = fileInput.files[0];
+  if (file) {
+    dropzone.classList.add('has-file');
+    dropzone.querySelector('.dropzone-content').style.display = 'none';
+    filePreview.style.display = 'flex';
+    fileName.textContent = file.name;
+    fileSize.textContent = formatFileSize(file.size);
+  }
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+removeFile.addEventListener('click', (e) => {
+  e.stopPropagation();
+  fileInput.value = '';
+  dropzone.classList.remove('has-file');
+  dropzone.querySelector('.dropzone-content').style.display = 'block';
+  filePreview.style.display = 'none';
+});
+
+// 文档类型选择
+document.querySelectorAll('.doc-type-option').forEach(option => {
+  option.addEventListener('click', () => {
+    document.querySelectorAll('.doc-type-option').forEach(o => o.classList.remove('selected'));
+    option.classList.add('selected');
+    option.querySelector('input').checked = true;
+  });
+});
+
+// 表单提交
+document.getElementById('uploadForm').addEventListener('submit', function() {
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.innerHTML = '<svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></path></svg> 上传中...';
+});
+</script>
+
 {% endblock %}

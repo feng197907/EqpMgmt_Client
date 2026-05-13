@@ -1,78 +1,301 @@
 {% extends 'base.html' %}
 {% block content %}
-{# 设备列表页头与快捷入口 #}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">设备列表</h3>
-  <a class="btn btn-success" href="{{ url_for('dashboard.add_device') }}">新增设备</a>
-</div>
+{# 设备列表页 - 增强版 #}
+<div class="page-container">
 
-{# 搜索与管理员筛选（显示停用设备） #}
-<form class="row g-2 mb-3" method="get">
-  <div class="col-md-6">
-    <input class="form-control" name="q" value="{{ query }}" placeholder="搜索设备编码/名称/型号">
-  </div>
-  <div class="col-md-2">
-    <button class="btn btn-outline-primary w-100" type="submit">搜索</button>
-  </div>
-  {% if current_user.is_admin %}
-  <div class="col-md-3 d-flex align-items-center">
-    <div class="form-check">
-      <input class="form-check-input" type="checkbox" name="show_inactive" value="1" id="showInactive" onchange="this.form.submit()"
-        {% if show_inactive %}checked{% endif %}>
-      <label class="form-check-label" for="showInactive">显示停用设备</label>
+  {# 页面标题区 #}
+  <div class="page-hero">
+    <div>
+      <h1 class="page-hero-title">
+        <i data-lucide="cpu"></i>
+        设备列表
+      </h1>
+      <p class="page-hero-subtitle">管理所有设备资产信息</p>
+    </div>
+    <div class="page-hero-actions">
+      <a href="{{ url_for('dashboard.add_device') }}" class="btn btn-success">
+        <i data-lucide="plus"></i>
+        新增设备
+      </a>
     </div>
   </div>
-  {% endif %}
-</form>
 
-<div class="card shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>设备编码</th>
-          <th>设备名称</th>
-          <th>型号</th>
-          <th>位置</th>
-          <th>状态</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        {# 设备列表循环 #}
-        {% for device in devices %}
-        <tr>
-          <td>{{ device.device_code }}</td>
-          <td>{{ device.device_name }}</td>
-          <td>{{ device.model or '-' }}</td>
-          <td>{{ device.location or '-' }}</td>
-          <td>
-            {% if device.status == 'active' %}
-              启用
-            {% else %}
-              停用
-            {% endif %}
-          </td>
-          <td>
-            {# 管理员可切换设备状态 #}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('devices.device_detail', device_id=device.id) }}">查看</a>
-            {% if current_user.is_admin %}
-            <form method="post" action="{{ url_for('devices.toggle_device', device_id=device.id) }}" class="d-inline">
-              {% if show_inactive %}
-              <input type="hidden" name="show_inactive" value="1">
+  {# 搜索与筛选 #}
+  <div class="search-card" id="searchCard">
+    <div class="search-card-header" onclick="toggleSearchCard()">
+      <h3 class="search-card-title">
+        <i data-lucide="search"></i>
+        搜索设备
+      </h3>
+      <span class="search-card-toggle">
+        <span>收起</span>
+        <i data-lucide="chevron-up"></i>
+      </span>
+    </div>
+    <div class="search-card-body">
+      <form method="get" id="searchForm" class="search-row">
+        <div class="form-group mb-0">
+          <label class="form-label">关键词搜索</label>
+          <input class="form-control" name="q" value="{{ query }}" placeholder="设备编码、名称或型号">
+        </div>
+        {% if current_user.is_admin %}
+        <div class="form-group mb-0 d-flex align-items-end">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="show_inactive" value="1" id="showInactive" onchange="this.form.submit()"
+              {% if show_inactive %}checked{% endif %}>
+            <label class="form-check-label" for="showInactive">
+              显示停用设备
+            </label>
+          </div>
+        </div>
+        {% endif %}
+        <div class="form-group mb-0 d-flex align-items-end gap-2">
+          <button class="btn btn-primary" type="submit">
+            <i data-lucide="search"></i>
+            搜索
+          </button>
+          <a href="{{ url_for('auth.index') }}" class="btn btn-outline-secondary">
+            <i data-lucide="rotate-ccw"></i>
+            重置
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# 快捷操作面板 #}
+  <div class="quick-actions-panel">
+    <a href="{{ url_for('dashboard.dashboard') }}" class="quick-action-btn">
+      <i data-lucide="layout-dashboard"></i>
+      <span>设备看板</span>
+    </a>
+    <a href="{{ url_for('documents.document_search') }}" class="quick-action-btn">
+      <i data-lucide="file-text"></i>
+      <span>文档检索</span>
+    </a>
+    <a href="{{ url_for('device_changes.device_changes') }}" class="quick-action-btn">
+      <i data-lucide="git-branch"></i>
+      <span>设备变更</span>
+    </a>
+  </div>
+
+  {# 数据表格 #}
+  <div class="data-table-card">
+    <div class="data-table-header">
+      <h3 class="data-table-title">
+        <i data-lucide="server"></i>
+        设备列表
+        {% if devices %}
+        <span class="data-table-count">{{ devices|length }}</span>
+        {% endif %}
+      </h3>
+      <div class="data-table-actions">
+        <button class="btn btn-sm btn-outline-secondary" onclick="exportDevices()">
+          <i data-lucide="download"></i>
+          导出
+        </button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="data-table" id="devicesTable">
+        <thead>
+          <tr>
+            <th>设备编码</th>
+            <th>设备名称</th>
+            <th>型号</th>
+            <th>位置</th>
+            <th>状态</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for device in devices %}
+          <tr class="{% if device.status != 'active' %}row-inactive{% endif %}">
+            <td class="table-cell-mono">{{ device.device_code }}</td>
+            <td>
+              <div class="table-cell-primary">{{ device.device_name }}</div>
+            </td>
+            <td>
+              {% if device.model %}
+              <span class="model-tag">{{ device.model }}</span>
+              {% else %}
+              <span class="text-muted">-</span>
               {% endif %}
-              <button class="btn btn-sm btn-outline-warning" type="submit">
-                {% if device.status == 'active' %}停用{% else %}启用{% endif %}
-              </button>
-            </form>
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">暂无设备</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+            </td>
+            <td>
+              {% if device.location %}
+              <span class="location-tag">
+                <i data-lucide="map-pin"></i>
+                {{ device.location }}
+              </span>
+              {% else %}
+              <span class="text-muted">-</span>
+              {% endif %}
+            </td>
+            <td>
+              <span class="status-pill {{ device.status }}">
+                {% if device.status == 'active' %}启用{% else %}停用{% endif %}
+              </span>
+            </td>
+            <td>
+              <div class="table-actions">
+                <a href="{{ url_for('devices.device_detail', device_id=device.id) }}" 
+                   class="table-action-btn primary" title="查看详情">
+                  <i data-lucide="eye"></i>
+                </a>
+                <a href="{{ url_for('devices.device_detail', device_id=device.id) }}?tab=documents" 
+                   class="table-action-btn" title="查看文档">
+                  <i data-lucide="file-text"></i>
+                </a>
+                {% if current_user.is_admin %}
+                <form method="post" action="{{ url_for('devices.toggle_device', device_id=device.id) }}" class="inline-form" onsubmit="return confirm('确定要{{ '启用' if device.status != 'active' else '停用' }}此设备吗？')">
+                  {% if show_inactive %}
+                  <input type="hidden" name="show_inactive" value="1">
+                  {% endif %}
+                  <button class="table-action-btn {% if device.status == 'active' %}warning{% else %}success{% endif %}" 
+                          type="submit" title="{{ '启用' if device.status != 'active' else '停用' }}">
+                    <i data-lucide="{{ 'play' if device.status != 'active' else 'pause' }}"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6">
+              <div class="empty-state-box">
+                <div class="empty-state-icon">
+                  <i data-lucide="server"></i>
+                </div>
+                <h4 class="empty-state-title">暂无设备</h4>
+                <p class="empty-state-desc">
+                  {% if query %}
+                  没有找到符合条件的设备
+                  {% else %}
+                  还没有添加任何设备到系统中
+                  {% endif %}
+                </p>
+                <div class="empty-state-action">
+                  <a href="{{ url_for('dashboard.add_device') }}" class="btn btn-success">
+                    <i data-lucide="plus"></i>
+                    添加第一个设备
+                  </a>
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
+
+<style>
+  .row-inactive {
+    opacity: 0.65;
+  }
+  
+  .row-inactive:hover {
+    opacity: 0.85;
+  }
+  
+  .model-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    font-size: 12px;
+    background: var(--color-gray-100);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+  }
+  
+  .location-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  
+  .location-tag svg {
+    width: 14px;
+    height: 14px;
+  }
+  
+  .inline-form {
+    display: inline-flex;
+  }
+  
+  .table-action-btn.warning {
+    color: var(--color-warning);
+  }
+  
+  .table-action-btn.warning:hover {
+    background: var(--color-warning-light);
+    border-color: var(--color-warning);
+  }
+  
+  .table-action-btn.success {
+    color: var(--color-success);
+  }
+  
+  .table-action-btn.success:hover {
+    background: var(--color-success-light);
+    border-color: var(--color-success);
+  }
+</style>
+
+<script>
+// 折叠/展开搜索卡片
+function toggleSearchCard() {
+  const card = document.getElementById('searchCard');
+  card.classList.toggle('collapsed');
+}
+
+// 导出设备列表
+function exportDevices() {
+  const table = document.getElementById('devicesTable');
+  const rows = table.querySelectorAll('tbody tr');
+  
+  if (rows.length === 0 || (rows.length === 1 && rows[0].querySelector('.empty-state-box'))) {
+    alert('没有可导出的数据');
+    return;
+  }
+  
+  let csv = '\uFEFF';
+  const headers = ['设备编码', '设备名称', '型号', '位置', '状态'];
+  csv += headers.join(',') + '\n';
+  
+  rows.forEach(row => {
+    if (!row.querySelector('.empty-state-box')) {
+      const cells = row.querySelectorAll('td');
+      const rowData = [
+        cells[0].textContent.trim(),
+        cells[1].textContent.trim(),
+        cells[2].textContent.trim(),
+        cells[3].textContent.trim(),
+        cells[4].textContent.trim()
+      ].map(text => {
+        text = text.replace(/"/g, '""');
+        return '"' + text + '"';
+      });
+      csv += rowData.join(',') + '\n';
+    }
+  });
+  
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'devices_' + new Date().toISOString().slice(0,10) + '.csv';
+  link.click();
+}
+
+// 重新初始化图标
+if (typeof lucide !== 'undefined') {
+  lucide.createIcons();
+}
+</script>
 {% endblock %}

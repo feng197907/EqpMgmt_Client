@@ -1,96 +1,274 @@
 {% extends 'base.html' %}
 {% block content %}
-{# 文档检索页 #}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-  <h3 class="mb-0">文档检索</h3>
-</div>
+{# 文档检索页 - 增强版 #}
+<div class="page-container">
 
-<form class="card shadow-sm p-3 mb-3" method="get">
-  <div class="row g-3">
-    <div class="col-md-4">
-      <label class="form-label">文档名称</label>
-      <input class="form-control" name="q" value="{{ query }}" placeholder="按文档名模糊搜索">
+  {# 页面标题区 #}
+  <div class="page-hero">
+    <div>
+      <h1 class="page-hero-title">
+        <i data-lucide="file-search"></i>
+        文档检索
+      </h1>
+      <p class="page-hero-subtitle">快速查找和管理设备相关文档</p>
     </div>
-    <div class="col-md-4">
-      <label class="form-label">设备</label>
-      <input class="form-control" name="device" value="{{ device_query }}" placeholder="设备编码或名称">
-    </div>
-    <div class="col-md-4">
-      <label class="form-label">上传人</label>
-      <input class="form-control" name="uploader" value="{{ uploader }}" placeholder="按上传人筛选">
-    </div>
-    <div class="col-md-4">
-      <label class="form-label">文档类型</label>
-      <select class="form-select" name="doc_type">
-        <option value="">全部</option>
-        {% for value, label in doc_types %}
-        <option value="{{ value }}" {% if doc_type == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">文档状态</label>
-      <select class="form-select" name="status">
-        <option value="">全部</option>
-        {% for key, label in doc_status_labels.items() %}
-        <option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">开始日期</label>
-      <input class="form-control" type="date" name="start_date" value="{{ start_date }}">
-    </div>
-    <div class="col-md-3">
-      <label class="form-label">结束日期</label>
-      <input class="form-control" type="date" name="end_date" value="{{ end_date }}">
-    </div>
-    <div class="col-md-3 d-flex align-items-end">
-      <button class="btn btn-primary w-100" type="submit">搜索</button>
+    <div class="page-hero-actions">
+      <a href="{{ url_for('documents.document_search') }}?reset=1" class="btn btn-outline-light">
+        <i data-lucide="rotate-ccw"></i>
+        重置筛选
+      </a>
     </div>
   </div>
-</form>
 
-<div class="card shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-hover mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>设备编码</th>
-          <th>设备名称</th>
-          <th>文档名称</th>
-          <th>类型</th>
-          <th>版本</th>
-          <th>状态</th>
-          <th>上传人</th>
-          <th>上传时间</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for row in rows %}
-        <tr>
-          <td>{{ row.device_code }}</td>
-          <td>{{ row.device_name }}</td>
-          <td>{{ row.doc_name }}</td>
-          <td>{{ doc_type_labels.get(row.doc_type) }}</td>
-          <td>v{{ row.version }}</td>
-          <td>{{ doc_status_labels.get(row.status, row.status) }}</td>
-          <td>{{ row.uploaded_by }}</td>
-          <td>{{ row.upload_time }}</td>
-          <td>
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('devices.device_detail', device_id=row.device_id) }}">查看设备</a>
-            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('documents.document_history', doc_id=row.id) }}">版本历史</a>
-            {% if row.status in ['active', 'archived'] %}
-            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('documents.download_doc', doc_id=row.id) }}">下载</a>
-            {% endif %}
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="9" class="text-center text-muted py-4">暂无结果</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  {# 统计概览 #}
+  <div class="stats-overview">
+    <div class="stat-mini-card">
+      <div class="stat-mini-icon" style="background: var(--color-primary-light);">
+        <i data-lucide="files" style="color: var(--color-primary);"></i>
+      </div>
+      <div class="stat-mini-content">
+        <div class="stat-mini-value">{{ rows|length if rows else 0 }}</div>
+        <div class="stat-mini-label">当前结果</div>
+      </div>
+    </div>
+    <div class="stat-mini-card">
+      <div class="stat-mini-icon" style="background: var(--color-success-light);">
+        <i data-lucide="check-circle" style="color: var(--color-success);"></i>
+      </div>
+      <div class="stat-mini-content">
+        <div class="stat-mini-value">{{ rows|selectattr('status', 'equalto', 'active')|list|length if rows else 0 }}</div>
+        <div class="stat-mini-label">有效文档</div>
+      </div>
+    </div>
+    <div class="stat-mini-card">
+      <div class="stat-mini-icon" style="background: var(--color-info-light);">
+        <i data-lucide="archive" style="color: var(--color-info);"></i>
+      </div>
+      <div class="stat-mini-content">
+        <div class="stat-mini-value">{{ rows|selectattr('status', 'equalto', 'archived')|list|length if rows else 0 }}</div>
+        <div class="stat-mini-label">已归档</div>
+      </div>
+    </div>
+  </div>
+
+  {# 搜索筛选卡片 #}
+  <div class="search-card" id="searchCard">
+    <div class="search-card-header" onclick="toggleSearchCard()">
+      <h3 class="search-card-title">
+        <i data-lucide="filter"></i>
+        筛选条件
+      </h3>
+      <span class="search-card-toggle">
+        <span>收起</span>
+        <i data-lucide="chevron-up"></i>
+      </span>
+    </div>
+    <div class="search-card-body">
+      <form method="get" id="searchForm">
+        <div class="search-row">
+          <div class="form-group mb-0">
+            <label class="form-label">文档名称</label>
+            <input class="form-control" name="q" value="{{ query }}" placeholder="按文档名模糊搜索">
+          </div>
+          <div class="form-group mb-0">
+            <label class="form-label">设备</label>
+            <input class="form-control" name="device" value="{{ device_query }}" placeholder="设备编码或名称">
+          </div>
+          <div class="form-group mb-0">
+            <label class="form-label">上传人</label>
+            <input class="form-control" name="uploader" value="{{ uploader }}" placeholder="按上传人筛选">
+          </div>
+          <div class="form-group mb-0">
+            <label class="form-label">文档类型</label>
+            <select class="form-control form-select" name="doc_type">
+              <option value="">全部类型</option>
+              {% for value, label in doc_types %}
+              <option value="{{ value }}" {% if doc_type == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <label class="form-label">文档状态</label>
+            <select class="form-control form-select" name="status">
+              <option value="">全部状态</option>
+              {% for key, label in doc_status_labels.items() %}
+              <option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group mb-0">
+            <label class="form-label">开始日期</label>
+            <input class="form-control" type="date" name="start_date" value="{{ start_date }}">
+          </div>
+          <div class="form-group mb-0">
+            <label class="form-label">结束日期</label>
+            <input class="form-control" type="date" name="end_date" value="{{ end_date }}">
+          </div>
+        </div>
+        <div class="search-actions">
+          <button class="btn btn-primary" type="submit">
+            <i data-lucide="search"></i>
+            搜索
+          </button>
+          <a href="{{ url_for('documents.document_search') }}" class="btn btn-outline-secondary">
+            <i data-lucide="rotate-ccw"></i>
+            重置
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# 数据表格 #}
+  <div class="data-table-card">
+    <div class="data-table-header">
+      <h3 class="data-table-title">
+        <i data-lucide="list"></i>
+        文档列表
+        {% if rows %}
+        <span class="data-table-count">{{ rows|length }}</span>
+        {% endif %}
+      </h3>
+      <div class="data-table-actions">
+        <button class="btn btn-sm btn-outline-secondary" onclick="exportTable()">
+          <i data-lucide="download"></i>
+          导出
+        </button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="data-table" id="documentsTable">
+        <thead>
+          <tr>
+            <th>设备编码</th>
+            <th>设备名称</th>
+            <th>文档名称</th>
+            <th>类型</th>
+            <th>版本</th>
+            <th>状态</th>
+            <th>上传人</th>
+            <th>上传时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="table-cell-mono">{{ row.device_code }}</td>
+            <td class="table-cell-primary">{{ row.device_name }}</td>
+            <td>
+              <div class="table-cell-primary">{{ row.doc_name }}</div>
+            </td>
+            <td>
+              <span class="doc-type-badge doc-type-{{ row.doc_type }}">
+                {{ doc_type_labels.get(row.doc_type, row.doc_type) }}
+              </span>
+            </td>
+            <td class="table-cell-mono">v{{ row.version }}</td>
+            <td>
+              <span class="status-pill {{ row.status }}">
+                {{ doc_status_labels.get(row.status, row.status) }}
+              </span>
+            </td>
+            <td>{{ row.uploaded_by }}</td>
+            <td class="table-cell-secondary">{{ row.upload_time }}</td>
+            <td>
+              <div class="table-actions">
+                <a href="{{ url_for('devices.device_detail', device_id=row.device_id) }}" 
+                   class="table-action-btn primary" title="查看设备">
+                  <i data-lucide="eye"></i>
+                </a>
+                <a href="{{ url_for('documents.document_history', doc_id=row.id) }}" 
+                   class="table-action-btn" title="版本历史">
+                  <i data-lucide="history"></i>
+                </a>
+                {% if row.status in ['active', 'archived'] %}
+                <a href="{{ url_for('documents.download_doc', doc_id=row.id) }}" 
+                   class="table-action-btn success" title="下载">
+                  <i data-lucide="download"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="9">
+              <div class="empty-state-box">
+                <div class="empty-state-icon">
+                  <i data-lucide="file-search"></i>
+                </div>
+                <h4 class="empty-state-title">暂无文档</h4>
+                <p class="empty-state-desc">
+                  {% if query or device_query or uploader or doc_type or status %}
+                  没有找到符合条件的文档，请尝试调整筛选条件
+                  {% else %}
+                  还没有上传任何文档到系统中
+                  {% endif %}
+                </p>
+                {% if not query and not device_query %}
+                <div class="empty-state-action">
+                  <a href="{{ url_for('dashboard.add_device') }}" class="btn btn-primary">
+                    <i data-lucide="plus"></i>
+                    添加设备
+                  </a>
+                </div>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
+
+<script>
+// 折叠/展开搜索卡片
+function toggleSearchCard() {
+  const card = document.getElementById('searchCard');
+  card.classList.toggle('collapsed');
+}
+
+// 导出表格
+function exportTable() {
+  const table = document.getElementById('documentsTable');
+  const rows = table.querySelectorAll('tbody tr');
+  
+  if (rows.length === 0 || (rows.length === 1 && rows[0].querySelector('.empty-state-box'))) {
+    alert('没有可导出的数据');
+    return;
+  }
+  
+  // 简单导出为CSV
+  let csv = '\uFEFF'; // BOM for UTF-8
+  const headers = table.querySelectorAll('thead th');
+  const headerTexts = Array.from(headers).map(h => h.textContent.trim());
+  csv += headerTexts.join(',') + '\n';
+  
+  rows.forEach(row => {
+    if (!row.querySelector('.empty-state-box')) {
+      const cells = row.querySelectorAll('td');
+      const rowData = Array.from(cells).slice(0, -1).map(cell => {
+        let text = cell.textContent.trim().replace(/"/g, '""');
+        return '"' + text + '"';
+      });
+      csv += rowData.join(',') + '\n';
+    }
+  });
+  
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'documents_' + new Date().toISOString().slice(0,10) + '.csv';
+  link.click();
+}
+
+// 初始化图标
+if (typeof lucide !== 'undefined') {
+  lucide.createIcons();
+}
+</script>
 {% endblock %}

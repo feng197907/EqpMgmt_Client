@@ -49,6 +49,53 @@ a:hover {
   color: var(--color-primary-hover);
 }
 
+/* 按钮内的链接颜色保持白色 */
+a.btn,
+a.btn:hover,
+a.btn-primary,
+a.btn-primary:hover,
+a.btn-success,
+a.btn-success:hover,
+a.btn-danger,
+a.btn-danger:hover,
+a.btn-warning,
+a.btn-warning:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
+a.btn span,
+a.btn-primary span,
+a.btn-success span,
+a.btn-danger span,
+a.btn-warning span {
+  color: inherit !important;
+}
+
+a.btn-outline-primary {
+  color: var(--color-primary);
+}
+
+a.btn-outline-primary:hover {
+  color: #fff;
+}
+
+a.btn-outline-primary span {
+  color: inherit !important;
+}
+
+a.btn-outline-secondary {
+  color: var(--text-secondary);
+}
+
+a.btn-outline-secondary:hover {
+  color: var(--text-primary);
+}
+
+a.btn-outline-secondary span {
+  color: inherit !important;
+}
+
 /* Focus Styles */
 :focus-visible {
   outline: 2px solid var(--color-primary);

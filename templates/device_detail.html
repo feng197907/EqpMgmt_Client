@@ -1,146 +1,198 @@
 {% extends 'base.html' %}
 {% block content %}
-{# 设备详情页头信息与上传入口 #}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-1">{{ device.device_name }}</h3>
-    <div class="text-muted">{{ device.device_code }} · {{ device.model or '-' }} · {{ device.location or '-' }}</div>
-  </div>
-  <div class="btn-group">
-    <a class="btn btn-success" href="{{ url_for('documents.upload_doc', device_id=device.id) }}">上传文档</a>
-    {% if current_user.is_admin %}
-    <a class="btn btn-outline-primary" href="{{ url_for('devices.edit_device', device_id=device.id) }}">编辑</a>
-    <form method="post" action="{{ url_for('devices.delete_device', device_id=device.id) }}" style="display:inline;" onsubmit="return confirm('确认删除该设备及其关联数据吗？');">
-      <button class="btn btn-outline-danger">删除</button>
-    </form>
-    {% endif %}
-  </div>
-</div>
 
-{# 标签页导航 #}
-<div class="nav-tabs-custom mb-3">
-  <a class="nav-tab {% if request.endpoint == 'devices.device_detail' %}active{% endif %}"
-     href="{{ url_for('devices.device_detail', device_id=device.id) }}">设备详情</a>
-  <a class="nav-tab {% if request.endpoint == 'maintenance.maintenance_plans' %}active{% endif %}"
-     href="{{ url_for('maintenance.maintenance_plans', device_id=device.id) }}">维护计划</a>
-  <a class="nav-tab {% if request.endpoint == 'maintenance.maintenance_history' %}active{% endif %}"
-     href="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">维护历史</a>
-</div>
+{# 设备详情页 - 现代化设计 #}
+<div class="device-detail-page">
+  {# 设备头部信息卡 #}
+  <div class="device-header-card">
+    <div class="device-header-left">
+      <div class="device-status-indicator device-status-{{ device.status }}">
+        <span class="status-dot"></span>
+        {{ device_status_labels.get(device.status, device.status) }}
+      </div>
+      <h1 class="device-title">{{ device.device_name }}</h1>
+      <div class="device-meta">
+        <span class="meta-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          {{ device.device_code }}
+        </span>
+        {% if device.model %}
+        <span class="meta-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+          {{ device.model }}
+        </span>
+        {% endif %}
+        {% if device.location %}
+        <span class="meta-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          {{ device.location }}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="device-header-actions">
+      <a href="{{ url_for('documents.upload_doc', device_id=device.id) }}" class="btn-upload">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+        上传文档
+      </a>
+      {% if current_user.is_admin %}
+      <a href="{{ url_for('devices.edit_device', device_id=device.id) }}" class="btn-edit">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+        编辑
+      </a>
+      {% endif %}
+    </div>
+  </div>
 
-{# 设备状态变更表单：所有用户可提交变更请求，关键状态需审批 #}
-<div class="card mb-3">
-  <div class="card-body">
-    <form method="post" action="{{ url_for('devices.change_device_status', device_id=device.id) }}">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-3">
-          <label class="form-label">变更目标状态</label>
+  {# 设备状态快速操作区 #}
+  <div class="device-quick-actions">
+    <div class="quick-action-card">
+      <form method="post" action="{{ url_for('devices.change_device_status', device_id=device.id) }}" class="status-change-form">
+        <div class="form-row">
           <select class="form-select" name="new_status">
             <option value="installation">入厂/安装</option>
             <option value="verification">验证中</option>
             <option value="running">运行</option>
             <option value="stopped">停机</option>
             <option value="maintenance">维修</option>
-            <option value="inactive">停用（需审批）</option>
-            <option value="retired">报废（需审批）</option>
+            <option value="inactive">停用</option>
+            <option value="retired">报废</option>
           </select>
+          <input type="text" class="form-control" name="reason" placeholder="变更原因" required>
+          <button type="submit" class="btn btn-primary">提交变更</button>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">变更原因（必填）</label>
-          <input class="form-control" name="reason" required placeholder="填写变更原因以便审批或记录">
+      </form>
+    </div>
+  </div>
+
+  {# 标签页 #}
+  <div class="page-tabs">
+    <a class="tab-item {% if request.endpoint == 'devices.device_detail' %}active{% endif %}" href="{{ url_for('devices.device_detail', device_id=device.id) }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+      设备详情
+    </a>
+    <a class="tab-item {% if request.endpoint == 'maintenance.maintenance_plans' %}active{% endif %}" href="{{ url_for('maintenance.maintenance_plans', device_id=device.id) }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      维护计划
+    </a>
+    <a class="tab-item {% if request.endpoint == 'maintenance.maintenance_history' %}active{% endif %}" href="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      维护历史
+    </a>
+  </div>
+
+  {# 文档列表 #}
+  <div class="documents-section">
+    <div class="section-header">
+      <h2 class="section-title">设备文档</h2>
+      <span class="doc-count">{{ grouped|length }} 个分类</span>
+    </div>
+
+    {# 文档分类卡片 #}
+    <div class="doc-category-grid">
+      {% for doc_type, label in doc_types %}
+      {% set docs = grouped.get(doc_type, []) %}
+      <div class="doc-category-card {% if docs|length == 0 %}empty{% endif %}">
+        <div class="category-header">
+          <div class="category-icon doc-type-{{ doc_type }}">
+            {% if doc_type == 'manual' %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+            {% elif doc_type == 'certificate' %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/></svg>
+            {% elif doc_type == 'calibration' %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+            {% elif doc_type == 'maintenance' %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            {% else %}
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+            {% endif %}
+          </div>
+          <div class="category-info">
+            <h3 class="category-name">{{ label }}</h3>
+            <span class="category-count">{{ docs|length }} 个文档</span>
+          </div>
+          <button class="category-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ doc_type }}">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
         </div>
-        <div class="col-md-3">
-          <button class="btn btn-primary w-100" type="submit">提交变更</button>
+
+        <div id="collapse-{{ doc_type }}" class="category-content collapse {% if docs|length > 0 %}show{% endif %}">
+          {% if docs %}
+          <div class="doc-list">
+            {% for doc in docs %}
+            <div class="doc-item">
+              <div class="doc-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+              </div>
+              <div class="doc-info">
+                <div class="doc-name">{{ doc.doc_name }}</div>
+                <div class="doc-meta">
+                  <span class="doc-version">v{{ doc.version }}</span>
+                  <span class="doc-uploader">{{ doc.uploaded_by }}</span>
+                  <span class="doc-date">{{ doc.upload_time }}</span>
+                </div>
+              </div>
+              <div class="doc-status">
+                <span class="status-badge status-{{ doc.status }}">{{ doc_status_labels.get(doc.status, doc.status) }}</span>
+              </div>
+              <div class="doc-actions">
+                {% if doc.status in ['active', 'archived'] %}
+                <a href="{{ url_for('documents.download_doc', doc_id=doc.id) }}" class="action-btn" title="下载">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                </a>
+                {% endif %}
+                {% if doc.status == 'active' %}
+                  {% if doc.borrow_status == 'borrowed' %}
+                    {% if doc.borrow_user == current_user.username %}
+                    <form method="post" action="{{ url_for('borrowing.return_doc', borrow_id=doc.borrow_id) }}" class="inline-form">
+                      <button type="submit" class="action-btn action-warning" title="归还">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                      </button>
+                    </form>
+                    {% else %}
+                    <span class="action-btn action-disabled" title="已被借出">借出中</span>
+                    {% endif %}
+                  {% else %}
+                  <form method="post" action="{{ url_for('borrowing.borrow_doc', doc_id=doc.id) }}" class="inline-form">
+                    <button type="submit" class="action-btn" title="借阅">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                    </button>
+                  </form>
+                  {% endif %}
+                {% endif %}
+                <a href="{{ url_for('documents.document_history', doc_id=doc.id) }}" class="action-btn" title="版本历史">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+                </a>
+                {% if doc.status == 'draft' and current_user.is_admin %}
+                <form method="post" action="{{ url_for('documents.submit_document', doc_id=doc.id) }}" class="inline-form">
+                  <button type="submit" class="action-btn action-primary" title="提交审批">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="m22 2-11 11"/></svg>
+                  </button>
+                </form>
+                {% endif %}
+                {% if current_user.is_admin %}
+                <form method="post" action="{{ url_for('documents.delete_doc', doc_id=doc.id) }}" class="inline-form" onsubmit="return confirm('确认删除该文档吗？');">
+                  <button type="submit" class="action-btn action-danger" title="删除">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+            <p>暂无文档</p>
+            <a href="{{ url_for('documents.upload_doc', device_id=device.id) }}" class="btn btn-sm btn-outline-primary">上传第一个文档</a>
+          </div>
+          {% endif %}
         </div>
       </div>
-    </form>
+      {% endfor %}
+    </div>
   </div>
 </div>
 
-{# 文档按类型分组展示，使用折叠面板 #}
-<div class="accordion" id="docAccordion">
-  {% for doc_type, label in doc_types %}
-  <div class="accordion-item">
-    <h2 class="accordion-header" id="heading-{{ doc_type }}">
-      <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ doc_type }}">
-        {{ label }}
-      </button>
-    </h2>
-    <div id="collapse-{{ doc_type }}" class="accordion-collapse collapse" data-bs-parent="#docAccordion">
-      <div class="accordion-body">
-        <div class="table-responsive">
-          <table class="table table-sm align-middle">
-            <thead>
-              <tr>
-                <th>版本</th>
-                <th>文件名</th>
-                <th>上传人</th>
-                <th>上传时间</th>
-                <th>下载次数</th>
-                <th>状态</th>
-                <th>借阅状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {# 文档列表循环：显示版本、借阅状态、操作 #}
-              {% for doc in grouped.get(doc_type, []) %}
-              <tr>
-                <td>v{{ doc.version }}</td>
-                <td>{{ doc.doc_name }}</td>
-                <td>{{ doc.uploaded_by }}</td>
-                <td>{{ doc.upload_time }}</td>
-                <td>{{ doc.download_count or 0 }}</td>
-                <td>{{ doc_status_labels.get(doc.status, doc.status) }}</td>
-                <td>
-                  {# 借阅状态展示 #}
-                  {% if doc.borrow_status == 'borrowed' %}
-                    已借出 ({{ doc.borrow_user }})
-                  {% else %}
-                    在库
-                  {% endif %}
-                </td>
-                <td class="d-flex gap-2">
-                  {# 下载/借阅/删除操作区 #}
-                  {% if doc.status in ['active', 'archived'] %}
-                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.download_doc', doc_id=doc.id) }}">下载</a>
-                  {% endif %}
-                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('documents.document_history', doc_id=doc.id) }}">版本历史</a>
-                  {% if doc.status == 'active' %}
-                    {% if doc.borrow_status == 'borrowed' %}
-                      {% if doc.borrow_user == current_user.username %}
-                        <form method="post" action="{{ url_for('borrowing.return_doc', borrow_id=doc.borrow_id) }}">
-                          <button class="btn btn-sm btn-outline-warning" type="submit">归还</button>
-                        </form>
-                      {% else %}
-                        <button class="btn btn-sm btn-outline-secondary" type="button" disabled>已被借出</button>
-                      {% endif %}
-                    {% else %}
-                      <form method="post" action="{{ url_for('borrowing.borrow_doc', doc_id=doc.id) }}">
-                        <button class="btn btn-sm btn-outline-success" type="submit">借阅</button>
-                      </form>
-                    {% endif %}
-                  {% endif %}
-                  {% if doc.status == 'draft' %}
-                  <form method="post" action="{{ url_for('documents.submit_document', doc_id=doc.id) }}">
-                    <button class="btn btn-sm btn-outline-secondary" type="submit">提交审批</button>
-                  </form>
-                  {% endif %}
-                  {% if current_user.is_admin %}
-                  <form method="post" action="{{ url_for('documents.delete_doc', doc_id=doc.id) }}" onsubmit="return confirm('确认删除该文档吗？');">
-                    <button class="btn btn-sm btn-outline-danger" type="submit">删除</button>
-                  </form>
-                  {% endif %}
-                </td>
-              </tr>
-              {% else %}
-              <tr><td colspan="7" class="text-center text-muted">暂无文档</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
 {% endblock %}

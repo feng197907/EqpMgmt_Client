@@ -148,6 +148,22 @@ def init_db():
         """
     )
 
+    # 密码重置请求表
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS password_reset_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            username TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            processed_at TIMESTAMP,
+            processed_by TEXT,
+            ip_address TEXT
+        )
+        """
+    )
+
     # 维护计划表
     cur.execute(
         """

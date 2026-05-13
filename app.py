@@ -19,6 +19,7 @@ from blueprints import (
     devices_bp,
     documents_bp,
     maintenance_bp,
+    password_bp,
     search_bp,
     users_bp,
 )
@@ -53,6 +54,7 @@ def create_app():
     app.register_blueprint(dashboard_bp)  # dashboard, reminders, add_device 等
     app.register_blueprint(maintenance_bp)  # 维护计划相关路由
     app.register_blueprint(search_bp)  # 全局搜索
+    app.register_blueprint(password_bp)  # 密码重置功能
 
     # 确保上传目录存在
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -73,8 +75,34 @@ def create_app():
             conn.close()
         except Exception:
             pending_count = 0
+
+        # 判断当前用户是否有文档审批权限（控制顶部闹铃显示）
+        can_view_approvals = False
+        try:
+            from flask_login import current_user
+            if current_user.is_authenticated:
+                can_view_approvals = current_user.has_permission("document_approval")
+        except Exception:
+            pass
+
+        # 查询待处理的密码重置请求数量（仅管理员可见）
+        password_reset_count = 0
+        try:
+            from flask_login import current_user
+            if current_user.is_authenticated and current_user.is_admin:
+                conn2 = get_db()
+                cur2 = conn2.cursor()
+                cur2.execute("SELECT COUNT(*) as total FROM password_reset_requests WHERE status = 'pending'")
+                result2 = cur2.fetchone()
+                password_reset_count = result2["total"] if result2 else 0
+                conn2.close()
+        except Exception:
+            pass
+
         return dict(
             pending_count=pending_count,
+            can_view_approvals=can_view_approvals,
+            password_reset_count=password_reset_count,
             doc_status_labels=DOC_STATUS_LABELS,
             device_status_labels=DEVICE_STATUS_LABELS,
         )

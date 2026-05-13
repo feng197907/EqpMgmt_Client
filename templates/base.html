@@ -98,6 +98,10 @@
           <i data-lucide="scroll-text"></i>
           <span>审计日志</span>
         </a>
+        <a href="{{ url_for('password.admin_password_resets') }}" class="nav-item {% if request.endpoint == 'password.admin_password_resets' %}active{% endif %}">
+          <i data-lucide="key"></i>
+          <span>密码重置</span>
+        </a>
       </div>
       {% endif %}
 
@@ -145,11 +149,15 @@
       </div>
 
       <div class="topbar-right">
-        <!-- 通知 -->
-        <button class="topbar-icon-btn" aria-label="通知">
-          <i data-lucide="bell"></i>
-          <span class="notification-dot"></span>
-        </button>
+        {# 密码重置请求提醒 - 仅对管理员显示 #}
+        {% if current_user.is_authenticated and current_user.is_admin %}
+        <a href="{{ url_for('password.admin_password_resets') }}" class="topbar-icon-btn" aria-label="密码重置请求" title="密码重置请求 ({{ password_reset_count if password_reset_count else 0 }})">
+          <i data-lucide="key"></i>
+          {% if password_reset_count and password_reset_count > 0 %}
+          <span class="notification-dot">{{ password_reset_count }}</span>
+          {% endif %}
+        </a>
+        {% endif %}
 
         <!-- 用户信息 -->
         {% if current_user.is_authenticated %}

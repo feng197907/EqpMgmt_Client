@@ -35,6 +35,11 @@ class User(UserMixin):
         """检查用户是否拥有指定权限"""
         return has_permission(self._role, permission)
 
+    @property
+    def can_view_approvals(self):
+        """判断用户是否有文档审批权限（用于顶部闹铃显示控制）"""
+        return self.has_permission("document_approval")
+
 
 def load_user(user_id):
     """Flask-Login 用户加载回调"""

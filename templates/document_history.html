@@ -1,62 +1,173 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-1">文档版本历史</h3>
-    <div class="text-muted">{{ current_doc.doc_name }} · {{ doc_type_label }} · 设备 {{ current_doc.device_id }}</div>
-  </div>
-  <div class="btn-group">
-    <a class="btn btn-outline-primary" href="{{ url_for('devices.device_detail', device_id=current_doc.device_id) }}">返回设备详情</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('documents.document_search') }}">返回检索</a>
-  </div>
-</div>
-
-<div class="card shadow-sm mb-3">
-  <div class="card-body">
-    <div class="row g-3">
-      <div class="col-md-3"><strong>设备编码：</strong>{{ current_doc.device_code }}</div>
-      <div class="col-md-3"><strong>文档类型：</strong>{{ doc_type_label }}</div>
-      <div class="col-md-3"><strong>当前版本：</strong>v{{ current_doc.version }}</div>
-      <div class="col-md-3"><strong>当前状态：</strong>{{ doc_status_labels.get(current_doc.status, current_doc.status) }}</div>
+<div class="page-container">
+  <!-- 页面标题 -->
+  <div class="d-flex flex-wrap justify-content-between align-items-start mb-4">
+    <div>
+      <h3 class="mb-1">文档版本历史</h3>
+      <p class="text-muted mb-0">
+        <span class="fw-medium">{{ current_doc.doc_name }}</span>
+        <span class="mx-2">·</span>
+        <span>{{ doc_type_label }}</span>
+        <span class="mx-2">·</span>
+        <span>设备 {{ current_doc.device_code }}</span>
+      </p>
+    </div>
+    <div class="btn-group">
+      <a class="btn btn-outline-primary" href="{{ url_for('devices.device_detail', device_id=current_doc.device_id) }}">
+        <i data-lucide="arrow-left"></i>
+        返回设备详情
+      </a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('documents.document_search') }}">
+        <i data-lucide="search"></i>
+        返回检索
+      </a>
     </div>
   </div>
-</div>
 
-<div class="card shadow-sm">
-  <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>版本</th>
-          <th>文件名</th>
-          <th>上传人</th>
-          <th>上传时间</th>
-          <th>下载次数</th>
-          <th>状态</th>
-          <th>操作</th>
-        </tr>
-      </thead>
-      <tbody>
+  <!-- 当前版本信息卡片 -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <div class="row g-4">
+        <div class="col-md-3">
+          <p class="text-muted small mb-1">设备编码</p>
+          <p class="fw-medium font-monospace mb-0">{{ current_doc.device_code }}</p>
+        </div>
+        <div class="col-md-3">
+          <p class="text-muted small mb-1">文档类型</p>
+          <p class="fw-medium mb-0">{{ doc_type_label }}</p>
+        </div>
+        <div class="col-md-3">
+          <p class="text-muted small mb-1">当前版本</p>
+          <p class="fw-medium mb-0">v{{ current_doc.version }}</p>
+        </div>
+        <div class="col-md-3">
+          <p class="text-muted small mb-1">当前状态</p>
+          <span class="status-pill {{ current_doc.status }}">
+            {{ doc_status_labels.get(current_doc.status, current_doc.status) }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 版本时间线 -->
+  <div class="card">
+    <div class="card-header">
+      <h5 class="mb-0 d-flex align-items-center gap-2">
+        <i data-lucide="git-branch" style="width: 18px; height: 18px;"></i>
+        版本时间线
+      </h5>
+    </div>
+    <div class="card-body">
+      {% if history_rows %}
+      <div class="version-timeline">
         {% for row in history_rows %}
-        <tr>
-          <td>v{{ row.version }}</td>
-          <td>{{ row.doc_name }}</td>
-          <td>{{ row.uploaded_by }}</td>
-          <td>{{ row.upload_time }}</td>
-          <td>{{ row.download_count or 0 }}</td>
-          <td>{{ doc_status_labels.get(row.status, row.status) }}</td>
-          <td>
-            {% if row.status in ['active', 'archived'] %}
-            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('documents.download_doc', doc_id=row.id) }}">下载</a>
+        <div class="version-timeline-item">
+          <!-- 时间线节点 -->
+          <div class="version-timeline-marker">
+            <div class="version-timeline-badge {{ row.status }}">
+              v{{ loop.revindex }}
+            </div>
+            {% if not loop.last %}
+            <div class="version-timeline-line"></div>
             {% endif %}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('devices.device_detail', device_id=row.device_id) }}">设备详情</a>
-          </td>
-        </tr>
-        {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">暂无版本历史</td></tr>
+          </div>
+          <!-- 内容 -->
+          <div class="version-timeline-content">
+            <div class="version-timeline-header">
+              <div class="d-flex align-items-center gap-2">
+                <span class="version-number">v{{ row.version }}</span>
+                <span class="status-pill {{ row.status }}">
+                  {{ doc_status_labels.get(row.status, row.status) }}
+                </span>
+                {% if loop.first %}
+                <span class="badge bg-primary">最新版本</span>
+                {% endif %}
+              </div>
+              <span class="text-muted small">{{ row.upload_time }}</span>
+            </div>
+            <div class="version-file-card">
+              <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-3">
+                  <div class="file-icon {{ row.doc_name.split('.')[-1] if '.' in row.doc_name else 'file' }}">
+                    <i data-lucide="file-text" style="width: 20px; height: 20px;"></i>
+                  </div>
+                  <div>
+                    <p class="fw-medium mb-0">{{ row.doc_name }}</p>
+                    <p class="text-muted small mb-0">
+                      上传人: {{ row.uploaded_by }} · 下载次数: {{ row.download_count or 0 }}
+                    </p>
+                  </div>
+                </div>
+                <div class="d-flex gap-2">
+                  {% if row.status in ['active', 'archived'] %}
+                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('documents.download_doc', doc_id=row.id) }}">
+                    <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+                    下载
+                  </a>
+                  {% endif %}
+                  <a class="btn btn-sm btn-outline-primary" href="{{ url_for('devices.device_detail', device_id=row.device_id) }}">
+                    <i data-lucide="info" style="width: 14px; height: 14px;"></i>
+                    详情
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         {% endfor %}
-      </tbody>
-    </table>
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i data-lucide="file-x" style="width: 48px; height: 48px; opacity: 0.5;"></i>
+        <p class="mt-3 mb-0">暂无版本历史</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- 统计信息 -->
+  <div class="row g-3 mt-4">
+    <div class="col-md-4">
+      <div class="stat-card">
+        <div class="stat-icon primary">
+          <i data-lucide="file-text" style="width: 20px; height: 20px;"></i>
+        </div>
+        <div class="stat-content">
+          <p class="stat-label">总版本数</p>
+          <p class="stat-value">{{ history_rows|length }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stat-card">
+        <div class="stat-icon success">
+          <i data-lucide="download" style="width: 20px; height: 20px;"></i>
+        </div>
+        <div class="stat-content">
+          <p class="stat-label">总下载次数</p>
+          <p class="stat-value">{{ history_rows|sum(attribute='download_count') or 0 }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stat-card">
+        <div class="stat-icon warning">
+          <i data-lucide="clock" style="width: 20px; height: 20px;"></i>
+        </div>
+        <div class="stat-content">
+          <p class="stat-label">首次上传</p>
+          <p class="stat-value" style="font-size: 16px;">
+            {% if history_rows %}
+              {{ history_rows[-1].upload_time[:10] if history_rows[-1].upload_time else '-' }}
+            {% else %}
+              -
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 {% endblock %}

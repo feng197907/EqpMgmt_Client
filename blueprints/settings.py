@@ -12,14 +12,14 @@ settings_bp = Blueprint("settings", __name__)
 # 设置项定义
 SETTINGS_CONFIG = {
     "approval_enabled": {
-        "label": "启用文档审批流程",
+        "label": "审批流程",
         "type": "boolean",
-        "description": "开启后，文档上传需要审批后才能生效。关闭后，文档直接生效。",
+        "description": "开启后，设备变更、文档上传等操作需要审批后才能生效。关闭后，所有审批流程跳过，操作直接生效。",
     },
     "auto_approve_document": {
         "label": "文档自动生效",
         "type": "boolean",
-        "description": "开启后，新上传的文档将自动设置为生效状态，跳过起草和审批流程。",
+        "description": "开启后，新上传的文档将自动设置为生效状态。仅当审批流程开启时生效。",
     },
 }
 

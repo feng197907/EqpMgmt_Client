@@ -306,8 +306,8 @@ def _ensure_default_settings(conn):
     """初始化默认系统设置"""
     cur = conn.cursor()
     default_settings = [
-        ("approval_enabled", "true", "是否启用文档审批流程"),
-        ("auto_approve_document", "false", "文档上传后是否自动生效（跳过审批）"),
+        ("approval_enabled", "true", "是否启用审批流程（设备变更、文档上传等）"),
+        ("auto_approve_document", "false", "文档上传后是否自动生效"),
     ]
     for key, value, description in default_settings:
         cur.execute(

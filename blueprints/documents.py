@@ -32,7 +32,16 @@ def upload_doc(device_id):
 
     # 检查审批流程是否启用
     approval_enabled = get_system_setting("approval_enabled", "true")
-    initial_status = "active" if approval_enabled != "true" else "draft"
+    auto_approve = get_system_setting("auto_approve_document", "false")
+
+    # 审批流程关闭时，文档直接生效
+    # 审批流程开启时，根据"文档自动生效"设置决定
+    if approval_enabled != "true":
+        initial_status = "active"
+    elif auto_approve == "true":
+        initial_status = "active"
+    else:
+        initial_status = "draft"
 
     if request.method == "POST":
         doc_type = request.form.get("doc_type")

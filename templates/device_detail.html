@@ -50,11 +50,11 @@
       <form method="post" action="{{ url_for('devices.change_device_status', device_id=device.id) }}" class="status-change-form">
         <div class="form-row">
           <select class="form-select" name="new_status">
-            <option value="installation">入厂/安装</option>
-            <option value="verification">验证中</option>
-            <option value="running">运行</option>
-            <option value="stopped">停机</option>
-            <option value="maintenance">维修</option>
+            <option value="active">运行</option>
+            <option value="standby">待机</option>
+            <option value="debug">调试</option>
+            <option value="maintenance">维护</option>
+            <option value="repair">维修</option>
             <option value="inactive">停用</option>
             <option value="retired">报废</option>
           </select>

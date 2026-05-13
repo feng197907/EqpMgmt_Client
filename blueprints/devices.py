@@ -12,7 +12,7 @@ from config import (
     DOC_TYPE_LABELS,
     DOC_TYPES,
 )
-from database import get_db
+from database import get_db, get_system_setting
 from utils.audit import log_action, log_action_with_cursor
 from utils.db_utils import commit_with_retry, execute_with_retry, get_next_version
 from utils.decorators import admin_required
@@ -146,7 +146,7 @@ def delete_device(device_id):
         log_action(
             current_user.username, "delete_device", "device", device_id,
             f"删除设备 {device['device_code']}",
-            before_value={"status": device.get("status")},
+            before_value={"status": device["status"]},
             after_value={"status": "inactive"},
         )
         flash("设备已删除（停用）。", "success")
@@ -175,7 +175,10 @@ def change_device_status(device_id):
         conn.close()
         flash("设备不存在。", "warning")
         return redirect(url_for("auth.index"))
-    if new_status in CRITICAL_DEVICE_STATUSES:
+    # 检查审批流程是否开启
+    approval_enabled = get_system_setting("approval_enabled", "true")
+    
+    if new_status in CRITICAL_DEVICE_STATUSES and approval_enabled == "true":
         ensure_device_change_table(cur)
         execute_with_retry(
             cur,
@@ -186,7 +189,7 @@ def change_device_status(device_id):
         log_action(
             current_user.username, "request_device_status_change", "device", device_id,
             f"申请将设备 {device['device_code']} 状态更改为 {new_status}",
-            before_value={"status": device.get("status")},
+            before_value={"status": device["status"]},
             after_value={"requested_status": new_status},
             reason=reason,
         )
@@ -196,14 +199,14 @@ def change_device_status(device_id):
     try:
         execute_with_retry(
             cur,
-            "UPDATE devices SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "UPDATE devices SET status = ? WHERE id = ?",
             (new_status, device_id),
         )
         conn.commit()
         log_action(
             current_user.username, "change_device_status", "device", device_id,
             f"将设备 {device['device_code']} 状态更新为 {new_status}",
-            before_value={"status": device.get("status")},
+            before_value={"status": device["status"]},
             after_value={"status": new_status},
             reason=reason,
         )

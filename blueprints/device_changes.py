@@ -3,8 +3,6 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from werkzeug.security import check_password_hash
-
 from database import get_db
 from utils.audit import log_action
 from utils.db_utils import commit_with_retry, execute_with_retry
@@ -34,13 +32,9 @@ def device_changes():
 def decide_device_change(req_id):
     """处理设备状态变更请求"""
     decision = request.form.get("decision")
-    password = request.form.get("password", "")
     comment = request.form.get("comment", "").strip()
     if decision not in {"approve", "reject"}:
         flash("无效的决策。", "warning")
-        return redirect(url_for("device_changes.device_changes"))
-    if not check_password_hash(current_user.password_hash, password):
-        flash("密码校验失败，无法签名。", "danger")
         return redirect(url_for("device_changes.device_changes"))
     conn = get_db()
     cur = conn.cursor()
@@ -55,7 +49,7 @@ def decide_device_change(req_id):
         try:
             execute_with_retry(
                 cur,
-                "UPDATE devices SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE devices SET status = ? WHERE id = ?",
                 (req["new_status"], req["device_id"]),
             )
             execute_with_retry(

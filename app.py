@@ -71,12 +71,18 @@ def create_app():
         try:
             conn = get_db()
             cur = conn.cursor()
+            # 文档审批待处理数量
             cur.execute("SELECT COUNT(*) as total FROM approval_requests WHERE status = 'pending'")
             result = cur.fetchone()
             pending_count = result["total"] if result else 0
+            # 设备状态变更待审批数量
+            cur.execute("SELECT COUNT(*) as total FROM device_status_requests WHERE status = 'pending'")
+            result = cur.fetchone()
+            device_change_count = result["total"] if result else 0
             conn.close()
         except Exception:
             pending_count = 0
+            device_change_count = 0
 
         # 判断当前用户是否有文档审批权限（控制顶部闹铃显示）
         can_view_approvals = False
@@ -103,6 +109,7 @@ def create_app():
 
         return dict(
             pending_count=pending_count,
+            device_change_count=device_change_count,
             can_view_approvals=can_view_approvals,
             password_reset_count=password_reset_count,
             doc_status_labels=DOC_STATUS_LABELS,

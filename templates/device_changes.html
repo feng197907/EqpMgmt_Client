@@ -31,7 +31,6 @@
             <form method="post" action="/device_changes/{{ r['id'] }}/decide" class="mb-1">
               <input type="hidden" name="decision" value="approve">
               <div class="input-group input-group-sm">
-                <input type="password" name="password" class="form-control" placeholder="输入管理员密码以签名" required>
                 <input type="text" name="comment" class="form-control" placeholder="备注（可选）">
                 <button class="btn btn-success" type="submit">批准</button>
               </div>
@@ -39,7 +38,6 @@
             <form method="post" action="/device_changes/{{ r['id'] }}/decide">
               <input type="hidden" name="decision" value="reject">
               <div class="input-group input-group-sm">
-                <input type="password" name="password" class="form-control" placeholder="输入管理员密码以签名" required>
                 <input type="text" name="comment" class="form-control" placeholder="拒绝原因（可选）">
                 <button class="btn btn-danger" type="submit">拒绝</button>
               </div>

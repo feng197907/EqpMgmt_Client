@@ -3,8 +3,6 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
-from werkzeug.security import check_password_hash
-
 from config import APPROVAL_STEPS, DOC_TYPE_LABELS
 from database import get_db
 from utils.audit import log_action_with_cursor
@@ -40,13 +38,9 @@ def approvals():
 def decide_approval(request_id):
     """处理审批决策"""
     decision = request.form.get("decision")
-    password = request.form.get("password", "")
     comment = request.form.get("comment", "").strip()
     if decision not in {"approve", "reject"}:
         flash("审批操作无效。", "warning")
-        return redirect(url_for("approvals.approvals"))
-    if not check_password_hash(current_user.password_hash, password):
-        flash("密码校验失败，无法签名。", "danger")
         return redirect(url_for("approvals.approvals"))
     conn = get_db()
     cur = conn.cursor()

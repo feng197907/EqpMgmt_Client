@@ -69,6 +69,7 @@
         <a href="{{ url_for('device_changes.device_changes') }}" class="nav-item {% if request.endpoint == 'device_changes.device_changes' %}active{% endif %}">
           <i data-lucide="git-branch"></i>
           <span>设备变更</span>
+          {% if device_change_count > 0 %}<span class="nav-badge">{{ device_change_count }}</span>{% endif %}
         </a>
       </div>
 
@@ -82,7 +83,7 @@
         <a href="{{ url_for('approvals.approvals') }}" class="nav-item {% if request.endpoint == 'approvals.approvals' %}active{% endif %}">
           <i data-lucide="clipboard-check"></i>
           <span>待审批</span>
-          <span class="nav-badge">{{ pending_count if pending_count else 0 }}</span>
+          {% if pending_count > 0 %}<span class="nav-badge">{{ pending_count }}</span>{% endif %}
         </a>
       </div>
 

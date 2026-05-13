@@ -69,9 +69,11 @@ def upload_doc(device_id):
             stored_name = f"{doc_type}_{version}_document.{ext}"
         file_path = os.path.join(device_dir, stored_name)
         file.save(file_path)
+        # 存储相对于项目根目录的相对路径，兼容云服务器部署
+        relative_path = os.path.relpath(file_path, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         cur.execute(
             "INSERT INTO documents (device_id, doc_type, doc_name, version, file_path, uploaded_by, remarks, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (device_id, doc_type, safe_name, version, file_path, current_user.username, remarks, initial_status),
+            (device_id, doc_type, safe_name, version, relative_path, current_user.username, remarks, initial_status),
         )
         conn.commit()
         doc_id = cur.lastrowid
@@ -93,6 +95,8 @@ def upload_doc(device_id):
 @login_required
 def download_doc(doc_id):
     """下载文档"""
+    from config import BASE_DIR
+
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM documents WHERE id = ? AND is_deleted = 0", (doc_id,))
@@ -112,8 +116,13 @@ def download_doc(doc_id):
         current_user.username, "download_document", "document", doc_id,
         f"下载 {doc['doc_name']} v{doc['version']}",
     )
-    directory = os.path.dirname(doc["file_path"])
-    filename = os.path.basename(doc["file_path"])
+    # file_path 存储为相对路径，转换为服务器上的绝对路径
+    file_path = doc["file_path"]
+    # 如果是相对路径，拼接 BASE_DIR
+    if not os.path.isabs(file_path):
+        file_path = os.path.join(BASE_DIR, file_path)
+    directory = os.path.dirname(file_path)
+    filename = os.path.basename(file_path)
     return send_from_directory(
         directory, filename, as_attachment=True, download_name=doc["doc_name"],
     )

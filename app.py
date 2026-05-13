@@ -21,6 +21,7 @@ from blueprints import (
     maintenance_bp,
     password_bp,
     search_bp,
+    settings_bp,
     users_bp,
 )
 from extensions import login_manager
@@ -55,6 +56,7 @@ def create_app():
     app.register_blueprint(maintenance_bp)  # 维护计划相关路由
     app.register_blueprint(search_bp)  # 全局搜索
     app.register_blueprint(password_bp)  # 密码重置功能
+    app.register_blueprint(settings_bp)  # 系统设置
 
     # 确保上传目录存在
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)

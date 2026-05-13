@@ -9,6 +9,7 @@ from blueprints.documents import documents_bp
 from blueprints.maintenance import maintenance_bp
 from blueprints.password import password_bp
 from blueprints.search import search_bp
+from blueprints.settings import settings_bp
 from blueprints.users import users_bp
 
 __all__ = [
@@ -23,4 +24,5 @@ __all__ = [
     "maintenance_bp",
     "search_bp",
     "password_bp",
+    "settings_bp",
 ]

@@ -102,6 +102,10 @@
           <i data-lucide="key"></i>
           <span>密码重置</span>
         </a>
+        <a href="{{ url_for('settings.system_settings') }}" class="nav-item {% if request.endpoint == 'settings.system_settings' %}active{% endif %}">
+          <i data-lucide="settings"></i>
+          <span>系统设置</span>
+        </a>
       </div>
       {% endif %}
 

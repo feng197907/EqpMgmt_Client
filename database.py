@@ -148,6 +148,23 @@ def init_db():
         """
     )
 
+    # 系统设置表
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS system_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            setting_key TEXT UNIQUE NOT NULL,
+            setting_value TEXT NOT NULL,
+            description TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_by TEXT
+        )
+        """
+    )
+
+    # 初始化默认设置
+    _ensure_default_settings(conn)
+
     # 密码重置请求表
     cur.execute(
         """
@@ -283,3 +300,51 @@ def _ensure_default_user(conn, username, password, role):
             "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
             (username, hashed, role),
         )
+
+
+def _ensure_default_settings(conn):
+    """初始化默认系统设置"""
+    cur = conn.cursor()
+    default_settings = [
+        ("approval_enabled", "true", "是否启用文档审批流程"),
+        ("auto_approve_document", "false", "文档上传后是否自动生效（跳过审批）"),
+    ]
+    for key, value, description in default_settings:
+        cur.execute(
+            "INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)",
+            (key, value, description),
+        )
+
+
+def get_system_setting(key, default=None):
+    """获取系统设置值"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT setting_value FROM system_settings WHERE setting_key = ?", (key,))
+    row = cur.fetchone()
+    conn.close()
+    if row:
+        return row["setting_value"]
+    return default
+
+
+def get_all_system_settings():
+    """获取所有系统设置"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM system_settings ORDER BY id")
+    rows = cur.fetchall()
+    conn.close()
+    return rows
+
+
+def update_system_setting(key, value, updated_by=None):
+    """更新系统设置"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "UPDATE system_settings SET setting_value = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?",
+        (value, updated_by, key),
+    )
+    conn.commit()
+    conn.close()

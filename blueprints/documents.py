@@ -8,7 +8,7 @@ from config import (
     DOC_TYPE_LABELS,
     DOC_TYPES,
 )
-from database import get_db
+from database import get_db, get_system_setting
 from utils.audit import log_action
 from utils.db_utils import commit_with_retry, execute_with_retry, get_next_version
 from utils.decorators import admin_required
@@ -141,6 +141,24 @@ def submit_document(doc_id):
         conn.close()
         flash("当前状态不允许提交审批。", "warning")
         return redirect(url_for("devices.device_detail", device_id=doc["device_id"]))
+
+    # 检查审批流程是否启用
+    approval_enabled = get_system_setting("approval_enabled", "true")
+
+    if approval_enabled != "true":
+        # 审批未启用，直接生效
+        execute_with_retry(cur, "UPDATE documents SET status = 'active' WHERE id = ?", (doc_id,))
+        commit_with_retry(conn)
+        log_action(
+            current_user.username, "submit_document", "document", doc_id,
+            "提交文档（审批已禁用，文档直接生效）",
+            before_value={"status": "draft"}, after_value={"status": "active"},
+        )
+        conn.close()
+        flash("文档已上传并生效（审批流程已禁用）。", "success")
+        return redirect(url_for("devices.device_detail", device_id=doc["device_id"]))
+
+    # 正常审批流程
     execute_with_retry(
         cur,
         "INSERT INTO approval_requests (doc_id, status, created_by, current_step) VALUES (?, 'pending', ?, 1)",

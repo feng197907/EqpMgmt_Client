@@ -18,7 +18,7 @@ def login():
         next_page = request.form.get("next", "").strip()
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users WHERE username = ?", (username,))
+        cur.execute("SELECT * FROM users WHERE username = %s", (username,))
         row = cur.fetchone()
         conn.close()
         if row and row["status"] != "active":
@@ -58,7 +58,7 @@ def index():
         cur.execute(
             f"""
             SELECT * FROM devices
-            WHERE (device_code LIKE ? OR device_name LIKE ? OR model LIKE ?)
+            WHERE (device_code LIKE %s OR device_name LIKE %s OR model LIKE %s)
             {status_filter}
             ORDER BY created_at DESC
             """,

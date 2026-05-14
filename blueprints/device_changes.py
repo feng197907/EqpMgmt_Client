@@ -39,7 +39,7 @@ def decide_device_change(req_id):
     conn = get_db()
     cur = conn.cursor()
     ensure_device_change_table(cur)
-    cur.execute("SELECT * FROM device_status_requests WHERE id = ?", (req_id,))
+    cur.execute("SELECT * FROM device_status_requests WHERE id = %s", (req_id,))
     req = cur.fetchone()
     if req is None or req["status"] != "pending":
         conn.close()
@@ -49,12 +49,12 @@ def decide_device_change(req_id):
         try:
             execute_with_retry(
                 cur,
-                "UPDATE devices SET status = ? WHERE id = ?",
+                "UPDATE devices SET status = %s WHERE id = %s",
                 (req["new_status"], req["device_id"]),
             )
             execute_with_retry(
                 cur,
-                "UPDATE device_status_requests SET status = 'approved', decided_by = ?, decided_at = CURRENT_TIMESTAMP, comment = ? WHERE id = ?",
+                "UPDATE device_status_requests SET status = 'approved', decided_by = %s, decided_at = CURRENT_TIMESTAMP, comment = %s WHERE id = %s",
                 (current_user.username, comment, req_id),
             )
             conn.commit()
@@ -71,7 +71,7 @@ def decide_device_change(req_id):
     else:
         execute_with_retry(
             cur,
-            "UPDATE device_status_requests SET status = 'rejected', decided_by = ?, decided_at = CURRENT_TIMESTAMP, comment = ? WHERE id = ?",
+            "UPDATE device_status_requests SET status = 'rejected', decided_by = %s, decided_at = CURRENT_TIMESTAMP, comment = %s WHERE id = %s",
             (current_user.username, comment, req_id),
         )
         conn.commit()

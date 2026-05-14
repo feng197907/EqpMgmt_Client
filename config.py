@@ -314,5 +314,5 @@ MAINTENANCE_RESULT_LABELS = dict(MAINTENANCE_RESULTS)
 # 关键状态（需要审批）
 CRITICAL_DEVICE_STATUSES = {"inactive", "retired"}
 
-# Flask 秘钥
-SECRET_KEY = "dev-secret-key"
+# Flask 秘钥（从环境变量读取，默认开发密钥）
+SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")

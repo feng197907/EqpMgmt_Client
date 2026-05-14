@@ -20,7 +20,7 @@ def maintenance_plans(device_id):
     """设备维护计划列表页"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()
@@ -108,7 +108,7 @@ def update_plan(device_id, plan_id):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM maintenance_plan WHERE id = ? AND device_id = ?", (plan_id, device_id))
+    cur.execute("SELECT * FROM maintenance_plan WHERE id = %s AND device_id = %s", (plan_id, device_id))
     row = cur.fetchone()
     if row is None:
         conn.close()
@@ -152,14 +152,14 @@ def delete_plan(device_id, plan_id):
     """删除维护计划（软删除）"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM maintenance_plan WHERE id = ? AND device_id = ?", (plan_id, device_id))
+    cur.execute("SELECT * FROM maintenance_plan WHERE id = %s AND device_id = %s", (plan_id, device_id))
     row = cur.fetchone()
     if row is None:
         conn.close()
         return jsonify({"error": "维护计划不存在"}), 404
 
     # 软删除：设置is_active=0
-    cur.execute("UPDATE maintenance_plan SET is_active = 0, updated_at = datetime('now') WHERE id = ?", (plan_id,))
+    cur.execute("UPDATE maintenance_plan SET is_active = 0, updated_at = datetime('now') WHERE id = %s", (plan_id,))
     conn.commit()
     conn.close()
 
@@ -179,7 +179,7 @@ def new_record_form(device_id, plan_id):
     cur = conn.cursor()
 
     # 获取维护计划信息
-    cur.execute("SELECT * FROM maintenance_plan WHERE id = ? AND device_id = ? AND is_active = 1", (plan_id, device_id))
+    cur.execute("SELECT * FROM maintenance_plan WHERE id = %s AND device_id = %s AND is_active = 1", (plan_id, device_id))
     plan = cur.fetchone()
     if plan is None:
         conn.close()
@@ -187,7 +187,7 @@ def new_record_form(device_id, plan_id):
         return redirect(url_for("maintenance.maintenance_plans", device_id=device_id))
 
     # 获取设备信息
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()
@@ -222,7 +222,7 @@ def submit_record(device_id, plan_id):
     cur = conn.cursor()
 
     # 获取维护计划
-    cur.execute("SELECT * FROM maintenance_plan WHERE id = ? AND device_id = ? AND is_active = 1", (plan_id, device_id))
+    cur.execute("SELECT * FROM maintenance_plan WHERE id = %s AND device_id = %s AND is_active = 1", (plan_id, device_id))
     plan = cur.fetchone()
     if plan is None:
         conn.close()
@@ -230,7 +230,7 @@ def submit_record(device_id, plan_id):
         return redirect(url_for("maintenance.maintenance_plans", device_id=device_id))
 
     # 获取设备信息
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()
@@ -258,7 +258,7 @@ def submit_record(device_id, plan_id):
     # 根据维护结果决定是否更新到期日
     if result == "qualified":
         cur.execute(
-            "UPDATE maintenance_plan SET next_due_date = ?, updated_at = datetime('now') WHERE id = ?",
+            "UPDATE maintenance_plan SET next_due_date = %s, updated_at = datetime('now') WHERE id = %s",
             (next_due_date, plan_id)
         )
         conn.commit()
@@ -289,7 +289,7 @@ def delete_record(device_id, record_id):
                   mp.maintenance_type AS plan_type
            FROM maintenance_record mr
            JOIN maintenance_plan mp ON mp.id = mr.plan_id
-           WHERE mr.id = ? AND mr.device_id = ?""",
+           WHERE mr.id = %s AND mr.device_id = %s""",
         (record_id, device_id),
     )
     record = cur.fetchone()
@@ -298,7 +298,7 @@ def delete_record(device_id, record_id):
         flash("维护记录不存在。", "warning")
         return redirect(url_for("maintenance.maintenance_history", device_id=device_id))
 
-    cur.execute("DELETE FROM maintenance_record WHERE id = ?", (record_id,))
+    cur.execute("DELETE FROM maintenance_record WHERE id = %s", (record_id,))
     conn.commit()
 
     log_action(
@@ -321,7 +321,7 @@ def maintenance_history(device_id):
     cur = conn.cursor()
 
     # 获取设备信息
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()

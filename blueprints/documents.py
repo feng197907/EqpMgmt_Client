@@ -23,7 +23,7 @@ def upload_doc(device_id):
     """上传文档"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()
@@ -72,7 +72,7 @@ def upload_doc(device_id):
         # 存储相对于项目根目录的相对路径，兼容云服务器部署
         relative_path = os.path.relpath(file_path, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         cur.execute(
-            "INSERT INTO documents (device_id, doc_type, doc_name, version, file_path, uploaded_by, remarks, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO documents (device_id, doc_type, doc_name, version, file_path, uploaded_by, remarks, status) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
             (device_id, doc_type, safe_name, version, relative_path, current_user.username, remarks, initial_status),
         )
         conn.commit()
@@ -99,14 +99,14 @@ def download_doc(doc_id):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM documents WHERE id = ? AND is_deleted = 0", (doc_id,))
+    cur.execute("SELECT * FROM documents WHERE id = %s AND is_deleted = 0", (doc_id,))
     doc = cur.fetchone()
     if doc is not None and doc["status"] not in {"active", "archived"}:
         conn.close()
         flash("该文档当前状态不允许下载。", "warning")
         return redirect(url_for("devices.device_detail", device_id=doc["device_id"]))
     if doc is not None:
-        cur.execute("UPDATE documents SET download_count = download_count + 1 WHERE id = ?", (doc_id,))
+        cur.execute("UPDATE documents SET download_count = download_count + 1 WHERE id = %s", (doc_id,))
         conn.commit()
     conn.close()
     if doc is None:
@@ -134,13 +134,13 @@ def delete_doc(doc_id):
     """删除文档"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM documents WHERE id = ?", (doc_id,))
+    cur.execute("SELECT * FROM documents WHERE id = %s", (doc_id,))
     doc = cur.fetchone()
     if doc is None:
         conn.close()
         flash("文档不存在。", "warning")
         return redirect(url_for("auth.index"))
-    cur.execute("UPDATE documents SET is_deleted = 1 WHERE id = ?", (doc_id,))
+    cur.execute("UPDATE documents SET is_deleted = 1 WHERE id = %s", (doc_id,))
     conn.commit()
     log_action(
         current_user.username, "delete_document", "document", doc_id,
@@ -157,7 +157,7 @@ def submit_document(doc_id):
     """提交文档审批"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM documents WHERE id = ? AND is_deleted = 0", (doc_id,))
+    cur.execute("SELECT * FROM documents WHERE id = %s AND is_deleted = 0", (doc_id,))
     doc = cur.fetchone()
     if doc is None:
         conn.close()
@@ -173,7 +173,7 @@ def submit_document(doc_id):
 
     if approval_enabled != "true":
         # 审批未启用，直接生效
-        execute_with_retry(cur, "UPDATE documents SET status = 'active' WHERE id = ?", (doc_id,))
+        execute_with_retry(cur, "UPDATE documents SET status = 'active' WHERE id = %s", (doc_id,))
         commit_with_retry(conn)
         log_action(
             current_user.username, "submit_document", "document", doc_id,
@@ -187,7 +187,7 @@ def submit_document(doc_id):
     # 正常审批流程
     execute_with_retry(
         cur,
-        "INSERT INTO approval_requests (doc_id, status, created_by, current_step) VALUES (?, 'pending', ?, 1)",
+        "INSERT INTO approval_requests (doc_id, status, created_by, current_step) VALUES (%s, 'pending', %s, 1)",
         (doc_id, current_user.username),
     )
     request_id = cur.lastrowid
@@ -196,10 +196,10 @@ def submit_document(doc_id):
     for idx, step in enumerate(APPROVAL_STEPS, start=1):
         execute_with_retry(
             cur,
-            "INSERT INTO approval_steps (request_id, step_order, approver_role) VALUES (?, ?, ?)",
+            "INSERT INTO approval_steps (request_id, step_order, approver_role) VALUES (%s, %s, %s)",
             (request_id, idx, step["role"]),
         )
-    execute_with_retry(cur, "UPDATE documents SET status = 'pending' WHERE id = ?", (doc_id,))
+    execute_with_retry(cur, "UPDATE documents SET status = 'pending' WHERE id = %s", (doc_id,))
     commit_with_retry(conn)
     log_action(
         current_user.username, "submit_document", "document", doc_id,
@@ -228,13 +228,13 @@ def document_search():
     )
     params = []
     if query:
-        sql += " AND d.doc_name LIKE ?"
+        sql += " AND d.doc_name LIKE %s"
         params.append(f"%{query}%")
     if device_query:
-        sql += " AND (dev.device_code LIKE ? OR dev.device_name LIKE ?)"
+        sql += " AND (dev.device_code LIKE %s OR dev.device_name LIKE %s)"
         params.extend([f"%{device_query}%", f"%{device_query}%"])
     if uploader:
-        sql += " AND d.uploaded_by LIKE ?"
+        sql += " AND d.uploaded_by LIKE %s"
         params.append(f"%{uploader}%")
     if doc_type:
         sql += " AND d.doc_type = ?"
@@ -277,7 +277,7 @@ def document_history(doc_id):
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "SELECT d.*, dev.device_code, dev.device_name FROM documents d JOIN devices dev ON dev.id = d.device_id WHERE d.id = ? AND d.is_deleted = 0",
+        "SELECT d.*, dev.device_code, dev.device_name FROM documents d JOIN devices dev ON dev.id = d.device_id WHERE d.id = %s AND d.is_deleted = 0",
         (doc_id,),
     )
     current_doc = cur.fetchone()
@@ -286,7 +286,7 @@ def document_history(doc_id):
         flash("文档不存在。", "warning")
         return redirect(url_for("documents.document_search"))
     cur.execute(
-        "SELECT d.*, dev.device_code, dev.device_name FROM documents d JOIN devices dev ON dev.id = d.device_id WHERE d.device_id = ? AND d.doc_type = ? AND d.is_deleted = 0 ORDER BY d.id DESC",
+        "SELECT d.*, dev.device_code, dev.device_name FROM documents d JOIN devices dev ON dev.id = d.device_id WHERE d.device_id = %s AND d.doc_type = %s AND d.is_deleted = 0 ORDER BY d.id DESC",
         (current_doc["device_id"], current_doc["doc_type"]),
     )
     history_rows = cur.fetchall()

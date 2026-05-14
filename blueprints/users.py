@@ -77,7 +77,7 @@ def create_user():
     try:
         hashed = generate_password_hash(password)
         cur.execute(
-            "INSERT INTO users (username, password, role, permissions) VALUES (?, ?, ?, ?)",
+            "INSERT INTO users (username, password, role, permissions) VALUES (%s, %s, %s, %s)",
             (username, hashed, role, permissions_str),
         )
         conn.commit()
@@ -106,14 +106,14 @@ def toggle_user(user_id):
         return redirect(url_for("users.user_list"))
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, status FROM users WHERE id = ?", (user_id,))
+    cur.execute("SELECT id, username, status FROM users WHERE id = %s", (user_id,))
     user_row = cur.fetchone()
     if user_row is None:
         conn.close()
         flash("用户不存在。", "warning")
         return redirect(url_for("users.user_list"))
     new_status = "inactive" if user_row["status"] == "active" else "active"
-    cur.execute("UPDATE users SET status = ? WHERE id = ?", (new_status, user_id))
+    cur.execute("UPDATE users SET status = %s WHERE id = %s", (new_status, user_id))
     conn.commit()
     log_action(
         current_user.username, "toggle_user", "user", user_id,
@@ -137,7 +137,7 @@ def update_user_permissions(user_id):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT username, role FROM users WHERE id = ?", (user_id,))
+    cur.execute("SELECT username, role FROM users WHERE id = %s", (user_id,))
     user_row = cur.fetchone()
     if user_row is None:
         conn.close()
@@ -151,7 +151,7 @@ def update_user_permissions(user_id):
         return redirect(url_for("users.user_list"))
 
     cur.execute(
-        "UPDATE users SET permissions = ? WHERE id = ?",
+        "UPDATE users SET permissions = %s WHERE id = %s",
         (permissions_str, user_id),
     )
     conn.commit()
@@ -179,7 +179,7 @@ def delete_user(user_id):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id, username, status, role FROM users WHERE id = ?", (user_id,))
+    cur.execute("SELECT id, username, status, role FROM users WHERE id = %s", (user_id,))
     user_row = cur.fetchone()
     if user_row is None:
         conn.close()
@@ -199,7 +199,7 @@ def delete_user(user_id):
         return redirect(url_for("users.user_list"))
 
     # 执行删除
-    cur.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    cur.execute("DELETE FROM users WHERE id = %s", (user_id,))
     conn.commit()
     log_action(
         current_user.username, "delete_user", "user", user_id,

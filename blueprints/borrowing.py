@@ -25,7 +25,7 @@ def borrow_doc(doc_id):
                 WHERE doc_id = d.id
                 ORDER BY id DESC LIMIT 1
             )
-        WHERE d.id = ? AND d.is_deleted = 0
+        WHERE d.id = %s AND d.is_deleted = 0
         """,
         (doc_id,),
     )
@@ -42,7 +42,7 @@ def borrow_doc(doc_id):
         conn.close()
         flash("文档已借出。", "warning")
         return redirect(url_for("devices.device_detail", device_id=doc["device_id"]))
-    cur.execute("INSERT INTO borrow_records (doc_id, borrower) VALUES (?, ?)", (doc_id, current_user.username))
+    cur.execute("INSERT INTO borrow_records (doc_id, borrower) VALUES (%s, %s)", (doc_id, current_user.username))
     conn.commit()
     borrow_id = cur.lastrowid
     log_action(
@@ -60,7 +60,7 @@ def return_doc(borrow_id):
     """归还文档"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM borrow_records WHERE id = ?", (borrow_id,))
+    cur.execute("SELECT * FROM borrow_records WHERE id = %s", (borrow_id,))
     record = cur.fetchone()
     if record is None:
         conn.close()
@@ -74,7 +74,7 @@ def return_doc(borrow_id):
         conn.close()
         flash("该记录已归还。", "info")
         return redirect(url_for("borrowing.borrow_list"))
-    cur.execute("UPDATE borrow_records SET status = 'returned', actual_return_date = CURRENT_TIMESTAMP WHERE id = ?", (borrow_id,))
+    cur.execute("UPDATE borrow_records SET status = 'returned', actual_return_date = CURRENT_TIMESTAMP WHERE id = %s", (borrow_id,))
     conn.commit()
     log_action(current_user.username, "return_document", "borrow", borrow_id, "归还文档")
     conn.close()

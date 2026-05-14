@@ -28,7 +28,7 @@ def device_detail(device_id):
     """设备详情页"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     conn.close()
     if device is None:
@@ -55,14 +55,14 @@ def toggle_device(device_id):
     """切换设备状态"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()
         flash("设备不存在。", "warning")
         return redirect(url_for("auth.index"))
     new_status = "inactive" if device["status"] == "active" else "active"
-    cur.execute("UPDATE devices SET status = ? WHERE id = ?", (new_status, device_id))
+    cur.execute("UPDATE devices SET status = %s WHERE id = %s", (new_status, device_id))
     conn.commit()
     log_action(
         current_user.username, "toggle_device", "device", device_id,
@@ -81,7 +81,7 @@ def edit_device(device_id):
     """编辑设备信息"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()
@@ -97,7 +97,7 @@ def edit_device(device_id):
             return redirect(url_for("devices.edit_device", device_id=device_id))
         try:
             cur.execute(
-                "UPDATE devices SET device_code = ?, device_name = ?, model = ?, location = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                "UPDATE devices SET device_code = %s, device_name = %s, model = %s, location = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
                 (device_code, device_name, model, location, device_id),
             )
             conn.commit()
@@ -134,14 +134,14 @@ def delete_device(device_id):
     """删除设备（软删除）"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()
         flash("设备不存在。", "warning")
         return redirect(url_for("auth.index"))
     try:
-        cur.execute("UPDATE devices SET status = 'inactive', is_deleted = 1 WHERE id = ?", (device_id,))
+        cur.execute("UPDATE devices SET status = 'inactive', is_deleted = 1 WHERE id = %s", (device_id,))
         conn.commit()
         log_action(
             current_user.username, "delete_device", "device", device_id,
@@ -169,7 +169,7 @@ def change_device_status(device_id):
         return redirect(url_for("devices.device_detail", device_id=device_id))
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM devices WHERE id = ?", (device_id,))
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
     device = cur.fetchone()
     if device is None:
         conn.close()
@@ -182,7 +182,7 @@ def change_device_status(device_id):
         ensure_device_change_table(cur)
         execute_with_retry(
             cur,
-            "INSERT INTO device_status_requests (device_id, requested_by, new_status, reason) VALUES (?, ?, ?, ?)",
+            "INSERT INTO device_status_requests (device_id, requested_by, new_status, reason) VALUES (%s, %s, %s, %s)",
             (device_id, current_user.username, new_status, reason),
         )
         conn.commit()
@@ -199,7 +199,7 @@ def change_device_status(device_id):
     try:
         execute_with_retry(
             cur,
-            "UPDATE devices SET status = ? WHERE id = ?",
+            "UPDATE devices SET status = %s WHERE id = %s",
             (new_status, device_id),
         )
         conn.commit()

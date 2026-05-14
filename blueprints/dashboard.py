@@ -43,17 +43,17 @@ def dashboard():
     params = []
     where = "WHERE is_deleted IS NULL OR is_deleted = 0"
     if status_filter:
-        where += " AND status = ?"
+        where += " AND status = %s"
         params.append(status_filter)
     if q:
-        where += " AND (device_code LIKE ? OR device_name LIKE ? OR model LIKE ? OR location LIKE ?)"
+        where += " AND (device_code LIKE %s OR device_name LIKE %s OR model LIKE %s OR location LIKE %s)"
         like = f"%{q}%"
         params.extend([like, like, like, like])
     count_sql = f"SELECT COUNT(*) as total FROM devices {where}"
     cur.execute(count_sql, params)
     total = cur.fetchone()["total"]
     offset = (page - 1) * per_page
-    list_sql = f"SELECT id, device_code, device_name, model, location, status FROM devices {where} ORDER BY status, device_code LIMIT ? OFFSET ?"
+    list_sql = f"SELECT id, device_code, device_name, model, location, status FROM devices {where} ORDER BY status, device_code LIMIT %s OFFSET %s"
     list_params = params + [per_page, offset]
     cur.execute(list_sql, list_params)
     devices = [dict(r) for r in cur.fetchall()]
@@ -306,7 +306,7 @@ def add_device():
         cur = conn.cursor()
         try:
             cur.execute(
-                "INSERT INTO devices (device_code, device_name, model, location) VALUES (?, ?, ?, ?)",
+                "INSERT INTO devices (device_code, device_name, model, location) VALUES (%s, %s, %s, %s)",
                 (device_code, device_name, model, location),
             )
             conn.commit()

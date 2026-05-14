@@ -26,7 +26,7 @@ def api_search():
         """
         SELECT id, device_code, device_name, model, location, status
         FROM devices
-        WHERE (device_code LIKE ? OR device_name LIKE ? OR model LIKE ? OR location LIKE ?)
+        WHERE (device_code LIKE %s OR device_name LIKE %s OR model LIKE %s OR location LIKE %s)
         AND (is_deleted IS NULL OR is_deleted = 0)
         LIMIT 5
         """,
@@ -50,7 +50,7 @@ def api_search():
                dev.device_code, dev.device_name
         FROM documents d
         JOIN devices dev ON dev.id = d.device_id
-        WHERE d.doc_name LIKE ? AND d.is_deleted = 0
+        WHERE d.doc_name LIKE %s AND d.is_deleted = 0
         LIMIT 5
         """,
         (like,),
@@ -74,7 +74,7 @@ def api_search():
         FROM borrow_records br
         JOIN documents d ON d.id = br.doc_id
         JOIN devices dev ON dev.id = d.device_id
-        WHERE br.borrower LIKE ?
+        WHERE br.borrower LIKE %s
         LIMIT 3
         """,
         (like,),
@@ -133,7 +133,7 @@ def search_results():
             """
             SELECT id, device_code, device_name, model, location, status, created_at
             FROM devices
-            WHERE (device_code LIKE ? OR device_name LIKE ? OR model LIKE ? OR location LIKE ?)
+            WHERE (device_code LIKE %s OR device_name LIKE %s OR model LIKE %s OR location LIKE %s)
             AND (is_deleted IS NULL OR is_deleted = 0)
             ORDER BY device_name
             """,
@@ -161,7 +161,7 @@ def search_results():
                    dev.device_code, dev.device_name
             FROM documents d
             JOIN devices dev ON dev.id = d.device_id
-            WHERE d.doc_name LIKE ? AND d.is_deleted = 0
+            WHERE d.doc_name LIKE %s AND d.is_deleted = 0
             ORDER BY d.upload_time DESC
             """,
             (like,),
@@ -189,7 +189,7 @@ def search_results():
             FROM borrow_records br
             JOIN documents d ON d.id = br.doc_id
             JOIN devices dev ON dev.id = d.device_id
-            WHERE br.borrower LIKE ?
+            WHERE br.borrower LIKE %s
             ORDER BY br.borrow_date DESC
             """,
             (like,),

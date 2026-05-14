@@ -35,7 +35,7 @@ def get_next_version(conn, device_id, doc_type):
     cur.execute(
         """
         SELECT version FROM documents
-        WHERE device_id = ? AND doc_type = ? AND is_deleted = 0
+        WHERE device_id = %s AND doc_type = %s AND is_deleted = 0
         ORDER BY id DESC LIMIT 1
         """,
         (device_id, doc_type),

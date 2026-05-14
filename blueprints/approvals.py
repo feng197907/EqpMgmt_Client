@@ -44,20 +44,20 @@ def decide_approval(request_id):
         return redirect(url_for("approvals.approvals"))
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM approval_requests WHERE id = ?", (request_id,))
+    cur.execute("SELECT * FROM approval_requests WHERE id = %s", (request_id,))
     req = cur.fetchone()
     if req is None or req["status"] != "pending":
         conn.close()
         flash("审批请求不存在或已处理。", "warning")
         return redirect(url_for("approvals.approvals"))
-    cur.execute("SELECT * FROM documents WHERE id = ?", (req["doc_id"],))
+    cur.execute("SELECT * FROM documents WHERE id = %s", (req["doc_id"],))
     doc = cur.fetchone()
     if doc is None:
         conn.close()
         flash("关联文档不存在。", "warning")
         return redirect(url_for("approvals.approvals"))
     cur.execute(
-        "SELECT * FROM approval_steps WHERE request_id = ? AND status = 'pending' ORDER BY step_order ASC LIMIT 1",
+        "SELECT * FROM approval_steps WHERE request_id = %s AND status = 'pending' ORDER BY step_order ASC LIMIT 1",
         (request_id,),
     )
     step = cur.fetchone()
@@ -70,7 +70,7 @@ def decide_approval(request_id):
     doc_hash = compute_doc_hash(doc["file_path"], current_user.username, meaning, signed_at)
     execute_with_retry(
         cur,
-        "INSERT INTO signatures (user, meaning, doc_id, doc_version, doc_hash, ip_address, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO signatures (user, meaning, doc_id, doc_version, doc_hash, ip_address, user_agent) VALUES (%s, %s, %s, %s, %s, %s, %s)",
         (
             current_user.username,
             meaning,
@@ -85,17 +85,17 @@ def decide_approval(request_id):
     new_status = "approved" if decision == "approve" else "rejected"
     execute_with_retry(
         cur,
-        "UPDATE approval_steps SET status = ?, decided_by = ?, decided_at = CURRENT_TIMESTAMP, comment = ?, signature_id = ? WHERE id = ?",
+        "UPDATE approval_steps SET status = %s, decided_by = %s, decided_at = CURRENT_TIMESTAMP, comment = %s, signature_id = %s WHERE id = %s",
         (new_status, current_user.username, comment, signature_id, step["id"]),
     )
     if decision == "approve":
-        execute_with_retry(cur, "UPDATE approval_requests SET status = 'approved' WHERE id = ?", (request_id,))
+        execute_with_retry(cur, "UPDATE approval_requests SET status = 'approved' WHERE id = %s", (request_id,))
         execute_with_retry(
             cur,
-            "UPDATE documents SET status = 'archived' WHERE device_id = ? AND doc_type = ? AND status = 'active' AND id != ?",
+            "UPDATE documents SET status = 'archived' WHERE device_id = %s AND doc_type = %s AND status = 'active' AND id != %s",
             (doc["device_id"], doc["doc_type"], doc["id"]),
         )
-        execute_with_retry(cur, "UPDATE documents SET status = 'active' WHERE id = ?", (doc["id"],))
+        execute_with_retry(cur, "UPDATE documents SET status = 'active' WHERE id = %s", (doc["id"],))
         log_action_with_cursor(
             cur, current_user.username, "approve_document", "document", doc["id"],
             "审批通过", before_value={"status": "pending"}, after_value={"status": "active"},
@@ -104,8 +104,8 @@ def decide_approval(request_id):
         )
         flash("审批通过。", "success")
     else:
-        execute_with_retry(cur, "UPDATE approval_requests SET status = 'rejected' WHERE id = ?", (request_id,))
-        execute_with_retry(cur, "UPDATE documents SET status = 'draft' WHERE id = ?", (doc["id"],))
+        execute_with_retry(cur, "UPDATE approval_requests SET status = 'rejected' WHERE id = %s", (request_id,))
+        execute_with_retry(cur, "UPDATE documents SET status = 'draft' WHERE id = %s", (doc["id"],))
         log_action_with_cursor(
             cur, current_user.username, "reject_document", "document", doc["id"],
             "审批拒绝", before_value={"status": "pending"}, after_value={"status": "draft"},

@@ -24,7 +24,7 @@ def forgot_password():
         # 检查用户是否存在
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT id, status FROM users WHERE username = ?", (username,))
+        cur.execute("SELECT id, status FROM users WHERE username = %s", (username,))
         user = cur.fetchone()
 
         if user is None:
@@ -41,7 +41,7 @@ def forgot_password():
         # 检查是否已有未完成的 pending 请求（防止频繁提交）
         cur.execute(
             """SELECT id FROM password_reset_requests
-               WHERE username = ? AND status = 'pending'
+               WHERE username = %s AND status = 'pending'
                ORDER BY requested_at DESC LIMIT 1""",
             (username,),
         )
@@ -56,7 +56,7 @@ def forgot_password():
         ip_address = request.remote_addr or ""
         cur.execute(
             """INSERT INTO password_reset_requests (user_id, username, ip_address)
-               VALUES (?, ?, ?)""",
+               VALUES (%s, %s, %s)""",
             (user["id"], username, ip_address),
         )
         conn.commit()
@@ -86,7 +86,7 @@ def admin_password_resets():
             """SELECT pr.*, u.role, u.status as user_status
                FROM password_reset_requests pr
                LEFT JOIN users u ON pr.user_id = u.id
-               WHERE pr.status = ?
+               WHERE pr.status = %s
                ORDER BY pr.requested_at DESC""",
             (status_filter,),
         )
@@ -124,7 +124,7 @@ def admin_reset_password(request_id):
 
     # 查询重置请求
     cur.execute(
-        "SELECT * FROM password_reset_requests WHERE id = ?",
+        "SELECT * FROM password_reset_requests WHERE id = %s",
         (request_id,),
     )
     reset_req = cur.fetchone()
@@ -145,8 +145,8 @@ def admin_reset_password(request_id):
             """UPDATE password_reset_requests
                SET status = 'cancelled',
                    processed_at = datetime('now'),
-                   processed_by = ?
-               WHERE id = ?""",
+                   processed_by = %s
+               WHERE id = %s""",
             (current_user.username, request_id),
         )
         conn.commit()
@@ -163,7 +163,7 @@ def admin_reset_password(request_id):
     # 更新用户密码
     hashed_password = generate_password_hash(new_password)
     cur.execute(
-        "UPDATE users SET password = ? WHERE id = ?",
+        "UPDATE users SET password = %s WHERE id = %s",
         (hashed_password, reset_req["user_id"]),
     )
 
@@ -172,8 +172,8 @@ def admin_reset_password(request_id):
         """UPDATE password_reset_requests
            SET status = 'completed',
                processed_at = datetime('now'),
-               processed_by = ?
-           WHERE id = ?""",
+               processed_by = %s
+           WHERE id = %s""",
         (current_user.username, request_id),
     )
 

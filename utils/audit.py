@@ -36,7 +36,7 @@ def log_action_with_cursor(
         """
         INSERT INTO audit_logs
         (user, action, target_type, target_id, details, before_value, after_value, reason, ip_address)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             user,

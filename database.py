@@ -20,6 +20,10 @@ except ImportError:
 # 数据库类型：'mysql' 或 'sqlite'
 DB_TYPE = os.environ.get('DB_TYPE', 'mysql')  # 默认使用 MySQL
 
+# SQLite 数据库路径（备用）
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'equipment.db')
+
 # MySQL 配置
 MYSQL_CONFIG = {
     'host': os.environ.get('MYSQL_HOST', 'localhost'),

@@ -22,7 +22,7 @@ def get_document_rows(device_id):
                 GROUP BY doc_id
             ) latest ON latest.max_id = b1.id
         ) br ON br.doc_id = d.id
-        WHERE d.device_id = ? AND d.is_deleted = 0
+        WHERE d.device_id = %s AND d.is_deleted = 0
         ORDER BY d.doc_type, d.upload_time DESC
         """,
         (device_id,),

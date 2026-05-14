@@ -15,7 +15,7 @@ app = Flask(__name__)
 # 配置
 GIT_DIR = "/data/EquipmentManagement"
 WEBHOOK_SECRET = "your_secret_token_here"  # 替换为您的 webhook 密钥
-DEPLOY_COMMAND = "cd /root/EquipmentManagement && git pull origin main"
+DEPLOY_COMMAND = "cd /data/EquipmentManagement && git pull origin main"
 RESTART_COMMAND = "systemctl restart flask-app"  # 或其他重启命令
 
 # 日志配置

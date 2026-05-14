@@ -14,7 +14,7 @@ app = Flask(__name__)
 
 # 配置
 GIT_DIR = "/data/EquipmentManagement"
-WEBHOOK_SECRET = "your_secret_token_here"  # 替换为您的 webhook 密钥
+WEBHOOK_SECRET = "6C1BFF08-CF1F-2813-907A-44B39B4D7FE5"  # 替换为您的 webhook 密钥
 DEPLOY_COMMAND = "cd /data/EquipmentManagement && git pull origin main"
 RESTART_COMMAND = "systemctl restart flask-app"  # 或其他重启命令
 
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 def verify_signature(payload_body, signature_header):
     """验证 GitHub webhook 签名"""
-    if not WEBHOOK_SECRET or WEBHOOK_SECRET == "your_secret_token_here":
+    if not WEBHOOK_SECRET or WEBHOOK_SECRET == "6C1BFF08-CF1F-2813-907A-44B39B4D7FE5":
         logger.warning("Webhook secret not configured, skipping verification")
         return True
     

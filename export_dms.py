@@ -16,7 +16,7 @@ import re
 from datetime import datetime
 
 # 配置
-DB_PATH = '/data/EquipmentManagement/dms.d'
+DB_PATH = '/data/EquipmentManagement/dms.db'
 OUTPUT_PATH = '/data/EquipmentManagement/migrate_dms.sql'
 
 def convert_sqlite_to_mysql_type(sqlite_type):

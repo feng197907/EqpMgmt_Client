@@ -88,7 +88,13 @@ def build_due_maintenance_reminders(conn, days=7, user=None):
     seven_days_later = today + timedelta(days=7)
 
     for row in plans:
-        due_date = datetime.strptime(row["next_due_date"], "%Y-%m-%d").date()
+        next_due = row["next_due_date"]
+        if isinstance(next_due, datetime):
+            due_date = next_due.date() if hasattr(next_due, 'date') else next_due
+        elif isinstance(next_due, str):
+            due_date = datetime.strptime(next_due, "%Y-%m-%d").date()
+        else:
+            due_date = next_due
         delta = (due_date - today).days
 
         item = {

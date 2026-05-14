@@ -55,7 +55,8 @@ def _get_mysql_db():
         password=MYSQL_CONFIG['password'],
         database=MYSQL_CONFIG['database'],
         charset='utf8mb4',
-        cursorclass=pymysql.cursors.DictCursor
+        cursorclass=pymysql.cursors.DictCursor,
+        ssl_disabled=True  # 添加这行
     )
     return conn
 

@@ -89,16 +89,16 @@ def ensure_device_change_table(cur):
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS device_status_requests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_id INTEGER NOT NULL,
-            requested_by TEXT NOT NULL,
-            new_status TEXT NOT NULL,
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            device_id INT NOT NULL,
+            requested_by VARCHAR(255) NOT NULL,
+            new_status VARCHAR(50) NOT NULL,
             reason TEXT,
-            status TEXT NOT NULL DEFAULT 'pending',
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            decided_by TEXT,
-            decided_at TIMESTAMP,
+            decided_by VARCHAR(255),
+            decided_at TIMESTAMP NULL,
             comment TEXT
-        )
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
     )

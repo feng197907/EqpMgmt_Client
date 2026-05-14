@@ -18,7 +18,7 @@ WEBHOOK_SECRET = "your_secret_token_here"  # 替换为您的 webhook 密钥
 DEPLOY_COMMAND = "cd /data/EquipmentManagement && git pull origin main"
 RESTART_COMMAND = "systemctl restart flask-app"  # 或其他重启命令
 
-# 日志配置
+# 日志配置 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',

@@ -607,11 +607,22 @@ def _ensure_default_settings(cur, conn):
         ("approval_enabled", "true", "是否启用审批流程（设备变更、文档上传等）"),
         ("auto_approve_document", "false", "文档上传后是否自动生效"),
     ]
+    import time
+    max_retries = 3
     for key, value, description in default_settings:
-        cur.execute(
-            "INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (%s, %s, %s)",
-            (key, value, description),
-        )
+        for attempt in range(max_retries):
+            try:
+                cur.execute(
+                    "INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (%s, %s, %s)",
+                    (key, value, description),
+                )
+                break
+            except pymysql.err.OperationalError as e:
+                if e.args[0] == 1213 and attempt < max_retries - 1:  # Deadlock
+                    conn.rollback()
+                    time.sleep(0.1 * (attempt + 1))
+                else:
+                    raise
 
 
 def get_system_setting(key, default=None):

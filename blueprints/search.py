@@ -184,7 +184,7 @@ def search_results():
     if not filter_type or filter_type == "borrow":
         cur.execute(
             """
-            SELECT br.id, br.borrower, br.status, br.borrow_date, br.return_date,
+            SELECT br.id, br.borrower, br.status, br.borrow_date, br.actual_return_date,
                    d.doc_name, dev.device_name
             FROM borrow_records br
             JOIN documents d ON d.id = br.doc_id

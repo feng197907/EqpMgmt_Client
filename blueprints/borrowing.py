@@ -74,7 +74,7 @@ def return_doc(borrow_id):
         conn.close()
         flash("该记录已归还。", "info")
         return redirect(url_for("borrowing.borrow_list"))
-    cur.execute("UPDATE borrow_records SET status = 'returned', return_date = CURRENT_TIMESTAMP WHERE id = ?", (borrow_id,))
+    cur.execute("UPDATE borrow_records SET status = 'returned', actual_return_date = CURRENT_TIMESTAMP WHERE id = ?", (borrow_id,))
     conn.commit()
     log_action(current_user.username, "return_document", "borrow", borrow_id, "归还文档")
     conn.close()

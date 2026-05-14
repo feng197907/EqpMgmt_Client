@@ -1,6 +1,11 @@
 # DMS 设备管理系统 - Flask 应用工厂
 import os
 
+from dotenv import load_dotenv
+
+# 加载 .env 文件中的环境变量
+load_dotenv()
+
 from flask import Flask
 
 from config import (

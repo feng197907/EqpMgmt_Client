@@ -91,7 +91,7 @@ def _init_mysql_tables(cur, conn):
             password VARCHAR(255) NOT NULL,
             role VARCHAR(50) NOT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'active',
-            permissions TEXT DEFAULT '[]'
+            permissions VARCHAR(500) DEFAULT '[]'
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     """)
 
@@ -120,7 +120,7 @@ def _init_mysql_tables(cur, conn):
             file_path VARCHAR(500) NOT NULL,
             uploaded_by VARCHAR(255) NOT NULL,
             upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            remarks TEXT,
+            remarks VARCHAR(1000),
             status VARCHAR(50) NOT NULL DEFAULT 'draft',
             download_count INT DEFAULT 0,
             is_deleted TINYINT DEFAULT 0,
@@ -149,10 +149,10 @@ def _init_mysql_tables(cur, conn):
             action VARCHAR(50) NOT NULL,
             target_type VARCHAR(50) NOT NULL,
             target_id INT,
-            details TEXT,
-            before_value TEXT,
-            after_value TEXT,
-            reason TEXT,
+            details VARCHAR(2000),
+            before_value VARCHAR(1000),
+            after_value VARCHAR(1000),
+            reason VARCHAR(1000),
             ip_address VARCHAR(50),
             log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -181,7 +181,7 @@ def _init_mysql_tables(cur, conn):
             status VARCHAR(50) NOT NULL DEFAULT 'pending',
             decided_by VARCHAR(255),
             decided_at TIMESTAMP NULL,
-            comment TEXT,
+            comment VARCHAR(1000),
             signature_id INT,
             FOREIGN KEY (request_id) REFERENCES approval_requests(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -192,12 +192,12 @@ def _init_mysql_tables(cur, conn):
         CREATE TABLE IF NOT EXISTS signatures (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user VARCHAR(255) NOT NULL,
-            meaning TEXT NOT NULL,
+            meaning VARCHAR(1000) NOT NULL,
             doc_id INT NOT NULL,
             doc_version VARCHAR(50) NOT NULL,
             doc_hash VARCHAR(255) NOT NULL,
             ip_address VARCHAR(50),
-            user_agent TEXT,
+            user_agent VARCHAR(500),
             signed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -209,7 +209,7 @@ def _init_mysql_tables(cur, conn):
             id INT AUTO_INCREMENT PRIMARY KEY,
             setting_key VARCHAR(255) UNIQUE NOT NULL,
             setting_value TEXT NOT NULL,
-            description TEXT,
+            description VARCHAR(500),
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             updated_by VARCHAR(255)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -252,12 +252,12 @@ def _init_mysql_tables(cur, conn):
             plan_id INT NOT NULL,
             device_id INT NOT NULL,
             maintenance_type VARCHAR(50) NOT NULL,
-            content TEXT NOT NULL,
+            content VARCHAR(2000) NOT NULL,
             result VARCHAR(50) NOT NULL,
             performed_by VARCHAR(255) NOT NULL,
             performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             next_due_date VARCHAR(50) NOT NULL,
-            parts_used TEXT,
+            parts_used VARCHAR(1000),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (plan_id) REFERENCES maintenance_plan(id) ON DELETE CASCADE,
             FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
@@ -273,7 +273,7 @@ def _init_mysql_tables(cur, conn):
             id INT AUTO_INCREMENT PRIMARY KEY,
             device_id INT NOT NULL,
             new_status VARCHAR(50) NOT NULL,
-            reason TEXT,
+            reason VARCHAR(1000),
             status VARCHAR(50) NOT NULL DEFAULT 'pending',
             created_by VARCHAR(255) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

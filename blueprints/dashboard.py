@@ -2,7 +2,7 @@
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
-from config import DEVICE_STATUS_LABELS, DOC_STATUS_LABELS
+from config import DEVICE_STATUS_LABELS, DOC_STATUS_LABELS, ROLE_LABELS
 from database import get_db
 from utils.audit import log_action
 from utils.decorators import admin_required
@@ -143,60 +143,78 @@ def user_stories():
     role_cards = [
         {
             "role": "QA经理",
+            "role_key": "qa_manager",
+            "card_class": "qa",
+            "avatar_icon": '<i data-lucide="shield-check"></i>',
             "summary": f"待审批 {pending_approvals} 项，文档待处理 {pending_documents} 份",
             "card_features": ["审批待办", "审计日志", "合规状态总览"],
             "links": [
-                {"label": "审批待办", "endpoint": "approvals.approvals"},
-                {"label": "审计日志", "endpoint": "dashboard.audit_log"},
-                {"label": "设备看板", "endpoint": "dashboard.dashboard"},
+                {"label": "审批待办", "endpoint": "approvals.approvals", "icon": "check-square"},
+                {"label": "审计日志", "endpoint": "dashboard.audit_log", "icon": "scroll-text"},
+                {"label": "设备看板", "endpoint": "dashboard.dashboard", "icon": "layout-grid"},
             ],
         },
         {
             "role": "设备工程师",
+            "role_key": "equipment_engineer",
+            "card_class": "engineer",
+            "avatar_icon": '<i data-lucide="wrench"></i>',
             "summary": f"设备检索与详情页已可用，当前设备数 {device_total}",
-            "card_features": ["设备详情", "文档检索", "文档下载"],
+            "card_features": ["设备详情", "文档检索", "设备校准"],
             "links": [
-                {"label": "设备列表", "endpoint": "auth.index"},
-                {"label": "文档检索", "endpoint": "documents.document_search"},
-                {"label": "新增设备", "endpoint": "dashboard.add_device"},
+                {"label": "设备列表", "endpoint": "dashboard.dashboard", "icon": "server"},
+                {"label": "文档检索", "endpoint": "documents.document_search", "icon": "search"},
+                {"label": "新增设备", "endpoint": "dashboard.add_device", "icon": "plus-circle"},
             ],
         },
         {
             "role": "验证工程师",
+            "role_key": "validation_engineer",
+            "card_class": "validation",
+            "avatar_icon": '<i data-lucide="file-check"></i>',
             "summary": f"最近版本记录 {len(recent_documents)} 条，可查看版本历史",
             "card_features": ["版本历史", "文档审批", "历史追溯"],
-            "links": validation_links,
+            "links": validation_links + [{"label": "设备看板", "endpoint": "dashboard.dashboard", "icon": "layout-grid"}],
         },
         {
             "role": "档案管理员",
+            "role_key": "archivist",
+            "card_class": "archive",
+            "avatar_icon": '<i data-lucide="archive"></i>',
             "summary": f"当前借阅中 {borrowed_total} 份，可追踪归还状态",
             "card_features": ["借阅记录", "归还确认", "文档归档"],
             "links": archive_links,
         },
         {
             "role": "生产主管",
+            "role_key": "production_supervisor",
+            "card_class": "production",
+            "avatar_icon": '<i data-lucide="clipboard-list"></i>',
             "summary": "设备状态分布已在看板中展示，可快速了解运行与停用情况",
             "card_features": ["设备看板", "状态筛选", "设备详情"],
             "links": [
-                {"label": "设备看板", "endpoint": "dashboard.dashboard"},
-                {"label": "设备列表", "endpoint": "auth.index"},
-                {"label": "提醒中心", "endpoint": "dashboard.reminders"},
+                {"label": "设备看板", "endpoint": "dashboard.dashboard", "icon": "layout-grid"},
+                {"label": "提醒中心", "endpoint": "dashboard.reminders", "icon": "bell"},
             ],
         },
         {
             "role": "计量工程师",
+            "role_key": "metrology_engineer",
+            "card_class": "metrology",
+            "avatar_icon": '<i data-lucide="ruler"></i>',
             "summary": f"校准提醒 {len(calibration_reminders)} 条，覆盖近期需关注文档",
             "card_features": ["校准提醒", "校准记录", "到期关注"],
             "links": [
-                {"label": "提醒中心", "endpoint": "dashboard.reminders"},
-                {"label": "文档检索", "endpoint": "documents.document_search"},
-                {"label": "设备看板", "endpoint": "dashboard.dashboard"},
+                {"label": "提醒中心", "endpoint": "dashboard.reminders", "icon": "bell"},
+                {"label": "文档检索", "endpoint": "documents.document_search", "icon": "search"},
+                {"label": "设备看板", "endpoint": "dashboard.dashboard", "icon": "layout-grid"},
             ],
         },
     ]
     return render_template(
         "user_stories.html",
         role_cards=role_cards,
+        role_labels=ROLE_LABELS,
         device_status_counts=device_status_counts,
         pending_documents=pending_documents,
         pending_approvals=pending_approvals,

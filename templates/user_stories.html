@@ -1,153 +1,852 @@
 {% extends 'base.html' %}
+
+{% block head %}
+<style>
+    /* ===== 主题配色 ===== */
+    :root {
+        --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        --warning-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        --info-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --dark-gradient: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        --card-shadow: 0 10px 40px rgba(0,0,0,0.08);
+        --card-hover-shadow: 0 20px 60px rgba(0,0,0,0.12);
+        --border-radius: 16px;
+        --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ===== 页面布局 ===== */
+    .user-stories-page {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 0;
+    }
+
+    /* ===== 头部欢迎区 ===== */
+    .welcome-header {
+        background: var(--primary-gradient);
+        border-radius: var(--border-radius);
+        padding: 2.5rem;
+        margin-bottom: 2rem;
+        color: white;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .welcome-header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -10%;
+        width: 400px;
+        height: 400px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 50%;
+    }
+
+    .welcome-header::after {
+        content: '';
+        position: absolute;
+        bottom: -30%;
+        left: -5%;
+        width: 300px;
+        height: 300px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 50%;
+    }
+
+    .welcome-content {
+        position: relative;
+        z-index: 1;
+    }
+
+    .welcome-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .welcome-subtitle {
+        font-size: 1rem;
+        opacity: 0.9;
+    }
+
+    /* ===== 统计卡片网格 ===== */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 992px) {
+        .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 576px) {
+        .stats-grid { grid-template-columns: 1fr; }
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+        transition: var(--transition);
+        border: 1px solid rgba(0,0,0,0.05);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--card-hover-shadow);
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+    }
+
+    .stat-card.devices::before { background: linear-gradient(180deg, #667eea, #764ba2); }
+    .stat-card.pending::before { background: linear-gradient(180deg, #f5576c, #f093fb); }
+    .stat-card.borrowed::before { background: linear-gradient(180deg, #11998e, #38ef7d); }
+    .stat-card.calibration::before { background: linear-gradient(180deg, #4facfe, #00f2fe); }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+        font-size: 1.5rem;
+    }
+
+    .stat-card.devices .stat-icon { background: rgba(102, 126, 234, 0.1); color: #667eea; }
+    .stat-card.pending .stat-icon { background: rgba(245, 87, 108, 0.1); color: #f5576c; }
+    .stat-card.borrowed .stat-icon { background: rgba(17, 153, 142, 0.1); color: #11998e; }
+    .stat-card.calibration .stat-icon { background: rgba(79, 172, 254, 0.1); color: #4facfe; }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2c3e50;
+        line-height: 1.2;
+    }
+
+    .stat-change {
+        font-size: 0.75rem;
+        margin-top: 0.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .stat-change.up { color: #11998e; }
+    .stat-change.alert { color: #f5576c; }
+
+    /* ===== 快捷操作区 ===== */
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .quick-actions { grid-template-columns: 1fr; }
+    }
+
+    .quick-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        text-decoration: none;
+        color: #2c3e50;
+        transition: var(--transition);
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .quick-action-btn:hover {
+        transform: translateX(5px);
+        box-shadow: var(--card-hover-shadow);
+        color: #667eea;
+    }
+
+    .quick-action-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .quick-action-icon.primary { background: rgba(102, 126, 234, 0.1); color: #667eea; }
+    .quick-action-icon.success { background: rgba(17, 153, 142, 0.1); color: #11998e; }
+    .quick-action-icon.warning { background: rgba(245, 87, 108, 0.1); color: #f5576c; }
+
+    .quick-action-text h6 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+
+    .quick-action-text span {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    /* ===== 角色入口卡片 ===== */
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .section-title i {
+        color: #667eea;
+    }
+
+    .role-cards {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 992px) {
+        .role-cards { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 576px) {
+        .role-cards { grid-template-columns: 1fr; }
+    }
+
+    .role-card {
+        background: white;
+        border-radius: var(--border-radius);
+        padding: 1.5rem;
+        box-shadow: var(--card-shadow);
+        transition: var(--transition);
+        border: 1px solid rgba(0,0,0,0.05);
+        position: relative;
+    }
+
+    .role-card:hover {
+        transform: translateY(-8px);
+        box-shadow: var(--card-hover-shadow);
+    }
+
+    .role-card-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .role-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        flex-shrink: 0;
+    }
+
+    .role-card.qa .role-avatar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+    .role-card.engineer .role-avatar { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
+    .role-card.validation .role-avatar { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+    .role-card.archive .role-avatar { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+    .role-card.production .role-avatar { background: linear-gradient(135deg, #f5af19 0%, #f12711 100%); color: white; }
+    .role-card.metrology .role-avatar { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); color: #764ba2; }
+
+    .role-info h5 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1rem;
+        color: #2c3e50;
+    }
+
+    .role-info .badge {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    .role-summary {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 1rem;
+        line-height: 1.5;
+    }
+
+    .role-features {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 1rem 0;
+    }
+
+    .role-features li {
+        font-size: 0.85rem;
+        color: #495057;
+        padding: 0.35rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .role-features li::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #667eea;
+        flex-shrink: 0;
+    }
+
+    .role-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .role-links .btn {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.85rem;
+        border-radius: 8px;
+    }
+
+    /* ===== 待办事项 ===== */
+    .todo-section {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .todo-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.25rem;
+    }
+
+    .todo-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+
+    @media (max-width: 768px) {
+        .todo-list { grid-template-columns: 1fr; }
+    }
+
+    .todo-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background: #f8f9fa;
+        border-radius: 12px;
+        transition: var(--transition);
+    }
+
+    .todo-item:hover {
+        background: #f0f4ff;
+    }
+
+    .todo-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .todo-icon.urgent { background: rgba(245, 87, 108, 0.15); color: #f5576c; }
+    .todo-icon.warning { background: rgba(245, 175, 25, 0.15); color: #f5af19; }
+    .todo-icon.info { background: rgba(102, 126, 234, 0.15); color: #667eea; }
+
+    .todo-content {
+        flex: 1;
+    }
+
+    .todo-title {
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: #2c3e50;
+        margin-bottom: 0.15rem;
+    }
+
+    .todo-desc {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .todo-action {
+        flex-shrink: 0;
+    }
+
+    /* ===== 最近动态 ===== */
+    .recent-section {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .recent-section { grid-template-columns: 1fr; }
+    }
+
+    .recent-card {
+        background: white;
+        border-radius: var(--border-radius);
+        box-shadow: var(--card-shadow);
+        overflow: hidden;
+    }
+
+    .recent-card-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #f0f0f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .recent-card-header h5 {
+        margin: 0;
+        font-weight: 600;
+        font-size: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .recent-card-header .badge {
+        font-size: 0.7rem;
+    }
+
+    .recent-card-body {
+        padding: 0;
+    }
+
+    .recent-item {
+        display: flex;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid #f8f9fa;
+        transition: var(--transition);
+    }
+
+    .recent-item:last-child { border-bottom: none; }
+
+    .recent-item:hover {
+        background: #f8f9fa;
+    }
+
+    .recent-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 1rem;
+        flex-shrink: 0;
+        font-size: 0.9rem;
+    }
+
+    .recent-icon.doc { background: rgba(102, 126, 234, 0.1); color: #667eea; }
+    .recent-icon.borrow { background: rgba(17, 153, 142, 0.1); color: #11998e; }
+
+    .recent-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .recent-title {
+        font-weight: 500;
+        font-size: 0.9rem;
+        color: #2c3e50;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .recent-meta {
+        font-size: 0.75rem;
+        color: #6c757d;
+    }
+
+    .recent-action {
+        flex-shrink: 0;
+    }
+
+    .status-badge {
+        font-size: 0.7rem;
+        padding: 0.25rem 0.6rem;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    .status-badge.active { background: rgba(17, 153, 142, 0.1); color: #11998e; }
+    .status-badge.pending { background: rgba(245, 175, 25, 0.1); color: #f5af19; }
+    .status-badge.borrowed { background: rgba(102, 126, 234, 0.1); color: #667eea; }
+    .status-badge.returned { background: rgba(108, 117, 125, 0.1); color: #6c757d; }
+
+    /* ===== 空状态 ===== */
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #6c757d;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .empty-state h5 {
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    /* ===== 动画 ===== */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .welcome-header { animation: fadeInUp 0.5s ease-out; }
+    .stat-card:nth-child(1) { animation: fadeInUp 0.5s ease-out 0.1s both; }
+    .stat-card:nth-child(2) { animation: fadeInUp 0.5s ease-out 0.2s both; }
+    .stat-card:nth-child(3) { animation: fadeInUp 0.5s ease-out 0.3s both; }
+    .stat-card:nth-child(4) { animation: fadeInUp 0.5s ease-out 0.4s both; }
+    .role-card:nth-child(1) { animation: fadeInUp 0.5s ease-out 0.5s both; }
+    .role-card:nth-child(2) { animation: fadeInUp 0.5s ease-out 0.6s both; }
+    .role-card:nth-child(3) { animation: fadeInUp 0.5s ease-out 0.7s both; }
+    .role-card:nth-child(4) { animation: fadeInUp 0.5s ease-out 0.8s both; }
+    .role-card:nth-child(5) { animation: fadeInUp 0.5s ease-out 0.9s both; }
+    .role-card:nth-child(6) { animation: fadeInUp 0.5s ease-out 1s both; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-1">用户故事中心</h3>
-    <div class="text-muted">按角色聚合常用入口，覆盖第 7 章中最常见的业务场景。</div>
-  </div>
-  <div class="btn-group">
-    <a class="btn btn-outline-primary" href="{{ url_for('dashboard.dashboard') }}">设备看板</a>
-    <a class="btn btn-outline-secondary" href="{{ url_for('documents.document_search') }}">文档检索</a>
-  </div>
-</div>
+<div class="user-stories-page">
+    <!-- 欢迎头部 -->
+    <div class="welcome-header">
+        <div class="welcome-content">
+            <h1 class="welcome-title">👋 欢迎回来，{{ current_user.username }}</h1>
+            <p class="welcome-subtitle">您当前的角色是 <strong>{{ role_labels.get(current_user.role, current_user.role) }}</strong>，以下是您的工作台入口</p>
+        </div>
+    </div>
 
-<div class="row g-3 mb-4">
-  <div class="col-md-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="text-muted small">设备总数</div>
-        <div class="fs-3 fw-bold">{{ device_total }}</div>
-      </div>
+    <!-- 统计卡片 -->
+    <div class="stats-grid">
+        <div class="stat-card devices">
+            <div class="stat-icon">
+                <i data-lucide="server"></i>
+            </div>
+            <div class="stat-label">设备总数</div>
+            <div class="stat-value">{{ device_total }}</div>
+            <div class="stat-change up">
+                <i data-lucide="trending-up"></i>
+                正常运行中
+            </div>
+        </div>
+        <div class="stat-card pending">
+            <div class="stat-icon">
+                <i data-lucide="clock"></i>
+            </div>
+            <div class="stat-label">待审批项</div>
+            <div class="stat-value">{{ pending_approvals }}</div>
+            <div class="stat-change {% if pending_approvals > 0 %}alert{% endif %}">
+                {% if pending_approvals > 0 %}
+                <i data-lucide="alert-circle"></i>
+                需要处理
+                {% else %}
+                <i data-lucide="check-circle"></i>
+                全部完成
+                {% endif %}
+            </div>
+        </div>
+        <div class="stat-card borrowed">
+            <div class="stat-icon">
+                <i data-lucide="book-open"></i>
+            </div>
+            <div class="stat-label">借阅中</div>
+            <div class="stat-value">{{ borrowed_total }}</div>
+            <div class="stat-change up">
+                <i data-lucide="activity"></i>
+                借阅活跃
+            </div>
+        </div>
+        <div class="stat-card calibration">
+            <div class="stat-icon">
+                <i data-lucide="alert-triangle"></i>
+            </div>
+            <div class="stat-label">校准提醒</div>
+            <div class="stat-value">{{ calibration_reminders|length }}</div>
+            <div class="stat-change {% if calibration_reminders|length > 0 %}alert{% endif %}">
+                {% if calibration_reminders|length > 0 %}
+                <i data-lucide="bell"></i>
+                待关注
+                {% else %}
+                <i data-lucide="check"></i>
+                无提醒
+                {% endif %}
+            </div>
+        </div>
     </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="text-muted small">待审批</div>
-        <div class="fs-3 fw-bold">{{ pending_approvals }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="text-muted small">借阅中</div>
-        <div class="fs-3 fw-bold">{{ borrowed_total }}</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <div class="text-muted small">校准提醒</div>
-        <div class="fs-3 fw-bold">{{ calibration_reminders|length }}</div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<div class="row g-3 mb-4">
-  {% for card in role_cards %}
-  <div class="col-lg-4 col-md-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h5 class="card-title">{{ card.role }}</h5>
-        <p class="text-muted mb-3">{{ card.summary }}</p>
-        <ul class="mb-3">
-          {% for item in card.card_features %}
-          <li>{{ item }}</li>
-          {% endfor %}
-        </ul>
-        <div class="d-flex flex-wrap gap-2">
-          {% for link in card.links %}
-            {% if link.get('doc_id') is not none %}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for(link.endpoint, doc_id=link.doc_id) }}">{{ link.label }}</a>
-            {% elif link.get('device_id') is not none %}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for(link.endpoint, device_id=link.device_id) }}">{{ link.label }}</a>
-            {% else %}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for(link.endpoint) }}">{{ link.label }}</a>
+    <!-- 快捷操作 -->
+    <div class="section-title">
+        <i data-lucide="zap"></i>
+        快捷操作
+    </div>
+    <div class="quick-actions">
+        <a href="{{ url_for('dashboard.dashboard') }}" class="quick-action-btn">
+            <div class="quick-action-icon primary">
+                <i data-lucide="layout-grid"></i>
+            </div>
+            <div class="quick-action-text">
+                <h6>设备看板</h6>
+                <span>查看所有设备状态</span>
+            </div>
+        </a>
+        <a href="{{ url_for('documents.document_search') }}" class="quick-action-btn">
+            <div class="quick-action-icon success">
+                <i data-lucide="search"></i>
+            </div>
+            <div class="quick-action-text">
+                <h6>文档检索</h6>
+                <span>搜索和查找文档</span>
+            </div>
+        </a>
+        {% if current_user.has_permission('document_approval') %}
+        <a href="{{ url_for('approvals.approvals') }}" class="quick-action-btn">
+            <div class="quick-action-icon warning">
+                <i data-lucide="check-square"></i>
+            </div>
+            <div class="quick-action-text">
+                <h6>审批待办</h6>
+                <span>{{ pending_approvals }} 项待处理</span>
+            </div>
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- 角色入口 -->
+    <div class="section-title">
+        <i data-lucide="users"></i>
+        角色工作台
+    </div>
+    <div class="role-cards">
+        {% for card in role_cards %}
+        <div class="role-card {{ card.card_class }}">
+            <div class="role-card-header">
+                <div class="role-avatar">
+                    {{ card.avatar_icon }}
+                </div>
+                <div class="role-info">
+                    <h5>{{ card.role }}</h5>
+                    <span class="badge bg-light text-dark">{{ card.role_key }}</span>
+                </div>
+            </div>
+            <p class="role-summary">{{ card.summary }}</p>
+            <ul class="role-features">
+                {% for item in card.card_features %}
+                <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+            <div class="role-links">
+                {% for link in card.links %}
+                    {% if link.get('doc_id') is not none %}
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for(link.endpoint, doc_id=link.doc_id) }}">
+                        <i data-lucide="{{ link.icon or 'external-link' }}" style="width:14px;height:14px"></i>
+                        {{ link.label }}
+                    </a>
+                    {% elif link.get('device_id') is not none %}
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for(link.endpoint, device_id=link.device_id) }}">
+                        <i data-lucide="{{ link.icon or 'external-link' }}" style="width:14px;height:14px"></i>
+                        {{ link.label }}
+                    </a>
+                    {% else %}
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for(link.endpoint) }}">
+                        <i data-lucide="{{ link.icon or 'external-link' }}" style="width:14px;height:14px"></i>
+                        {{ link.label }}
+                    </a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- 待办事项 -->
+    {% if pending_approvals > 0 or calibration_reminders|length > 0 %}
+    <div class="todo-section">
+        <div class="todo-header">
+            <div class="section-title mb-0">
+                <i data-lucide="list-todo"></i>
+                待办事项
+            </div>
+            <span class="badge bg-danger">{{ pending_approvals + calibration_reminders|length }} 项</span>
+        </div>
+        <div class="todo-list">
+            {% if pending_approvals > 0 %}
+            <a href="{{ url_for('approvals.approvals') }}" class="todo-item">
+                <div class="todo-icon urgent">
+                    <i data-lucide="alert-circle"></i>
+                </div>
+                <div class="todo-content">
+                    <div class="todo-title">待审批文档</div>
+                    <div class="todo-desc">有 {{ pending_approvals }} 个审批请求等待处理</div>
+                </div>
+                <div class="todo-action">
+                    <span class="btn btn-danger btn-sm">立即处理</span>
+                </div>
+            </a>
             {% endif %}
-          {% endfor %}
+            {% for cal in calibration_reminders[:3] %}
+            <a href="{{ url_for('devices.device_detail', device_id=cal.device_id) }}" class="todo-item">
+                <div class="todo-icon warning">
+                    <i data-lucide="calendar"></i>
+                </div>
+                <div class="todo-content">
+                    <div class="todo-title">校准提醒</div>
+                    <div class="todo-desc">{{ cal.device_name }} - {{ cal.doc_name }}</div>
+                </div>
+                <div class="todo-action">
+                    <span class="btn btn-outline-secondary btn-sm">查看</span>
+                </div>
+            </a>
+            {% endfor %}
         </div>
-      </div>
     </div>
-  </div>
-  {% endfor %}
+    {% endif %}
+
+    <!-- 最近动态 -->
+    <div class="section-title">
+        <i data-lucide="activity"></i>
+        最近动态
+    </div>
+    <div class="recent-section">
+        <div class="recent-card">
+            <div class="recent-card-header">
+                <h5>
+                    <i data-lucide="file-text"></i>
+                    最近文档
+                </h5>
+                <a href="{{ url_for('documents.document_search') }}" class="btn btn-link btn-sm">查看全部</a>
+            </div>
+            <div class="recent-card-body">
+                {% for row in recent_documents %}
+                <div class="recent-item">
+                    <div class="recent-icon doc">
+                        <i data-lucide="file"></i>
+                    </div>
+                    <div class="recent-info">
+                        <div class="recent-title">{{ row.doc_name }}</div>
+                        <div class="recent-meta">{{ row.device_code }} · v{{ row.version }} · {{ row.upload_time[:10] }}</div>
+                    </div>
+                    <div class="recent-action">
+                        <span class="status-badge {{ row.status }}">
+                            {{ doc_status_labels.get(row.status, row.status) }}
+                        </span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i data-lucide="file-x"></i>
+                    <h5>暂无文档</h5>
+                    <p>还没有上传任何文档</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        <div class="recent-card">
+            <div class="recent-card-header">
+                <h5>
+                    <i data-lucide="book-open"></i>
+                    最近借阅
+                </h5>
+                <a href="{{ url_for('borrowing.borrow_list') }}" class="btn btn-link btn-sm">查看全部</a>
+            </div>
+            <div class="recent-card-body">
+                {% for row in recent_borrows %}
+                <div class="recent-item">
+                    <div class="recent-icon borrow">
+                        <i data-lucide="book"></i>
+                    </div>
+                    <div class="recent-info">
+                        <div class="recent-title">{{ row.doc_name }} v{{ row.version }}</div>
+                        <div class="recent-meta">{{ row.borrower }} · {{ row.borrow_date[:10] }}</div>
+                    </div>
+                    <div class="recent-action">
+                        <span class="status-badge {{ row.status }}">
+                            {% if row.status == 'borrowed' %}借出中
+                            {% elif row.status == 'returned' %}已归还
+                            {% elif row.status == 'pending' %}待审批
+                            {% else %}{{ row.status }}
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i data-lucide="book-x"></i>
+                    <h5>暂无借阅</h5>
+                    <p>还没有借阅记录</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="row g-3">
-  <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h5 class="card-title">最近文档</h5>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0">
-            <thead>
-              <tr>
-                <th>设备</th>
-                <th>文档</th>
-                <th>版本</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in recent_documents %}
-              <tr>
-                <td>{{ row.device_code }}</td>
-                <td>{{ row.doc_name }}</td>
-                <td>v{{ row.version }}</td>
-                <td>{{ doc_status_labels.get(row.status, row.status) }}</td>
-                <td><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('documents.document_history', doc_id=row.id) }}">历史</a></td>
-              </tr>
-              {% else %}
-              <tr><td colspan="5" class="text-center text-muted py-3">暂无文档</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-6">
-    <div class="card shadow-sm h-100">
-      <div class="card-body">
-        <h5 class="card-title">最近借阅</h5>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle mb-0">
-            <thead>
-              <tr>
-                <th>设备</th>
-                <th>文档</th>
-                <th>借阅人</th>
-                <th>状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for row in recent_borrows %}
-              <tr>
-                <td>{{ row.device_code }}</td>
-                <td>{{ row.doc_name }} v{{ row.version }}</td>
-                <td>{{ row.borrower }}</td>
-                <td>
-                  {% if row.status == 'pending' %}待审批
-                  {% elif row.status == 'approved' %}已批准
-                  {% elif row.status == 'rejected' %}已拒绝
-                  {% elif row.status == 'returned' %}已归还
-                  {% elif row.status == 'borrowed' %}借出中
-                  {% elif row.status == 'overdue' %}已逾期
-                  {% else %}{{ row.status }}
-                  {% endif %}
-                </td>
-              </tr>
-              {% else %}
-              <tr><td colspan="4" class="text-center text-muted py-3">暂无借阅</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+<script>
+// 初始化 Lucide 图标
+document.addEventListener('DOMContentLoaded', function() {
+    lucide.createIcons();
+});
+</script>
 {% endblock %}

@@ -23,6 +23,7 @@
   <link href="{{ url_for('static', filename='css/components.css') }}?v=2" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/pages.css') }}?v=2" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/pages-enhanced.css') }}?v=2" rel="stylesheet">
+  {% block head %}{% endblock %}
 </head>
 <body>
   <!-- 侧边栏 -->

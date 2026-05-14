@@ -684,7 +684,7 @@
         <div class="role-card {{ card.card_class }}">
             <div class="role-card-header">
                 <div class="role-avatar">
-                    {{ card.avatar_icon }}
+                    {{ card.avatar_icon|safe }}
                 </div>
                 <div class="role-info">
                     <h5>{{ card.role }}</h5>

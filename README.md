@@ -135,6 +135,16 @@ pip install -r requirements.txt
 
 # 启动服务
 python app.py
+
+# 实时查看应用日志
+tail -f /data/EquipmentManagement/logs/app.log
+
+# 查看错误日志
+tail -f /data/EquipmentManagement/logs/error.log
+
+# 搜索错误
+grep -i "error\|exception" /data/EquipmentManagement/logs/app.log
+
 ```
 
 ### Linux 服务器部署

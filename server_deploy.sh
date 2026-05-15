@@ -37,4 +37,8 @@ else
     echo "❌ 部署失败，请检查日志"
     echo "=============================================="
     echo "tail -f /data/EquipmentManagement/gunicorn.log"
+    echo "实时查看应用日志"
+    echo "tail -f /data/EquipmentManagement/logs/app.log"
+    echo "查看错误日志"
+    echo "tail -f /data/EquipmentManagement/logs/error.log"
 fi

@@ -32,6 +32,7 @@ from blueprints import (
     users_bp,
 )
 from extensions import login_manager
+from utils.logging_config import setup_logging
 from models.user import load_user
 
 
@@ -47,6 +48,7 @@ def create_app():
     # 初始化 Flask-Login
     login_manager.login_view = "auth.login"
     login_manager.init_app(app)
+    app = setup_logging(app)
 
     # 注册用户加载回调
     login_manager.user_loader(load_user)
@@ -135,3 +137,4 @@ app = create_app()
 
 if __name__ == "__main__":
     app.run(debug=True, use_reloader=False)
+

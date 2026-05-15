@@ -106,7 +106,91 @@
  nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app &
  ```
 
- ## 切换到 MySQL （可选）
+ ## 自动化部署（GitHub Webhook）
+
+本项目支持 GitHub Webhook 自动化部署，当代码推送到 GitHub 仓库时，服务器会自动拉取最新代码并重启服务。
+
+### 服务器端配置
+
+Webhook 服务已配置在腾讯云服务器上：
+
+- **Webhook 地址**：`http://82.157.4.72:5001/webhook`
+- **服务端口**：5001
+- **日志文件**：`/var/log/webhook-deploy.log`
+- **Webhook Secret**：`6C1BFF08-CF1F-2813-907A-44B39B4D7FE5`
+
+### 查看部署日志
+
+```bash
+# 实时查看部署日志
+tail -f /var/log/webhook-deploy.log
+
+# 查看最近10条日志
+tail -10 /var/log/webhook-deploy.log
+```
+
+### 部署日志示例
+
+当有代码推送时，日志会显示：
+
+```
+========================================
+=== Starting deployment at 2026-05-15 10:32:08 ===
+========================================
+[BEFORE] Branch: main, Commit: dbd318a6
+[BEFORE] Last commit: 重写README.md文件 (2026-05-15 10:26:25 +0800) by wangtiefeng
+[REMOTE] origin  git@github.com:feng197907/EquipmentManagement.git
+[GIT] Executing: git pull origin main...
+[GIT] Fetch origin: OK
+[GIT] Pull output:
+  | Already up-to-date.
+[CHANGE] No code changes (already up-to-date)
+[SERVICE] Gunicorn reloaded successfully
+========================================
+=== Deployment completed at 2026-05-15 10:32:14 ===
+========================================
+```
+
+### 管理 Webhook 服务
+
+```bash
+# SSH 登录服务器
+ssh root@82.157.4.72
+
+# 查看 webhook 服务状态
+ps aux | grep webhook_server
+
+# 重启 webhook 服务
+cd /data/EquipmentManagement
+pkill -f webhook_server
+nohup python3 scripts/webhook_server.py > /tmp/webhook.log 2>&1 &
+
+# 测试 webhook 服务
+curl http://82.157.4.72:5001/health
+```
+
+### GitHub Webhook 配置步骤
+
+1. 进入 GitHub 仓库 → Settings → Webhooks → Add webhook
+2. 配置以下选项：
+   - **Payload URL**：`http://82.157.4.72:5001/webhook`
+   - **Content type**：`application/json`
+   - **Secret**：`6C1BFF08-CF1F-2813-907A-44B39B4D7FE5`
+   - **SSL verification**：`Disable`（因为使用 HTTP）
+   - **Events**：选择 `Just the push event`
+3. 点击 `Add webhook`
+
+### 手动测试 Webhook
+
+```bash
+# 在服务器上手动触发一次部署
+curl -X POST http://82.157.4.72:5001/webhook \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-Event: push" \
+  -d '{"ref":"refs/heads/main","repository":{"name":"EquipmentManagement"}}'
+```
+
+## 切换到 MySQL （可选）
 
  1. 安装客户端：
 

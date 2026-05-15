@@ -1,216 +1,285 @@
- # 设备档案与文档管理系统（DMS）
+# 设备档案文档管理系统 (DMS)
 
- 一款基于 Flask 的轻量级设备档案与文档管理系统，默认使用 SQLite，适合中小型设备管理和文档归档场景。
+<div align="center">
 
- ## 精简说明
+![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
+![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
+![Status](https://img.shields.io/badge/Status-Production-brightgreen.svg)
 
- - 快速搭建：开箱即用，首次运行会自动初始化数据库并创建默认管理员。
- - 核心功能：设备台账、文档版本与下载、借阅管理、审批流、审计日志与菜单权限。
+**轻量级设备档案与文档管理系统 | 开箱即用 | 支持自动化部署**
 
- ## 主要特性
+[功能介绍](#功能介绍) • [快速开始](#快速开始) • [系统截图](#系统截图) • [部署指南](#部署指南) • [项目结构](#项目结构)
 
- - 设备管理：新增/编辑/停用/报废、状态与位置管理
- - 文档中心：上传、版本控制、下载统计
- - 借阅流程：借出/归还记录与审批
- - 审批与电子签名：支持多步骤审批与签名记录
- - 权限系统：7 类角色与菜单级权限控制
- - 审计日志：关键操作审计，便于追踪变更
+</div>
 
- ## 环境要求
+---
 
- - Python 3.10+
- - 建议在虚拟环境中运行（推荐使用项目自带 .venv）
+## 功能介绍
 
- ## 快速开始
+### 📋 核心功能
 
- 1. 安装依赖（在项目根目录）：
+| 模块 | 功能 | 说明 |
+|------|------|------|
+| **设备管理** | 新增/编辑/停用/报废 | 完整的设备生命周期管理 |
+| **设备看板** | 状态统计与列表 | 可视化设备分布情况 |
+| **设备校准** | 校准计划与记录 | 确保设备精度合规 |
+| **设备维护** | 维护计划与执行 | 预防性维护管理 |
+| **文档中心** | 上传/下载/版本控制 | 支持多版本文档管理 |
+| **借阅管理** | 借出/归还/审批 | 文档资产追踪 |
+| **审批流程** | 多级审批+电子签名 | 数字化审批体验 |
+| **提醒中心** | 待办事项与通知 | 不遗漏任何事项 |
 
- ```bash
- .venv\Scripts\python.exe -m pip install -r requirements.txt
- ```
+### 🔐 权限系统
 
- 2. 启动服务：
+系统内置 **7 种角色**，精细化权限控制：
 
- ```bash
- .venv\Scripts\python.exe app.py
- ```
-
- 3. 打开浏览器访问：
-
- ```text
- http://127.0.0.1:5000
- ```
-
- ## 默认账号
-
- - admin / admin123 （管理员）
- - user / user123 （设备工程师）
-
- 请首次登录后立即修改默认密码。
-
- ## 快速验证建议
-
- - 使用 `admin` 新建一个设备并进入详情页
- - 上传文档，检查版本号是否自增
- - 下载文档，查看下载次数统计
- - 创建并审批借阅记录，验证归还流程
-
- ## 项目结构（摘录）
-
- ```
- app.py
- config.py
- database.py
- blueprints/      # 路由模块
- models/          # 数据模型
- templates/       # Jinja2 模板
- static/          # 前端资源
- tests/           # 单元测试
- uploads/         # 上传文件
- ```
-
- ## 测试
-
- 使用 `pytest` 运行自动化测试（测试会使用临时数据库）：
-
- ```bash
- .venv\Scripts\python.exe -m pytest
- ```
-
- ## 部署（简要）
-
- - 推荐在 Linux 服务器上使用 `gunicorn` + `systemd` 部署。
- - 例：
-
- ```bash
- pip3 install gunicorn
- nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app &
 ```
- ## 手动重新部署
+┌─────────────────────────────────────────────────────────────┐
+│                        角色权限矩阵                          │
+├──────────┬────────┬────────┬────────┬────────┬────────┬──────┤
+│ 管理员   │ 设备工程师│ 文档管理员 │ 质量工程师│ 部门经理│ 主管 │访客│
+├──────────┼────────┼────────┼────────┼────────┼────────┼──────┤
+│    ✅    │   ✅   │   ✅   │   ✅   │   ✅   │   ✅   │  ❌  │
+└──────────┴────────┴────────┴────────┴────────┴────────┴──────┘
+```
+
+### 📊 审计追踪
+
+所有关键操作均记录审计日志，便于：
+- 合规审查
+- 问题追溯
+- 操作统计
+
+---
+
+## 快速开始
+
+### 环境要求
+
+- Python 3.10+
+- SQLite（默认）或 MySQL（可选）
+
+### 安装步骤
 
 ```bash
-cd /data/EquipmentManagement
-chmod +x server_deploy.sh
-./server_deploy.sh
- ```
+# 1. 克隆项目
+git clone https://github.com/YOUR_USERNAME/EquipmentManagement.git
+cd EquipmentManagement
 
- ## 自动化部署（GitHub Webhook）
+# 2. 安装依赖
+pip install -r requirements.txt
 
-本项目支持 GitHub Webhook 自动化部署，当代码推送到 GitHub 仓库时，服务器会自动拉取最新代码并重启服务。
+# 3. 启动服务
+python app.py
+```
 
-### 服务器端配置
+### 访问系统
 
-Webhook 服务已配置在腾讯云服务器上：
+> 🌐 **http://127.0.0.1:5000**
 
-- **Webhook 地址**：`http://82.157.4.72:5001/webhook`
-- **服务端口**：5001
-- **日志文件**：`/var/log/webhook-deploy.log`
-- **Webhook Secret**：`6C1BFF08-CF1F-2813-907A-44B39B4D7FE5`
+### 默认账号
 
-### 查看部署日志
+| 角色 | 用户名 | 密码 |
+|------|--------|------|
+| 管理员 | admin | admin123 |
+| 设备工程师 | user | user123 |
+
+> ⚠️ **请首次登录后立即修改默认密码！**
+
+---
+
+## 系统截图
+
+> 📸 **请将你的截图放置在 `docs/screenshots/` 目录下，然后替换下方的图片路径**
+
+### 登录页面
+![登录页面](docs/screenshots/login.png)
+
+### 设备看板
+![设备看板](docs/screenshots/dashboard.png)
+
+### 设备列表
+![设备列表](docs/screenshots/device-list.png)
+
+### 设备详情
+![设备详情](docs/screenshots/device-detail.png)
+
+### 文档中心
+![文档中心](docs/screenshots/document-center.png)
+
+### 借阅管理
+![借阅管理](docs/screenshots/borrowing.png)
+
+### 审批流程
+![审批流程](docs/screenshots/approval.png)
+
+### 提醒中心
+![提醒中心](docs/screenshots/reminder.png)
+
+### 系统设置
+![系统设置](docs/screenshots/settings.png)
+
+---
+
+## 部署指南
+
+### 本地开发部署
+
+```bash
+# 使用虚拟环境
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 启动服务
+python app.py
+```
+
+### Linux 服务器部署
+
+```bash
+# 安装依赖
+pip3 install flask gunicorn
+
+# 使用 systemd 管理服务
+sudo cp deploy/dms.service /etc/systemd/system/
+sudo systemctl enable dms
+sudo systemctl start dms
+```
+
+### 一键迁移
+
+新服务器快速部署：
+
+```bash
+curl -sL https://raw.githubusercontent.com/YOUR_USERNAME/EquipmentManagement/main/migrate/quick_migrate.sh | bash
+```
+
+---
+
+## 自动化部署
+
+本项目支持 **GitHub Webhook** 自动化部署。
+
+### 配置步骤
+
+1. GitHub 仓库 → Settings → Webhooks → Add webhook
+2. 配置：
+   - **Payload URL**: `http://YOUR_SERVER:5001/webhook`
+   - **Content type**: `application/json`
+   - **Secret**: `YOUR_WEBHOOK_SECRET`
+   - **Events**: `push`
+
+### 部署流程
+
+```
+Git Push → GitHub Webhook → 服务器自动拉取 → 重启服务
+```
+
+### 查看日志
 
 ```bash
 # 实时查看部署日志
 tail -f /var/log/webhook-deploy.log
-
-# 查看最近10条日志
-tail -10 /var/log/webhook-deploy.log
 ```
 
-### 部署日志示例
+---
 
-当有代码推送时，日志会显示：
+## 项目结构
 
 ```
-========================================
-=== Starting deployment at 2026-05-15 10:32:08 ===
-========================================
-[BEFORE] Branch: main, Commit: dbd318a6
-[BEFORE] Last commit: 重写README.md文件 (2026-05-15 10:26:25 +0800) by wangtiefeng
-[REMOTE] origin  git@github.com:feng197907/EquipmentManagement.git
-[GIT] Executing: git pull origin main...
-[GIT] Fetch origin: OK
-[GIT] Pull output:
-  | Already up-to-date.
-[CHANGE] No code changes (already up-to-date)
-[SERVICE] Gunicorn reloaded successfully
-========================================
-=== Deployment completed at 2026-05-15 10:32:14 ===
-========================================
+EquipmentManagement/
+├── app.py                 # 应用入口
+├── config.py              # 配置文件
+├── database.py            # 数据库模型
+├── requirements.txt       # Python 依赖
+│
+├── blueprints/            # 路由模块
+│   ├── auth.py           # 认证模块
+│   ├── devices.py        # 设备管理
+│   ├── documents.py      # 文档管理
+│   ├── borrowing.py      # 借阅管理
+│   └── ...
+│
+├── models/                # 数据模型
+│   ├── device.py
+│   ├── document.py
+│   ├── borrowing.py
+│   └── ...
+│
+├── templates/             # 前端模板
+│   ├── base.html
+│   ├── login.html
+│   └── ...
+│
+├── static/                # 静态资源
+│   ├── css/
+│   ├── js/
+│   └── uploads/          # 上传文件
+│
+├── scripts/               # 脚本工具
+│   ├── webhook_server.py  # Webhook 服务
+│   └── ...
+│
+├── migrate/               # 迁移脚本
+│   ├── quick_migrate.sh
+│   └── ...
+│
+├── docs/                  # 文档
+│   ├── 使用手册.md
+│   └── screenshots/      # 截图目录
+│
+└── tests/                 # 测试文件
 ```
 
-### 管理 Webhook 服务
+---
+
+## 数据库配置
+
+### 默认 SQLite（开箱即用）
+
+无需任何配置，直接启动即可。
+
+### 可选 MySQL
 
 ```bash
-# SSH 登录服务器
-ssh root@82.157.4.72
+# 1. 安装依赖
+pip install pymysql cryptography
 
-# 查看 webhook 服务状态
-ps aux | grep webhook_server
-
-# 重启 webhook 服务
-cd /data/EquipmentManagement
-pkill -f webhook_server
-nohup python3 scripts/webhook_server.py > /tmp/webhook.log 2>&1 &
-
-# 测试 webhook 服务
-curl http://82.157.4.72:5001/health
+# 2. 修改 database.py 中的连接配置
 ```
 
-### GitHub Webhook 配置步骤
+---
 
-1. 进入 GitHub 仓库 → Settings → Webhooks → Add webhook
-2. 配置以下选项：
-   - **Payload URL**：`http://82.157.4.72:5001/webhook`
-   - **Content type**：`application/json`
-   - **Secret**：`6C1BFF08-CF1F-2813-907A-44B39B4D7FE5`
-   - **SSL verification**：`Disable`（因为使用 HTTP）
-   - **Events**：选择 `Just the push event`
-3. 点击 `Add webhook`
+## 常见问题
 
-### 手动测试 Webhook
+| 问题 | 解决方案 |
+|------|----------|
+| 登录后看不到内容 | 检查账号是否被停用或权限分配 |
+| 上传失败 | 确认文件类型（pdf/doc/docx/xls/xlsx/jpg/png） |
+| 服务启动失败 | 检查端口占用 `lsof -i:5000` |
+| 数据库异常 | 删除 `dms.db` 重启自动重建 |
 
-```bash
-# 在服务器上手动触发一次部署
-curl -X POST http://82.157.4.72:5001/webhook \
-  -H "Content-Type: application/json" \
-  -H "X-GitHub-Event: push" \
-  -d '{"ref":"refs/heads/main","repository":{"name":"EquipmentManagement"}}'
-```
+---
 
-## 切换到 MySQL （可选）
+## 参考文档
 
- 1. 安装客户端：
+- 📖 [使用手册](docs/使用手册.md)
 
- ```bash
- pip install PyMySQL cryptography
- ```
+---
 
- 2. 创建数据库并修改 `database.py` 中的连接配置为 MySQL。
+## 开源协议
 
- ## 说明与注意事项
+MIT License
 
- - 上传文件保存在 `uploads/` 目录
- - 默认数据库文件：`dms.db`（SQLite）
- - 首次启动会自动建表，若遇旧库字段缺失，尝试重启应用触发迁移逻辑
+---
 
- ## 常见问题
+<div align="center">
 
- - 登录后看不到内容：检查账号是否被停用或权限是否分配
- - 上传失败：请确认文件类型在允许范围（pdf/doc/docx/xls/xlsx/jpg/png）
+**如果这个项目对你有帮助，请点个 ⭐ Star！**
 
- ## 参考文档
-
- - 使用手册： [使用手册](docs/使用手册.md)
-
- ## 需要我做什么？
-
- 如果你希望我：
-
- - 进一步压缩成英文版 README；
- - 添加 CI / badges；
- - 或者基于此生成项目首页文档；
-
- 请告诉我你的优先项，我会继续修改。
-| reminder_center | 提醒中心 |       
-
+</div>

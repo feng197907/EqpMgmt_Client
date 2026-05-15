@@ -91,8 +91,6 @@ python app.py
 
 ## 系统截图
 
-> 📸 **请将你的截图放置在 `docs/screenshots/` 目录下，然后替换下方的图片路径**
-
 ### 登录页面
 ![登录页面](docs/screenshots/login.png)
 

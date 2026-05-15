@@ -2,6 +2,26 @@
 
 本文档介绍如何配置 GitHub Webhook 实现代码自动部署。
 
+## 脚本说明（目录说明）
+
+- `webhook_server.py`：
+	- 一个基于 Flask 的 Webhook 接收服务，监听 `/webhook` 路径（默认端口 `5001`），在收到 `push` 事件时执行拉取并部署流程。
+	- 关键配置：`GIT_DIR`（项目路径）、`WEBHOOK_SECRET`（可用于签名校验，但仓库中可能已禁用校验）、`DEPLOY_LOG`（日志文件）。
+	- 功能：记录拉取前/后的 git 信息、执行 `git fetch` / `git pull`，在必要时重启或 reload 应用（尝试发送 SIGHUP 给 gunicorn，或以 daemon 方式启动）。
+
+- `webhook-deploy.sh`：
+	- 一个用于传统 CGI/HTTP 接收的 Bash 自动部署脚本，适合将 Webhook 请求交给 shell 脚本处理的场景。
+	- 关键配置：`GIT_DIR`、`WEBHOOK_SECRET`（若为空则跳过签名校验）、`LOG_FILE`。
+	- 功能：验证签名（如果配置了 `WEBHOOK_SECRET`）、处理 `push` 事件、执行 `git pull` 并根据运行方式（systemd / gunicorn / 直接 Python）重启服务。
+
+安全与使用建议：
+
+- 若部署在公网服务器，建议启用 `WEBHOOK_SECRET` 并在 GitHub Webhook 配置中填写相同的 Secret，以防止被他人触发部署。
+- 将 `GIT_DIR` 修改为实际项目路径（示例默认 `/data/EquipmentManagement`）。
+- 若使用 `systemd` 管理服务，优先使用 `systemctl restart <service>` 方式重启；若使用 `gunicorn`，脚本会尝试发送 SIGHUP 进行平滑重载。
+
+下面为详细部署说明：
+
 ## 目录
 
 - [方案一：Webhook 自动部署](#方案一webhook-自动部署)

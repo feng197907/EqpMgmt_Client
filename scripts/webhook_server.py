@@ -18,6 +18,7 @@ app = Flask(__name__)
 
 GIT_DIR = "/data/EquipmentManagement"
 WEBHOOK_SECRET = "6C1BFF08-CF1F-2813-907A-44B39B4D7FE5"
+RESTART_COMMAND = "systemctl restart dms"
 DEPLOY_LOG = "/var/log/webhook-deploy.log"
 
 logging.basicConfig(
@@ -174,27 +175,53 @@ def deploy():
         else:
             logger.info("[CHANGE] No code changes (already up-to-date)")
         
-        # 重启 gunicorn
-        logger.info("[SERVICE] Restarting gunicorn...")
-        
-        returncode, stdout, stderr = run_command(["pgrep", "-f", "gunicorn.*5000"])
-        
-        if returncode == 0:
-            pids = stdout.strip().splitlines()
-            for pid in pids:
-                if pid:
-                    try:
-                        os.kill(int(pid), signal.SIGHUP)
-                        logger.info("[SERVICE] Sent SIGHUP to gunicorn PID %s", pid)
-                    except (ProcessLookupError, ValueError):
-                        logger.warning("[SERVICE] PID %s not found", pid)
-            logger.info("[SERVICE] Gunicorn reloaded successfully")
+        # 尝试通过 RESTART_COMMAND 重启服务（优先）
+        if RESTART_COMMAND:
+            logger.info("[SERVICE] Restarting service via RESTART_COMMAND: %s", RESTART_COMMAND)
+            rc, out, err = run_command(RESTART_COMMAND, shell=True)
+            if rc == 0:
+                logger.info("[SERVICE] Restart command succeeded: %s", out.strip())
+            else:
+                logger.warning("[SERVICE] Restart command failed (%d): %s", rc, err.strip())
+                # 回退到 gunicorn 检查/启动逻辑
+                logger.info("[SERVICE] Falling back to gunicorn reload/startup")
+                returncode, stdout, stderr = run_command(["pgrep", "-f", "gunicorn.*5000"]) 
+                if returncode == 0:
+                    pids = stdout.strip().splitlines()
+                    for pid in pids:
+                        if pid:
+                            try:
+                                os.kill(int(pid), signal.SIGHUP)
+                                logger.info("[SERVICE] Sent SIGHUP to gunicorn PID %s", pid)
+                            except (ProcessLookupError, ValueError):
+                                logger.warning("[SERVICE] PID %s not found", pid)
+                    logger.info("[SERVICE] Gunicorn reloaded successfully")
+                else:
+                    logger.warning("[SERVICE] No gunicorn found, starting new...")
+                    run_command(
+                        "cd /data/EquipmentManagement && nohup gunicorn -w 2 -b 0.0.0.0:5000 'app:create_app()' --daemon",
+                        shell=True
+                    )
         else:
-            logger.warning("[SERVICE] No gunicorn found, starting new...")
-            run_command(
-                "cd /data/EquipmentManagement && nohup gunicorn -w 2 -b 0.0.0.0:5000 'app:create_app()' --daemon",
-                shell=True
-            )
+            # 默认行为：尝试平滑 reload gunicorn，否则以 daemon 方式启动
+            logger.info("[SERVICE] Restarting gunicorn (no RESTART_COMMAND configured)")
+            returncode, stdout, stderr = run_command(["pgrep", "-f", "gunicorn.*5000"]) 
+            if returncode == 0:
+                pids = stdout.strip().splitlines()
+                for pid in pids:
+                    if pid:
+                        try:
+                            os.kill(int(pid), signal.SIGHUP)
+                            logger.info("[SERVICE] Sent SIGHUP to gunicorn PID %s", pid)
+                        except (ProcessLookupError, ValueError):
+                            logger.warning("[SERVICE] PID %s not found", pid)
+                logger.info("[SERVICE] Gunicorn reloaded successfully")
+            else:
+                logger.warning("[SERVICE] No gunicorn found, starting new...")
+                run_command(
+                    "cd /data/EquipmentManagement && nohup gunicorn -w 2 -b 0.0.0.0:5000 'app:create_app()' --daemon",
+                    shell=True
+                )
         
         logger.info("========================================")
         logger.info("=== Deployment completed at %s ===", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))

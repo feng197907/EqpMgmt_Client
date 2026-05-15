@@ -28,10 +28,10 @@ def forgot_password():
         user = cur.fetchone()
 
         if user is None:
-            # 安全考虑：不暴露用户存在与否的信息，统一提示
-            flash("如果用户名正确，管理员将收到您的密码重置请求，请耐心等待处理。", "info")
+            # 明确提示用户名不存在，留在当前页面
+            flash(f'用户名 "{username}" 不存在，请确认后重新输入。', "danger")
             conn.close()
-            return redirect(url_for("auth.login"))
+            return render_template("forgot_password.html")
 
         if user["status"] != "active":
             flash("该账号已被禁用，请联系管理员。", "warning")

@@ -220,7 +220,26 @@ curl -X POST http://localhost:5001/webhook
 # 查看服务状态
 systemctl status dms
 ```
-
+## 查看服务状态
+```bash
+systemctl status dms
+systemctl status dms-webhook
+```
+## 停止/启动/重启服务
+```bash
+systemctl stop dms
+systemctl start dms
+systemctl restart dms
+```
+## 查看日志
+```bash
+journalctl -u dms -f
+journalctl -u dms-webhook -f
+```
+## 查看部署日志
+```bash
+tail -f /var/log/webhook-deploy.log
+```
 ---
 
 ## 常见问题

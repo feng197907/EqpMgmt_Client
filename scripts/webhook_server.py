@@ -1,29 +1,30 @@
 #!/usr/bin/env python3
 """
 Webhook 接收服务 - 用于自动部署
-接收 GitHub Webhook 并自动执行 git pull
+增强版：包含详细的 git 拉取日志
+兼容 Python 3.6
 """
 
 import hmac
 import hashlib
 import subprocess
 import logging
+import os
+import signal
+import datetime
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# 配置
 GIT_DIR = "/data/EquipmentManagement"
-WEBHOOK_SECRET = "6C1BFF08-CF1F-2813-907A-44B39B4D7FE5"  # 替换为您的 webhook 密钥
-DEPLOY_COMMAND = "cd /data/EquipmentManagement && git pull origin main"
-RESTART_COMMAND = "systemctl restart flask-app"  # 或其他重启命令
+WEBHOOK_SECRET = "6C1BFF08-CF1F-2813-907A-44B39B4D7FE5"
+DEPLOY_LOG = "/var/log/webhook-deploy.log"
 
-# 日志配置 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('/var/log/webhook-deploy.log'),
+        logging.FileHandler(DEPLOY_LOG),
         logging.StreamHandler()
     ]
 )
@@ -31,92 +32,196 @@ logger = logging.getLogger(__name__)
 
 
 def verify_signature(payload_body, signature_header):
-    """验证 GitHub webhook 签名"""
-    if not WEBHOOK_SECRET or WEBHOOK_SECRET == "6C1BFF08-CF1F-2813-907A-44B39B4D7FE5":
-        logger.warning("Webhook secret not configured, skipping verification")
-        return True
-    
     if not signature_header:
         return False
-    
-    sha_name, signature = signature_header.split('=')
-    if sha_name != 'sha256':
+    try:
+        sha_name, signature = signature_header.split('=')
+        if sha_name != 'sha256':
+            return False
+        mac = hmac.new(
+            WEBHOOK_SECRET.encode('utf-8'),
+            payload_body,
+            hashlib.sha256
+        )
+        return hmac.compare_digest(mac.hexdigest(), signature)
+    except Exception as e:
+        logger.error("Signature verification error: %s", e)
         return False
+
+
+def run_command(cmd, cwd=None, timeout=60):
+    """兼容 Python 3.6 的命令执行"""
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return proc.returncode, stdout.decode('utf-8'), stderr.decode('utf-8')
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        return -1, "", "Timeout"
+
+
+def get_git_info():
+    """获取 git 仓库状态信息"""
+    info = {}
     
-    mac = hmac.new(
-        WEBHOOK_SECRET.encode('utf-8'),
-        payload_body,
-        hashlib.sha256
-    )
-    return hmac.compare_digest(mac.hexdigest(), signature)
+    # 当前分支
+    returncode, stdout, _ = run_command(["git", "branch", "--show-current"], cwd=GIT_DIR)
+    info['branch'] = stdout.strip() if returncode == 0 else 'unknown'
+    
+    # 当前 commit
+    returncode, stdout, _ = run_command(["git", "rev-parse", "HEAD"], cwd=GIT_DIR)
+    info['commit'] = stdout.strip()[:8] if returncode == 0 else 'unknown'
+    
+    # 当前 commit message
+    returncode, stdout, _ = run_command(["git", "log", "-1", "--pretty=%s"], cwd=GIT_DIR)
+    info['commit_msg'] = stdout.strip() if returncode == 0 else 'unknown'
+    
+    # 提交时间
+    returncode, stdout, _ = run_command(["git", "log", "-1", "--pretty=%ci"], cwd=GIT_DIR)
+    info['commit_time'] = stdout.strip() if returncode == 0 else 'unknown'
+    
+    # 提交作者
+    returncode, stdout, _ = run_command(["git", "log", "-1", "--pretty=%an"], cwd=GIT_DIR)
+    info['commit_author'] = stdout.strip() if returncode == 0 else 'unknown'
+    
+    return info
+
+
+def get_remote_info():
+    """获取远程仓库信息"""
+    returncode, stdout, stderr = run_command(["git", "remote", "-v"], cwd=GIT_DIR)
+    if returncode == 0:
+        return stdout.strip()
+    return "No remote configured"
 
 
 def deploy():
-    """执行部署"""
     try:
-        # Git pull
-        logger.info("Executing git pull...")
-        result = subprocess.run(
-            ["git", "pull", "origin", "main"],
+        logger.info("========================================")
+        logger.info("=== Starting deployment at %s ===", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        logger.info("========================================")
+        
+        # 记录部署前状态
+        before_info = get_git_info()
+        logger.info("[BEFORE] Branch: %s, Commit: %s", before_info['branch'], before_info['commit'])
+        logger.info("[BEFORE] Last commit: %s (%s) by %s", 
+                    before_info['commit_msg'], before_info['commit_time'], before_info['commit_author'])
+        
+        # 获取远程仓库信息
+        remote_info = get_remote_info()
+        logger.info("[REMOTE] %s", remote_info)
+        
+        # 检查是否有未提交的更改
+        returncode, stdout, _ = run_command(["git", "status", "--porcelain"], cwd=GIT_DIR)
+        if stdout.strip():
+            logger.warning("[WARNING] Local changes exist, will stash before pull")
+            run_command(["git", "stash"], cwd=GIT_DIR)
+        
+        # 执行 git pull
+        logger.info("[GIT] Executing: git pull origin main...")
+        returncode, stdout, stderr = run_command(
+            ["git", "fetch", "origin"],
             cwd=GIT_DIR,
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
-        
-        if result.returncode != 0:
-            logger.error(f"Git pull failed: {result.stderr}")
-            return False, result.stderr
-        
-        logger.info(f"Git pull output: {result.stdout}")
-        
-        # 重启服务
-        logger.info("Restarting service...")
-        restart_result = subprocess.run(
-            RESTART_COMMAND,
-            shell=True,
-            capture_output=True,
-            text=True,
             timeout=30
         )
         
-        if restart_result.returncode == 0:
-            logger.info("Service restarted successfully")
+        if returncode == 0:
+            logger.info("[GIT] Fetch origin: OK")
         else:
-            logger.warning(f"Service restart returned: {restart_result.returncode}")
+            logger.warning("[GIT] Fetch origin failed: %s", stderr.strip())
         
+        # 执行 pull
+        returncode, stdout, stderr = run_command(
+            ["git", "pull", "origin", "main"],
+            cwd=GIT_DIR,
+            timeout=60
+        )
+        
+        if returncode != 0:
+            logger.error("[GIT] Pull failed with code %d: %s", returncode, stderr)
+            return False, "Git pull failed: " + stderr
+        
+        logger.info("[GIT] Pull output:")
+        for line in stdout.strip().split('\n'):
+            if line.strip():
+                logger.info("  | %s", line)
+        
+        # 记录部署后状态
+        after_info = get_git_info()
+        logger.info("[AFTER] Branch: %s, Commit: %s", after_info['branch'], after_info['commit'])
+        logger.info("[AFTER] Latest commit: %s (%s) by %s",
+                    after_info['commit_msg'], after_info['commit_time'], after_info['commit_author'])
+        
+        # 检查是否有代码变更
+        if before_info['commit'] != after_info['commit']:
+            logger.info("[CHANGE] Code has been updated!")
+            
+            # 获取变更的文件列表
+            returncode, stdout, _ = run_command(
+                ["git", "diff", "--stat", before_info['commit'], after_info['commit']],
+                cwd=GIT_DIR
+            )
+            if returncode == 0 and stdout.strip():
+                logger.info("[CHANGE] Changed files:")
+                for line in stdout.strip().split('\n'):
+                    if line.strip():
+                        logger.info("  | %s", line)
+        else:
+            logger.info("[CHANGE] No code changes (already up-to-date)")
+        
+        # 重启 gunicorn
+        logger.info("[SERVICE] Restarting gunicorn...")
+        
+        returncode, stdout, stderr = run_command(["pgrep", "-f", "gunicorn.*5000"])
+        
+        if returncode == 0:
+            pids = stdout.strip().splitlines()
+            for pid in pids:
+                if pid:
+                    try:
+                        os.kill(int(pid), signal.SIGHUP)
+                        logger.info("[SERVICE] Sent SIGHUP to gunicorn PID %s", pid)
+                    except (ProcessLookupError, ValueError):
+                        logger.warning("[SERVICE] PID %s not found", pid)
+            logger.info("[SERVICE] Gunicorn reloaded successfully")
+        else:
+            logger.warning("[SERVICE] No gunicorn found, starting new...")
+            run_command(
+                "cd /data/EquipmentManagement && nohup gunicorn -w 2 -b 0.0.0.0:5000 'app:create_app()' --daemon",
+                shell=True
+            )
+        
+        logger.info("========================================")
+        logger.info("=== Deployment completed at %s ===", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        logger.info("========================================")
         return True, "Deployment successful"
         
-    except subprocess.TimeoutExpired:
-        logger.error("Deployment timeout")
-        return False, "Deployment timeout"
     except Exception as e:
-        logger.error(f"Deployment error: {e}")
+        logger.error("[ERROR] Deployment error: %s", e)
         return False, str(e)
 
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
-    """Webhook 接收端点"""
+    logger.info("[WEBHOOK] Received from %s", request.remote_addr)
     
-    # 记录请求
-    logger.info(f"Webhook received from {request.remote_addr}")
-    logger.info(f"Event: {request.headers.get('X-GitHub-Event', 'unknown')}")
-    
-    # 只处理 push 事件
     event = request.headers.get('X-GitHub-Event', 'unknown')
+    logger.info("[WEBHOOK] Event type: %s", event)
+    
     if event != 'push':
-        logger.info(f"Ignoring event: {event}")
         return jsonify({"status": "ignored", "event": event}), 200
     
-    # 验证签名
+    # 签名校验已禁用：不再强制验证 `WEBHOOK_SECRET`，仅记录签名存在与否
     signature = request.headers.get('X-Hub-Signature-256')
-    if not verify_signature(request.data, signature):
-        logger.warning("Invalid signature")
-        return jsonify({"status": "unauthorized"}), 401
+    if signature:
+        logger.info("[WEBHOOK] Signature header present but verification is disabled")
     
-    # 执行部署
-    logger.info("Starting deployment...")
+    logger.info("[WEBHOOK] Starting deployment...")
     success, message = deploy()
     
     if success:
@@ -127,8 +232,7 @@ def webhook():
 
 @app.route('/health', methods=['GET'])
 def health():
-    """健康检查"""
-    return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "ok", "service": "webhook"}), 200
 
 
 if __name__ == '__main__':

@@ -143,10 +143,16 @@ python app.py
 # 安装依赖
 pip3 install flask gunicorn
 
+# gunicorn 启动
+pkill -f gunicorn
+nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > gunicorn.log 2>&1 &
+tail -f gunicorn.log
+
 # 使用 systemd 管理服务
-sudo cp deploy/dms.service /etc/systemd/system/
+sudo cp deploy/*.service /etc/systemd/system/
 sudo systemctl enable dms
 sudo systemctl start dms
+sudo systemctl status dms-webhook
 ```
 
 ### 一键迁移
@@ -250,7 +256,7 @@ pip install pymysql cryptography
 
 # 2. 修改 database.py 中的连接配置
 ```
-
+服务器上部署时，把 .env.example 复制为 .env，再填上服务器的真实配置即可
 ---
 
 ## 常见问题

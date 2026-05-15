@@ -85,6 +85,13 @@
  ```bash
  pip3 install gunicorn
  nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app &
+```
+ ## 手动重新部署
+
+```bash
+git pull origin main
+pkill -f gunicorn
+nohup gunicorn --bind 0.0.0.0:5000 --workers 2 app:app > gunicorn.log 2>&1 &
  ```
 
  ## 自动化部署（GitHub Webhook）

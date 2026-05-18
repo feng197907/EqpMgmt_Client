@@ -44,32 +44,37 @@ def upload_doc(device_id):
         initial_status = "draft"
 
     if request.method == "POST":
-        doc_type = request.form.get("doc_type")
+        default_doc_type = request.form.get("default_doc_type") or request.form.get("doc_type_default")
         remarks = request.form.get("remarks", "").strip()
-        calibration_due_date = request.form.get("calibration_due_date", "").strip() or None
-        # 非校准记录类型时忽略该字段
-        if doc_type != "calibration":
-            calibration_due_date = None
         files = request.files.getlist("files")
-        if doc_type not in DOC_TYPE_LABELS:
-            flash("请选择正确的文档类型。", "warning")
-            return redirect(url_for("documents.upload_doc", device_id=device_id))
+
         if not files or all(f.filename == "" for f in files):
             flash("请选择要上传的文件。", "warning")
             return redirect(url_for("documents.upload_doc", device_id=device_id))
 
         success_count = 0
         error_msgs = []
-        doc_ids = []
         device_dir = ensure_upload_dir(device_id)
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-        for file in files:
+        for idx, file in enumerate(files):
             if not file or file.filename == "":
                 continue
             if not allowed_file(file.filename):
                 error_msgs.append(f"「{file.filename}」文件类型不允许。")
                 continue
+
+            # 每个文件独立读取文档类型（优先 doc_type_map_{idx}，回退默认）
+            doc_type = request.form.get(f"doc_type_map_{idx}") or default_doc_type
+            if doc_type not in DOC_TYPE_LABELS:
+                error_msgs.append(f"「{file.filename}」文档类型无效。")
+                continue
+
+            # 校准到期日：仅当文件类型为校准记录时处理
+            calibration_due_date = None
+            if doc_type == "calibration":
+                calibration_due_date = request.form.get("calibration_due_date", "").strip() or None
+
             version = get_next_version(conn, device_id, doc_type)
             original_name = file.filename
             # 清理文件名中的危险字符，但保留中文等非ASCII字符
@@ -90,7 +95,6 @@ def upload_doc(device_id):
             )
             conn.commit()
             doc_id = cur.lastrowid
-            doc_ids.append(doc_id)
             log_action(
                 current_user.username, "upload_document", "document", doc_id,
                 f"上传 {DOC_TYPE_LABELS.get(doc_type)} v{version}",
@@ -100,7 +104,8 @@ def upload_doc(device_id):
         conn.close()
 
         # 汇总反馈
-        if success_count == len(files):
+        total = sum(1 for f in files if f and f.filename != "")
+        if success_count == total:
             msg = f"已成功上传 {success_count} 个文档"
             if initial_status == "active":
                 msg += "并生效（审批流程已禁用）。"

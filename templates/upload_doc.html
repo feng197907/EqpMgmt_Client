@@ -25,7 +25,7 @@
 .file-list-item {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   background: #fff;
   border: 1px solid var(--border-color);
@@ -65,6 +65,31 @@
 .file-list-size {
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+
+.file-list-type {
+  flex-shrink: 0;
+  min-width: 140px;
+}
+
+.file-list-type select {
+  height: 32px;
+  padding: 0 0.5rem;
+  font-size: var(--text-xs);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background: #fff;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.file-list-type select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.file-list-type select option {
+  padding: 0.25rem;
 }
 
 .file-list-remove {
@@ -142,6 +167,9 @@
 
   {# 上传表单 #}
   <form class="upload-form" method="post" enctype="multipart/form-data" id="uploadForm">
+    {# 默认类型（作为新文件的默认值，同时提交给后端校验） #}
+    <input type="hidden" name="default_doc_type" id="defaultDocType" value="{{ doc_types[0][0] }}">
+
     <div class="form-grid">
       {# 左侧：上传区域 #}
       <div class="form-section upload-section">
@@ -188,13 +216,13 @@
 
         <div class="form-group">
           <label class="form-label">
-            文档类型
+            默认文档类型
             <span class="required">*</span>
           </label>
           <div class="doc-type-grid" id="docTypeGrid">
             {% for value, label in doc_types %}
             <label class="doc-type-option {% if loop.first %}selected{% endif %}">
-              <input type="radio" name="doc_type" value="{{ value }}" {% if loop.first %}checked{% endif %} required>
+              <input type="radio" name="doc_type_default" value="{{ value }}" {% if loop.first %}checked{% endif %}>
               <div class="type-icon doc-type-{{ value }}">
                 {% if value == 'manual' %}
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
@@ -212,6 +240,7 @@
             </label>
             {% endfor %}
           </div>
+          <span class="form-hint">点击上方选择默认类型，已添加的文件可在左侧列表中单独调整类型</span>
         </div>
 
         <div class="form-group">
@@ -243,7 +272,11 @@
 </div>
 
 <script>
-// 多文件上传功能
+// 多文件上传功能（支持每个文件独立选择类型）
+const DOC_TYPES = {{ doc_types | tojson }};
+const DOC_TYPE_LABELS = {};
+DOC_TYPES.forEach(([k, v]) => DOC_TYPE_LABELS[k] = v);
+
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
 const dropzoneContent = document.getElementById('dropzoneContent');
@@ -251,8 +284,14 @@ const fileList = document.getElementById('fileList');
 const addMoreFiles = document.getElementById('addMoreFiles');
 const btnAddMore = document.getElementById('btnAddMore');
 const submitBtn = document.getElementById('submitBtn');
+const defaultDocTypeInput = document.getElementById('defaultDocType');
 
-let selectedFiles = new DataTransfer();
+let selectedFiles = [];
+
+function getDefaultDocType() {
+  const checked = document.querySelector('input[name="doc_type_default"]:checked');
+  return checked ? checked.value : DOC_TYPES[0][0];
+}
 
 // 拖拽效果
 ['dragenter', 'dragover'].forEach(eventName => {
@@ -288,27 +327,40 @@ btnAddMore.addEventListener('click', (e) => {
 });
 
 function addFiles(files) {
+  const defaultType = getDefaultDocType();
   for (const file of files) {
-    selectedFiles.items.add(file);
+    selectedFiles.push({
+      file: file,
+      doc_type: defaultType
+    });
   }
-  fileInput.files = selectedFiles.files;
+  syncFileInput();
   renderFileList();
   updateSubmitButton();
 }
 
 function removeFileAt(index) {
-  const dt = new DataTransfer();
-  for (let i = 0; i < selectedFiles.files.length; i++) {
-    if (i !== index) dt.items.add(selectedFiles.files[i]);
-  }
-  selectedFiles = dt;
-  fileInput.files = selectedFiles.files;
+  selectedFiles.splice(index, 1);
+  syncFileInput();
   renderFileList();
   updateSubmitButton();
 }
 
+function syncFileInput() {
+  const dt = new DataTransfer();
+  selectedFiles.forEach(item => dt.items.add(item.file));
+  fileInput.files = dt.files;
+}
+
+function buildTypeOptions(selectedValue) {
+  return DOC_TYPES.map(([value, label]) => {
+    const sel = value === selectedValue ? 'selected' : '';
+    return `<option value="${value}" ${sel}>${label}</option>`;
+  }).join('');
+}
+
 function renderFileList() {
-  if (selectedFiles.files.length === 0) {
+  if (selectedFiles.length === 0) {
     dropzoneContent.style.display = 'flex';
     fileList.style.display = 'none';
     addMoreFiles.style.display = 'none';
@@ -323,11 +375,12 @@ function renderFileList() {
   fileInput.style.pointerEvents = 'none';
 
   fileList.innerHTML = '';
-  for (let i = 0; i < selectedFiles.files.length; i++) {
-    const file = selectedFiles.files[i];
-    const item = document.createElement('div');
-    item.className = 'file-list-item';
-    item.innerHTML = `
+  for (let i = 0; i < selectedFiles.length; i++) {
+    const item = selectedFiles[i];
+    const file = item.file;
+    const el = document.createElement('div');
+    el.className = 'file-list-item';
+    el.innerHTML = `
       <div class="file-list-icon">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
       </div>
@@ -335,13 +388,27 @@ function renderFileList() {
         <span class="file-list-name">${escapeHtml(file.name)}</span>
         <span class="file-list-size">${formatFileSize(file.size)}</span>
       </div>
+      <div class="file-list-type">
+        <select name="doc_type_per_file_${i}" data-index="${i}" class="file-type-select">
+          ${buildTypeOptions(item.doc_type)}
+        </select>
+      </div>
       <button type="button" class="file-list-remove" data-index="${i}" title="移除">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
       </button>
     `;
-    fileList.appendChild(item);
+    fileList.appendChild(el);
   }
 
+  // 绑定类型变更
+  fileList.querySelectorAll('.file-type-select').forEach(select => {
+    select.addEventListener('change', (e) => {
+      const idx = parseInt(e.target.dataset.index);
+      selectedFiles[idx].doc_type = e.target.value;
+    });
+  });
+
+  // 绑定移除
   fileList.querySelectorAll('.file-list-remove').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -351,7 +418,7 @@ function renderFileList() {
 }
 
 function updateSubmitButton() {
-  const count = selectedFiles.files.length;
+  const count = selectedFiles.length;
   if (count > 0) {
     submitBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> 上传 ${count} 个文档`;
   } else {
@@ -371,32 +438,51 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-// 文档类型选择
+// 默认类型选择
+const docTypeRadios = document.querySelectorAll('input[name="doc_type_default"]');
+docTypeRadios.forEach(radio => {
+  radio.addEventListener('change', () => {
+    defaultDocTypeInput.value = radio.value;
+    // 更新校准日期字段显示
+    toggleCalibrationField();
+    // 新添加的文件会使用新默认值；已添加的文件不自动变更
+  });
+});
+
 document.querySelectorAll('.doc-type-option').forEach(option => {
   option.addEventListener('click', () => {
     document.querySelectorAll('.doc-type-option').forEach(o => o.classList.remove('selected'));
     option.classList.add('selected');
     option.querySelector('input').checked = true;
+    defaultDocTypeInput.value = option.querySelector('input').value;
     toggleCalibrationField();
   });
 });
 
 function toggleCalibrationField() {
-  const selected = document.querySelector('input[name="doc_type"]:checked');
+  const selected = getDefaultDocType();
   const group = document.getElementById('calibrationDueDateGroup');
   if (group) {
-    group.style.display = (selected && selected.value === 'calibration') ? 'block' : 'none';
+    group.style.display = (selected === 'calibration') ? 'block' : 'none';
   }
 }
 
-// 初始化：检查默认选中项
+// 初始化
 document.addEventListener('DOMContentLoaded', function() {
   toggleCalibrationField();
 });
 
 // 表单提交
-document.getElementById('uploadForm').addEventListener('submit', function() {
-  const submitBtn = document.getElementById('submitBtn');
+const uploadForm = document.getElementById('uploadForm');
+uploadForm.addEventListener('submit', function(e) {
+  // 构建文件类型映射隐藏字段
+  selectedFiles.forEach((item, idx) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = `doc_type_map_${idx}`;
+    input.value = item.doc_type;
+    uploadForm.appendChild(input);
+  });
   submitBtn.disabled = true;
   submitBtn.innerHTML = '<svg class="spinner" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></path></svg> 上传中...';
 });

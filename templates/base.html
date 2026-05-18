@@ -51,10 +51,12 @@
           <i data-lucide="search"></i>
           <span>文档检索</span>
         </a>
+        {% if borrowing_enabled %}
         <a href="{{ url_for('borrowing.borrow_list') }}" class="nav-item {% if request.endpoint == 'borrowing.borrow_list' %}active{% endif %}">
           <i data-lucide="bookmark"></i>
           <span>借阅记录</span>
         </a>
+        {% endif %}
       </div>
       {% endif %}
 

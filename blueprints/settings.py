@@ -21,6 +21,11 @@ SETTINGS_CONFIG = {
         "type": "boolean",
         "description": "开启后，新上传的文档将自动设置为生效状态。仅当审批流程开启时生效。",
     },
+    "borrowing_enabled": {
+        "label": "借阅功能",
+        "type": "boolean",
+        "description": "开启后，用户可以借阅和归还文档，侧栏显示借阅记录入口。关闭后，借阅相关功能全部隐藏。",
+    },
 }
 
 

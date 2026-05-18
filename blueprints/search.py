@@ -3,7 +3,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import login_required
 
 from config import DEVICE_STATUS_LABELS, DOC_STATUS_LABELS
-from database import get_db
+from database import get_db, get_system_setting
 
 search_bp = Blueprint("search", __name__, url_prefix="/search")
 
@@ -67,28 +67,32 @@ def api_search():
         })
 
     # 3. 搜索借阅记录
-    cur.execute(
-        """
-        SELECT br.id, br.borrower, br.status, br.borrow_date,
-               d.doc_name, dev.device_name
-        FROM borrow_records br
-        JOIN documents d ON d.id = br.doc_id
-        JOIN devices dev ON dev.id = d.device_id
-        WHERE br.borrower LIKE %s
-        LIMIT 3
-        """,
-        (like,),
-    )
-    for row in cur.fetchall():
-        results.append({
-            "type": "borrow",
-            "id": row["id"],
-            "title": f"借阅: {row['doc_name']}",
-            "subtitle": f"借阅人: {row['borrower']} | 设备: {row['device_name']}",
-            "status": row["status"],
-            "url": "/borrowing",
-            "icon": "bookmark",
-        })
+    # 检查借阅功能是否开启
+    borrowing_enabled = get_system_setting("borrowing_enabled")
+    borrowing_enabled = (borrowing_enabled == "true") if borrowing_enabled else True
+    if borrowing_enabled:
+        cur.execute(
+            """
+            SELECT br.id, br.borrower, br.status, br.borrow_date,
+                   d.doc_name, dev.device_name
+            FROM borrow_records br
+            JOIN documents d ON d.id = br.doc_id
+            JOIN devices dev ON dev.id = d.device_id
+            WHERE br.borrower LIKE %s
+            LIMIT 3
+            """,
+            (like,),
+        )
+        for row in cur.fetchall():
+            results.append({
+                "type": "borrow",
+                "id": row["id"],
+                "title": f"借阅: {row['doc_name']}",
+                "subtitle": f"借阅人: {row['borrower']} | 设备: {row['device_name']}",
+                "status": row["status"],
+                "url": "/borrowing",
+                "icon": "bookmark",
+            })
 
     conn.close()
 
@@ -181,7 +185,10 @@ def search_results():
             })
 
     # 搜索借阅记录
-    if not filter_type or filter_type == "borrow":
+    # 检查借阅功能是否开启
+    borrowing_enabled_search = get_system_setting("borrowing_enabled")
+    borrowing_enabled_search = (borrowing_enabled_search == "true") if borrowing_enabled_search else True
+    if borrowing_enabled_search and (not filter_type or filter_type == "borrow"):
         cur.execute(
             """
             SELECT br.id, br.borrower, br.status, br.borrow_date, br.actual_return_date,

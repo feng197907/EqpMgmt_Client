@@ -119,11 +119,21 @@ def create_app():
         except Exception:
             pass
 
+        # 查询借阅功能开关
+        borrowing_enabled = True  # 默认开启
+        try:
+            from database import get_system_setting
+            val = get_system_setting("borrowing_enabled")
+            borrowing_enabled = (val == "true") if val is not None else True
+        except Exception:
+            pass
+
         return dict(
             pending_count=pending_count,
             device_change_count=device_change_count,
             can_view_approvals=can_view_approvals,
             password_reset_count=password_reset_count,
+            borrowing_enabled=borrowing_enabled,
             doc_status_labels=DOC_STATUS_LABELS,
             device_status_labels=DEVICE_STATUS_LABELS,
             MENU_PERMISSIONS=MENU_PERMISSIONS,

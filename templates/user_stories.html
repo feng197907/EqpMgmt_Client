@@ -43,6 +43,7 @@
                 {% endif %}
             </div>
         </div>
+        {% if borrowing_enabled %}
         <div class="stat-card borrowed">
             <div class="stat-icon">
                 <i data-lucide="book-open"></i>
@@ -54,6 +55,7 @@
                 借阅活跃
             </div>
         </div>
+        {% endif %}
         <div class="stat-card calibration">
             <div class="stat-icon">
                 <i data-lucide="alert-triangle"></i>
@@ -238,6 +240,7 @@
                 {% endfor %}
             </div>
         </div>
+        {% if borrowing_enabled %}
         <div class="recent-card">
             <div class="recent-card-header">
                 <h5>
@@ -275,6 +278,7 @@
                 {% endfor %}
             </div>
         </div>
+        {% endif %}
     </div>
 </div>
 

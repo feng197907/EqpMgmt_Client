@@ -3,16 +3,25 @@ from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
 from config import DOC_TYPE_LABELS
-from database import get_db
+from database import get_db, get_system_setting
 from utils.audit import log_action
 
 borrowing_bp = Blueprint("borrowing", __name__)
+
+
+def _check_borrowing_enabled():
+    """检查借阅功能是否开启"""
+    val = get_system_setting("borrowing_enabled")
+    return (val == "true") if val is not None else True
 
 
 @borrowing_bp.route("/borrow/<int:doc_id>", methods=["POST"])
 @login_required
 def borrow_doc(doc_id):
     """借阅文档"""
+    if not _check_borrowing_enabled():
+        flash("借阅功能已关闭。", "warning")
+        return redirect(url_for("auth.index"))
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -58,6 +67,9 @@ def borrow_doc(doc_id):
 @login_required
 def return_doc(borrow_id):
     """归还文档"""
+    if not _check_borrowing_enabled():
+        flash("借阅功能已关闭。", "warning")
+        return redirect(url_for("auth.index"))
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM borrow_records WHERE id = %s", (borrow_id,))
@@ -87,6 +99,9 @@ def return_doc(borrow_id):
 @login_required
 def borrow_list():
     """借阅记录列表"""
+    if not _check_borrowing_enabled():
+        flash("借阅功能已关闭。", "warning")
+        return redirect(url_for("auth.index"))
     conn = get_db()
     cur = conn.cursor()
     cur.execute(

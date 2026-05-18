@@ -3,7 +3,7 @@ from flask import Blueprint, flash, jsonify, redirect, render_template, request,
 from flask_login import current_user, login_required
 
 from config import DEVICE_STATUS_LABELS, DOC_STATUS_LABELS, ROLE_LABELS
-from database import get_db
+from database import get_db, get_system_setting
 from utils.audit import log_action
 from utils.decorators import admin_required
 from utils.helpers import build_calibration_reminders, get_document_rows
@@ -101,8 +101,14 @@ def reminders():
     calibration_rows = cur.fetchall()
     cur.execute("SELECT COUNT(*) AS total FROM approval_requests WHERE status = 'pending'")
     pending_approvals = cur.fetchone()["total"]
-    cur.execute("SELECT COUNT(*) AS total FROM borrow_records WHERE status = 'borrowed'")
-    borrowed_total = cur.fetchone()["total"]
+    # 检查借阅功能是否开启
+    borrowing_enabled_val = get_system_setting("borrowing_enabled")
+    borrowing_enabled = (borrowing_enabled_val == "true") if borrowing_enabled_val else True
+    if borrowing_enabled:
+        cur.execute("SELECT COUNT(*) AS total FROM borrow_records WHERE status = 'borrowed'")
+        borrowed_total = cur.fetchone()["total"]
+    else:
+        borrowed_total = 0
     conn.close()
 
     all_reminders = build_calibration_reminders(calibration_rows)
@@ -146,16 +152,23 @@ def user_stories():
     pending_documents = cur.fetchone()["total"]
     cur.execute("SELECT COUNT(*) AS total FROM approval_requests WHERE status = 'pending'")
     pending_approvals = cur.fetchone()["total"]
-    cur.execute("SELECT COUNT(*) AS total FROM borrow_records WHERE status = 'borrowed'")
-    borrowed_total = cur.fetchone()["total"]
+    # 检查借阅功能是否开启
+    borrowing_enabled_val = get_system_setting("borrowing_enabled")
+    borrowing_enabled_dash = (borrowing_enabled_val == "true") if borrowing_enabled_val else True
+    if borrowing_enabled_dash:
+        cur.execute("SELECT COUNT(*) AS total FROM borrow_records WHERE status = 'borrowed'")
+        borrowed_total = cur.fetchone()["total"]
+        cur.execute(
+            "SELECT b.*, d.doc_name, d.version, d.doc_type, dev.device_code, dev.device_name FROM borrow_records b JOIN documents d ON d.id = b.doc_id JOIN devices dev ON dev.id = d.device_id ORDER BY b.borrow_date DESC LIMIT 8"
+        )
+        recent_borrows = cur.fetchall()
+    else:
+        borrowed_total = 0
+        recent_borrows = []
     cur.execute(
         "SELECT d.*, dev.device_code, dev.device_name FROM documents d JOIN devices dev ON dev.id = d.device_id WHERE d.is_deleted = 0 ORDER BY d.upload_time DESC LIMIT 8"
     )
     recent_documents = cur.fetchall()
-    cur.execute(
-        "SELECT b.*, d.doc_name, d.version, d.doc_type, dev.device_code, dev.device_name FROM borrow_records b JOIN documents d ON d.id = b.doc_id JOIN devices dev ON dev.id = d.device_id ORDER BY b.borrow_date DESC LIMIT 8"
-    )
-    recent_borrows = cur.fetchall()
     cur.execute(
         "SELECT d.*, dev.device_code, dev.device_name FROM documents d JOIN devices dev ON dev.id = d.device_id WHERE d.doc_type = 'calibration' AND d.is_deleted = 0 ORDER BY d.upload_time DESC"
     )
@@ -168,9 +181,10 @@ def user_stories():
         {"label": "审批待办", "endpoint": "approvals.approvals"},
     ]
     archive_links = [
-        {"label": "借阅记录", "endpoint": "borrowing.borrow_list"},
         {"label": "文档检索", "endpoint": "documents.document_search"},
     ]
+    if borrowing_enabled_dash:
+        archive_links.insert(0, {"label": "借阅记录", "endpoint": "borrowing.borrow_list"})
     if recent_documents:
         validation_links.insert(
             1, {"label": "版本历史", "endpoint": "documents.document_history", "doc_id": recent_documents[0]["id"]}
@@ -219,8 +233,8 @@ def user_stories():
             "role_key": "archivist",
             "card_class": "archive",
             "avatar_icon": '<i data-lucide="archive"></i>',
-            "summary": f"当前借阅中 {borrowed_total} 份，可追踪归还状态",
-            "card_features": ["借阅记录", "归还确认", "文档归档"],
+            "summary": f"当前借阅中 {borrowed_total} 份，可追踪归还状态" if borrowing_enabled_dash else "文档归档与管理",
+            "card_features": ["借阅记录", "归还确认", "文档归档"] if borrowing_enabled_dash else ["文档归档", "文档检索"],
             "links": archive_links,
         },
         {

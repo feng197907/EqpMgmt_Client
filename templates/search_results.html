@@ -50,10 +50,12 @@
       <i data-lucide="file-text"></i>
       <span>文档</span>
     </a>
+    {% if borrowing_enabled %}
     <a href="{{ url_for('search.search_results', q=query, type='borrow') }}" class="filter-tag {% if filter_type == 'borrow' %}active{% endif %}">
       <i data-lucide="bookmark"></i>
       <span>借阅</span>
     </a>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -114,6 +116,7 @@
                   {% else %}{{ item.status }}
                   {% endif %}
                 {% elif item.type == 'borrow' %}
+                  {% if borrowing_enabled %}
                   {% if item.status == 'pending' %}待审批
                   {% elif item.status == 'approved' %}已批准
                   {% elif item.status == 'rejected' %}已拒绝
@@ -121,9 +124,8 @@
                   {% elif item.status == 'overdue' %}已逾期
                   {% else %}{{ item.status }}
                   {% endif %}
-                {% else %}
-                  {{ item.status }}
-                {% endif %}
+                  {% else %}{{ item.status }}
+                  {% endif %}
               </span>
             </td>
             <td class="table-cell-secondary">{{ item.date or '-' }}</td>

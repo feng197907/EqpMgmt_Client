@@ -731,6 +731,7 @@ def _ensure_default_settings(cur, conn, db_type='mysql'):
     default_settings = [
         ("approval_enabled", "true",  "是否启用审批流程（设备变更、文档上传等）"),
         ("auto_approve_document", "false", "文档上传后是否自动生效"),
+        ("borrowing_enabled", "true", "是否启用借阅功能（借阅、归还文档等）"),
     ]
     import time
 

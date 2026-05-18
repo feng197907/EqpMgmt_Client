@@ -5,6 +5,19 @@ from config import MAINTENANCE_RESULT_LABELS, MAINTENANCE_TYPE_LABELS
 from database import get_db
 
 
+def _normalize_date(value):
+    """将日期值标准化为 date 对象，兼容 MySQL 返回的 datetime/date 对象和字符串"""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    return value
+
+
 class MaintenancePlan:
     """维护计划类"""
 
@@ -36,26 +49,26 @@ class MaintenancePlan:
     @property
     def is_overdue(self):
         """检查是否已逾期"""
-        if not self.next_due_date:
+        due_date = _normalize_date(self.next_due_date)
+        if not due_date:
             return False
-        due_date = datetime.strptime(self.next_due_date, "%Y-%m-%d").date()
         return due_date < date.today()
 
     @property
     def overdue_days(self):
         """计算逾期天数"""
-        if not self.next_due_date:
+        due_date = _normalize_date(self.next_due_date)
+        if not due_date:
             return 0
-        due_date = datetime.strptime(self.next_due_date, "%Y-%m-%d").date()
         delta = date.today() - due_date
         return delta.days
 
     @property
     def urgency(self):
         """计算紧迫度标签"""
-        if not self.next_due_date:
+        due_date = _normalize_date(self.next_due_date)
+        if not due_date:
             return "info"
-        due_date = datetime.strptime(self.next_due_date, "%Y-%m-%d").date()
         delta = (due_date - date.today()).days
         if delta < 0 or delta == 0:
             return "danger"

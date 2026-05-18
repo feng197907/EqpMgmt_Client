@@ -25,14 +25,20 @@ def calc_urgency(due_date):
     """计算到期紧迫度
 
     Args:
-        due_date: 到期日期（'YYYY-MM-DD'字符串）
+        due_date: 到期日期（'YYYY-MM-DD'字符串 或 datetime.date/datetime.datetime 对象）
 
     Returns:
         'danger' | 'warning' | 'info' | 'success'
     """
     if not due_date:
         return "info"
-    due = datetime.strptime(due_date, "%Y-%m-%d").date()
+    # 兼容 MySQL 返回的 date/datetime 对象，以及字符串格式
+    if isinstance(due_date, datetime):
+        due = due_date.date()
+    elif isinstance(due_date, date):
+        due = due_date
+    else:
+        due = datetime.strptime(str(due_date), "%Y-%m-%d").date()
     delta = (due - date.today()).days
     if delta < 0 or delta == 0:
         return "danger"

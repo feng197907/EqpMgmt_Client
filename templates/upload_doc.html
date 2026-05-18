@@ -12,6 +12,107 @@
   margin-left: 6px;
   vertical-align: middle;
 }
+
+/* 多文件列表 */
+.file-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+}
+
+.file-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  transition: all var(--transition-fast);
+}
+
+.file-list-item:hover {
+  background: var(--color-gray-50);
+}
+
+.file-list-icon {
+  flex-shrink: 0;
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-list-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.file-list-name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-list-size {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.file-list-remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.file-list-remove:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+.add-more-files {
+  padding: 0 0.75rem 0.75rem;
+  text-align: center;
+}
+
+.btn-add-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.875rem;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-add-more:hover {
+  background: var(--color-primary);
+  color: #fff;
+  border-style: solid;
+}
 </style>
 {# 文档上传页 - 现代化设计 #}
 <div class="upload-page">
@@ -48,26 +149,23 @@
 
         {# 拖拽上传区域 #}
         <div class="dropzone" id="dropzone">
-          <input type="file" name="file" id="fileInput" class="file-input" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png" required>
-          <div class="dropzone-content">
+          <input type="file" name="files" id="fileInput" class="file-input" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png" required>
+          <div class="dropzone-content" id="dropzoneContent">
             <div class="dropzone-icon">
               <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
             </div>
             <p class="dropzone-text">拖拽文件到此处，或<span class="highlight">点击选择</span></p>
-            <p class="dropzone-hint">支持 PDF、Word、Excel、PPT、图片等格式</p>
+            <p class="dropzone-hint">支持 PDF、Word、Excel、PPT、图片等格式，可多选</p>
           </div>
 
-          {# 文件预览 #}
-          <div class="file-preview" id="filePreview" style="display: none;">
-            <div class="file-icon" id="fileIcon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
-            </div>
-            <div class="file-details">
-              <span class="file-name" id="fileName"></span>
-              <span class="file-size" id="fileSize"></span>
-            </div>
-            <button type="button" class="remove-file" id="removeFile" title="移除文件">
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          {# 文件列表 #}
+          <div class="file-list" id="fileList" style="display: none;"></div>
+
+          {# 添加更多文件 #}
+          <div class="add-more-files" id="addMoreFiles" style="display: none;">
+            <button type="button" class="btn-add-more" id="btnAddMore">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              添加更多文件
             </button>
           </div>
         </div>
@@ -145,13 +243,16 @@
 </div>
 
 <script>
-// 拖拽上传功能
+// 多文件上传功能
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
-const filePreview = document.getElementById('filePreview');
-const fileName = document.getElementById('fileName');
-const fileSize = document.getElementById('fileSize');
-const removeFile = document.getElementById('removeFile');
+const dropzoneContent = document.getElementById('dropzoneContent');
+const fileList = document.getElementById('fileList');
+const addMoreFiles = document.getElementById('addMoreFiles');
+const btnAddMore = document.getElementById('btnAddMore');
+const submitBtn = document.getElementById('submitBtn');
+
+let selectedFiles = new DataTransfer();
 
 // 拖拽效果
 ['dragenter', 'dragover'].forEach(eventName => {
@@ -169,23 +270,92 @@ const removeFile = document.getElementById('removeFile');
 });
 
 // 文件选择
-fileInput.addEventListener('change', handleFileSelect);
+fileInput.addEventListener('change', () => {
+  addFiles(fileInput.files);
+});
+
 dropzone.addEventListener('drop', (e) => {
   const files = e.dataTransfer.files;
   if (files.length > 0) {
-    fileInput.files = files;
-    handleFileSelect();
+    addFiles(files);
   }
 });
 
-function handleFileSelect() {
-  const file = fileInput.files[0];
-  if (file) {
-    dropzone.classList.add('has-file');
-    dropzone.querySelector('.dropzone-content').style.display = 'none';
-    filePreview.style.display = 'flex';
-    fileName.textContent = file.name;
-    fileSize.textContent = formatFileSize(file.size);
+// 点击添加更多
+btnAddMore.addEventListener('click', (e) => {
+  e.stopPropagation();
+  fileInput.click();
+});
+
+function addFiles(files) {
+  for (const file of files) {
+    selectedFiles.items.add(file);
+  }
+  fileInput.files = selectedFiles.files;
+  renderFileList();
+  updateSubmitButton();
+}
+
+function removeFileAt(index) {
+  const dt = new DataTransfer();
+  for (let i = 0; i < selectedFiles.files.length; i++) {
+    if (i !== index) dt.items.add(selectedFiles.files[i]);
+  }
+  selectedFiles = dt;
+  fileInput.files = selectedFiles.files;
+  renderFileList();
+  updateSubmitButton();
+}
+
+function renderFileList() {
+  if (selectedFiles.files.length === 0) {
+    dropzoneContent.style.display = 'flex';
+    fileList.style.display = 'none';
+    addMoreFiles.style.display = 'none';
+    dropzone.classList.remove('has-file');
+    fileInput.style.pointerEvents = 'auto';
+    return;
+  }
+  dropzoneContent.style.display = 'none';
+  fileList.style.display = 'block';
+  addMoreFiles.style.display = 'block';
+  dropzone.classList.add('has-file');
+  fileInput.style.pointerEvents = 'none';
+
+  fileList.innerHTML = '';
+  for (let i = 0; i < selectedFiles.files.length; i++) {
+    const file = selectedFiles.files[i];
+    const item = document.createElement('div');
+    item.className = 'file-list-item';
+    item.innerHTML = `
+      <div class="file-list-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+      </div>
+      <div class="file-list-info">
+        <span class="file-list-name">${escapeHtml(file.name)}</span>
+        <span class="file-list-size">${formatFileSize(file.size)}</span>
+      </div>
+      <button type="button" class="file-list-remove" data-index="${i}" title="移除">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    `;
+    fileList.appendChild(item);
+  }
+
+  fileList.querySelectorAll('.file-list-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removeFileAt(parseInt(btn.dataset.index));
+    });
+  });
+}
+
+function updateSubmitButton() {
+  const count = selectedFiles.files.length;
+  if (count > 0) {
+    submitBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> 上传 ${count} 个文档`;
+  } else {
+    submitBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg> 上传文档`;
   }
 }
 
@@ -195,13 +365,11 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-removeFile.addEventListener('click', (e) => {
-  e.stopPropagation();
-  fileInput.value = '';
-  dropzone.classList.remove('has-file');
-  dropzone.querySelector('.dropzone-content').style.display = 'block';
-  filePreview.style.display = 'none';
-});
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
 
 // 文档类型选择
 document.querySelectorAll('.doc-type-option').forEach(option => {

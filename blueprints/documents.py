@@ -50,46 +50,75 @@ def upload_doc(device_id):
         # 非校准记录类型时忽略该字段
         if doc_type != "calibration":
             calibration_due_date = None
-        file = request.files.get("file")
+        files = request.files.getlist("files")
         if doc_type not in DOC_TYPE_LABELS:
             flash("请选择正确的文档类型。", "warning")
             return redirect(url_for("documents.upload_doc", device_id=device_id))
-        if not file or file.filename == "":
+        if not files or all(f.filename == "" for f in files):
             flash("请选择要上传的文件。", "warning")
             return redirect(url_for("documents.upload_doc", device_id=device_id))
-        if not allowed_file(file.filename):
-            flash("文件类型不允许。", "danger")
-            return redirect(url_for("documents.upload_doc", device_id=device_id))
-        version = get_next_version(conn, device_id, doc_type)
-        original_name = file.filename
-        # 清理文件名中的危险字符，但保留中文等非ASCII字符
-        safe_name = original_name.replace("..", ".").replace("/", "_").replace("\\", "_")
+
+        success_count = 0
+        error_msgs = []
+        doc_ids = []
         device_dir = ensure_upload_dir(device_id)
-        # 存储文件名使用安全的ASCII版本（用于文件系统）
-        stored_name = secure_filename(f"{doc_type}_{version}_{safe_name}")
-        if not stored_name or stored_name == f"{doc_type}_{version}_":
-            # 如果secure_filename去掉了所有字符，使用原始扩展名
-            ext = safe_name.rsplit(".", 1)[-1] if "." in safe_name else "file"
-            stored_name = f"{doc_type}_{version}_document.{ext}"
-        file_path = os.path.join(device_dir, stored_name)
-        file.save(file_path)
-        # 存储相对于项目根目录的相对路径，兼容云服务器部署
-        relative_path = os.path.relpath(file_path, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        cur.execute(
-            "INSERT INTO documents (device_id, doc_type, doc_name, version, file_path, uploaded_by, remarks, status, calibration_due_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (device_id, doc_type, safe_name, version, relative_path, current_user.username, remarks, initial_status, calibration_due_date),
-        )
-        conn.commit()
-        doc_id = cur.lastrowid
-        log_action(
-            current_user.username, "upload_document", "document", doc_id,
-            f"上传 {DOC_TYPE_LABELS.get(doc_type)} v{version}",
-        )
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        for file in files:
+            if not file or file.filename == "":
+                continue
+            if not allowed_file(file.filename):
+                error_msgs.append(f"「{file.filename}」文件类型不允许。")
+                continue
+            version = get_next_version(conn, device_id, doc_type)
+            original_name = file.filename
+            # 清理文件名中的危险字符，但保留中文等非ASCII字符
+            safe_name = original_name.replace("..", ".").replace("/", "_").replace("\\", "_")
+            # 存储文件名使用安全的ASCII版本（用于文件系统）
+            stored_name = secure_filename(f"{doc_type}_{version}_{safe_name}")
+            if not stored_name or stored_name == f"{doc_type}_{version}_":
+                # 如果secure_filename去掉了所有字符，使用原始扩展名
+                ext = safe_name.rsplit(".", 1)[-1] if "." in safe_name else "file"
+                stored_name = f"{doc_type}_{version}_document.{ext}"
+            file_path = os.path.join(device_dir, stored_name)
+            file.save(file_path)
+            # 存储相对于项目根目录的相对路径，兼容云服务器部署
+            relative_path = os.path.relpath(file_path, base_dir)
+            cur.execute(
+                "INSERT INTO documents (device_id, doc_type, doc_name, version, file_path, uploaded_by, remarks, status, calibration_due_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (device_id, doc_type, safe_name, version, relative_path, current_user.username, remarks, initial_status, calibration_due_date),
+            )
+            conn.commit()
+            doc_id = cur.lastrowid
+            doc_ids.append(doc_id)
+            log_action(
+                current_user.username, "upload_document", "document", doc_id,
+                f"上传 {DOC_TYPE_LABELS.get(doc_type)} v{version}",
+            )
+            success_count += 1
+
         conn.close()
-        if initial_status == "active":
-            flash("文档已上传并生效（审批流程已禁用）。", "success")
+
+        # 汇总反馈
+        if success_count == len(files):
+            msg = f"已成功上传 {success_count} 个文档"
+            if initial_status == "active":
+                msg += "并生效（审批流程已禁用）。"
+            else:
+                msg += "。"
+            flash(msg, "success")
+        elif success_count > 0:
+            flash(f"上传完成：{success_count} 个成功，{len(error_msgs)} 个失败。", "success")
+            for err in error_msgs[:3]:
+                flash(err, "warning")
+            if len(error_msgs) > 3:
+                flash(f"还有 {len(error_msgs) - 3} 个文件上传失败。", "warning")
         else:
-            flash("文档已上传。", "success")
+            for err in error_msgs[:3]:
+                flash(err, "danger")
+            flash("所有文件上传失败，请检查文件类型。", "danger")
+            return redirect(url_for("documents.upload_doc", device_id=device_id))
+
         return redirect(url_for("devices.device_detail", device_id=device_id))
     conn.close()
     return render_template("upload_doc.html", device=device, doc_types=DOC_TYPES)

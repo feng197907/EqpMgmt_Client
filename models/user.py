@@ -71,7 +71,7 @@ def load_user(user_id):
     """Flask-Login 用户加载回调"""
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    cur.execute("SELECT * FROM users WHERE id = %s", (user_id,))
     row = cur.fetchone()
     conn.close()
     if row is None:

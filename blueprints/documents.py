@@ -237,16 +237,16 @@ def document_search():
         sql += " AND d.uploaded_by LIKE %s"
         params.append(f"%{uploader}%")
     if doc_type:
-        sql += " AND d.doc_type = ?"
+        sql += " AND d.doc_type = %s"
         params.append(doc_type)
     if status:
-        sql += " AND d.status = ?"
+        sql += " AND d.status = %s"
         params.append(status)
     if start_date:
-        sql += " AND date(d.upload_time) >= date(?)"
+        sql += " AND DATE(d.upload_time) >= DATE(%s)"
         params.append(start_date)
     if end_date:
-        sql += " AND date(d.upload_time) <= date(?)"
+        sql += " AND DATE(d.upload_time) <= DATE(%s)"
         params.append(end_date)
     sql += " ORDER BY d.upload_time DESC"
     conn = get_db()

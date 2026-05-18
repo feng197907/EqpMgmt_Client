@@ -159,7 +159,7 @@ def delete_plan(device_id, plan_id):
         return jsonify({"error": "维护计划不存在"}), 404
 
     # 软删除：设置is_active=0
-    cur.execute("UPDATE maintenance_plan SET is_active = 0, updated_at = datetime('now') WHERE id = %s", (plan_id,))
+    cur.execute("UPDATE maintenance_plan SET is_active = 0, updated_at = NOW() WHERE id = %s", (plan_id,))
     conn.commit()
     conn.close()
 
@@ -258,7 +258,7 @@ def submit_record(device_id, plan_id):
     # 根据维护结果决定是否更新到期日
     if result == "qualified":
         cur.execute(
-            "UPDATE maintenance_plan SET next_due_date = %s, updated_at = datetime('now') WHERE id = %s",
+            "UPDATE maintenance_plan SET next_due_date = %s, updated_at = NOW() WHERE id = %s",
             (next_due_date, plan_id)
         )
         conn.commit()

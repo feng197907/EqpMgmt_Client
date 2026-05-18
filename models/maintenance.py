@@ -70,7 +70,7 @@ class MaintenancePlan:
         """根据ID获取维护计划"""
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM maintenance_plan WHERE id = ?", (plan_id,))
+        cur.execute("SELECT * FROM maintenance_plan WHERE id = %s", (plan_id,))
         row = cur.fetchone()
         conn.close()
         if row is None:
@@ -84,12 +84,12 @@ class MaintenancePlan:
         cur = conn.cursor()
         if active_only:
             cur.execute(
-                "SELECT * FROM maintenance_plan WHERE device_id = ? AND is_active = 1",
+                "SELECT * FROM maintenance_plan WHERE device_id = %s AND is_active = 1",
                 (device_id,)
             )
         else:
             cur.execute(
-                "SELECT * FROM maintenance_plan WHERE device_id = ?",
+                "SELECT * FROM maintenance_plan WHERE device_id = %s",
                 (device_id,)
             )
         rows = cur.fetchall()
@@ -102,7 +102,7 @@ class MaintenancePlan:
         conn = get_db()
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM maintenance_plan WHERE device_id = ? AND maintenance_type = ? AND is_active = 1",
+            "SELECT * FROM maintenance_plan WHERE device_id = %s AND maintenance_type = %s AND is_active = 1",
             (device_id, maintenance_type)
         )
         row = cur.fetchone()
@@ -120,7 +120,7 @@ class MaintenancePlan:
                 """INSERT INTO maintenance_plan
                    (device_id, maintenance_type, interval_days, next_due_date,
                     is_active, created_by, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))""",
+                   VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())""",
                 (self.device_id, self.maintenance_type, self.interval_days,
                  self.next_due_date, self.is_active, self.created_by)
             )
@@ -128,9 +128,9 @@ class MaintenancePlan:
         else:
             cur.execute(
                 """UPDATE maintenance_plan SET
-                   maintenance_type = ?, interval_days = ?, next_due_date = ?,
-                   is_active = ?, updated_at = datetime('now')
-                   WHERE id = ?""",
+                   maintenance_type = %s, interval_days = %s, next_due_date = %s,
+                   is_active = %s, updated_at = NOW()
+                   WHERE id = %s""",
                 (self.maintenance_type, self.interval_days, self.next_due_date,
                  self.is_active, self.id)
             )
@@ -173,7 +173,7 @@ class MaintenanceRecord:
         """根据ID获取维护记录"""
         conn = get_db()
         cur = conn.cursor()
-        cur.execute("SELECT * FROM maintenance_record WHERE id = ?", (record_id,))
+        cur.execute("SELECT * FROM maintenance_record WHERE id = %s", (record_id,))
         row = cur.fetchone()
         conn.close()
         if row is None:
@@ -185,14 +185,14 @@ class MaintenanceRecord:
         """获取设备的维护记录列表（支持分页和筛选）"""
         conn = get_db()
         cur = conn.cursor()
-        where = "WHERE device_id = ?"
+        where = "WHERE device_id = %s"
         params = [device_id]
         if maintenance_type:
-            where += " AND maintenance_type = ?"
+            where += " AND maintenance_type = %s"
             params.append(maintenance_type)
         if year:
-            where += " AND strftime('%Y', performed_at) = ?"
-            params.append(str(year))
+            where += " AND YEAR(performed_at) = %s"
+            params.append(int(year))
         cur.execute(
             f"SELECT COUNT(*) as total FROM maintenance_record {where}",
             params
@@ -202,7 +202,7 @@ class MaintenanceRecord:
         params_with_pagination = params + [per_page, offset]
         cur.execute(
             f"""SELECT * FROM maintenance_record {where}
-                ORDER BY performed_at DESC LIMIT ? OFFSET ?""",
+                ORDER BY performed_at DESC LIMIT %s OFFSET %s""",
             params_with_pagination
         )
         rows = cur.fetchall()
@@ -222,7 +222,7 @@ class MaintenanceRecord:
         conn = get_db()
         cur = conn.cursor()
         cur.execute(
-            "SELECT * FROM maintenance_record WHERE plan_id = ? ORDER BY performed_at DESC",
+            "SELECT * FROM maintenance_record WHERE plan_id = %s ORDER BY performed_at DESC",
             (plan_id,)
         )
         rows = cur.fetchall()
@@ -238,7 +238,7 @@ class MaintenanceRecord:
                 """INSERT INTO maintenance_record
                    (plan_id, device_id, maintenance_type, content, result,
                     performed_by, performed_at, next_due_date, parts_used, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())""",
                 (self.plan_id, self.device_id, self.maintenance_type,
                  self.content, self.result, self.performed_by,
                  self.performed_at, self.next_due_date, self.parts_used)

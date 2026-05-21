@@ -6,7 +6,7 @@ from flask_login import current_user, login_required
 
 from config import FIXED_INTERVAL_LABELS, FIXED_INTERVAL_OPTIONS, MAINTENANCE_RESULTS, MAINTENANCE_RESULT_LABELS, MAINTENANCE_TYPE_LABELS, MAINTENANCE_TYPES
 from database import get_db
-from models.maintenance import MaintenancePlan, MaintenanceRecord
+from models.maintenance import DeviceRepairRecord, MaintenancePlan, MaintenanceRecord
 from utils.audit import log_action
 from utils.decorators import admin_required, permission_required
 from utils.maintenance import calc_next_due_date, calc_urgency
@@ -448,3 +448,175 @@ def api_get_records(device_id):
         })
 
     return jsonify({"records": result, "pagination": pagination})
+
+
+# ============================================================
+# 维修记录（独立于维护计划）
+# ============================================================
+
+@maintenance_bp.route("/repair", methods=["GET"])
+@login_required
+def repair_records(device_id):
+    """设备维修记录列表页"""
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 获取设备信息
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
+    device = cur.fetchone()
+    if device is None:
+        conn.close()
+        flash("设备不存在。", "warning")
+        return redirect(url_for("auth.index"))
+
+    try:
+        page = max(1, int(request.args.get("page", 1)))
+    except ValueError:
+        page = 1
+    per_page = 20
+
+    # 获取维修记录（分页）
+    records, pagination = DeviceRepairRecord.get_by_device(device_id, page=page, per_page=per_page)
+
+    display_records = []
+    for record in records:
+        if record.result == "qualified":
+            result_text = "合格"
+            result_class = "bg-success"
+        elif record.result == "unqualified":
+            result_text = "不合格"
+            result_class = "bg-danger"
+        elif record.result == "pending":
+            result_text = "待处理"
+            result_class = "bg-warning text-dark"
+        else:
+            result_text = record.result if record.result else "-"
+            result_class = "bg-secondary"
+        display_records.append(
+            {
+                "id": record.id,
+                "performed_at": record.performed_at,
+                "content": record.content,
+                "result_text": result_text,
+                "result_class": result_class,
+                "performed_by": record.performed_by,
+                "parts_used": record.parts_used,
+            }
+        )
+
+    conn.close()
+
+    return render_template(
+        "device_repair_records.html",
+        device=device,
+        records=display_records,
+        pagination=pagination,
+        results=MAINTENANCE_RESULTS,
+        result_labels=MAINTENANCE_RESULT_LABELS,
+    )
+
+
+@maintenance_bp.route("/repair/new", methods=["GET"])
+@login_required
+def new_repair_form(device_id):
+    """新增维修记录表单页"""
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 获取设备信息
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
+    device = cur.fetchone()
+    if device is None:
+        conn.close()
+        flash("设备不存在。", "warning")
+        return redirect(url_for("auth.index"))
+
+    conn.close()
+
+    return render_template(
+        "repair_record_form.html",
+        device=device,
+        results=MAINTENANCE_RESULTS,
+        result_labels=MAINTENANCE_RESULT_LABELS,
+    )
+
+
+@maintenance_bp.route("/repair/new", methods=["POST"])
+@permission_required("device_maintenance")
+def submit_repair_record(device_id):
+    """提交维修记录"""
+    content = request.form.get("content", "").strip()
+    result = request.form.get("result", "").strip()
+    parts_used = request.form.get("parts_used", "").strip()
+    performed_at = request.form.get("performed_at", "").strip()
+
+    if not content or not result:
+        flash("请填写维修内容和结果。", "warning")
+        return redirect(url_for("maintenance.new_repair_form", device_id=device_id))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # 获取设备信息
+    cur.execute("SELECT * FROM devices WHERE id = %s", (device_id,))
+    device = cur.fetchone()
+    if device is None:
+        conn.close()
+        flash("设备不存在。", "warning")
+        return redirect(url_for("auth.index"))
+
+    # 使用表单日期或当前时间
+    if not performed_at:
+        performed_at = datetime.now().strftime("%Y-%m-%d")
+
+    # 创建维修记录
+    record = DeviceRepairRecord(
+        device_id=device_id,
+        content=content,
+        result=result,
+        performed_by=current_user.username,
+        performed_at=performed_at,
+        parts_used=parts_used if parts_used else None,
+    )
+    record.save()
+
+    log_action(
+        current_user.username, "submit_repair_record", "repair_record", record.id,
+        f"提交设备 {device['device_code']} 的维修记录，结果：{result}",
+    )
+
+    conn.close()
+
+    flash("维修记录已保存。", "success")
+    return redirect(url_for("maintenance.repair_records", device_id=device_id))
+
+
+@maintenance_bp.route("/repair/<int:record_id>/delete", methods=["POST"])
+@admin_required
+def delete_repair_record(device_id, record_id):
+    """删除维修记录（管理员）"""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM repair_record WHERE id = %s AND device_id = %s",
+        (record_id, device_id),
+    )
+    record = cur.fetchone()
+    if record is None:
+        conn.close()
+        flash("维修记录不存在。", "warning")
+        return redirect(url_for("maintenance.repair_records", device_id=device_id))
+
+    cur.execute("DELETE FROM repair_record WHERE id = %s", (record_id,))
+    conn.commit()
+
+    log_action(
+        current_user.username,
+        "delete_repair_record",
+        "repair_record",
+        record_id,
+        f"删除设备 {device_id} 的维修记录：{record['content']}（结果：{record['result']}）",
+    )
+    conn.close()
+    flash("维修记录已删除。", "success")
+    return redirect(url_for("maintenance.repair_records", device_id=device_id))

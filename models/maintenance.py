@@ -260,3 +260,86 @@ class MaintenanceRecord:
         conn.commit()
         conn.close()
         return self
+
+
+class DeviceRepairRecord:
+    """设备维修记录类（独立于维护计划的维修记录）"""
+
+    def __init__(self, id=None, device_id=None, content=None,
+                 result=None, performed_by=None, performed_at=None,
+                 parts_used=None, created_at=None):
+        self.id = id
+        self.device_id = device_id
+        self.content = content
+        self.result = result
+        self.performed_by = performed_by
+        self.performed_at = performed_at
+        self.parts_used = parts_used
+        self.created_at = created_at
+
+    @staticmethod
+    def get_by_id(record_id):
+        """根据ID获取维修记录"""
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM repair_record WHERE id = %s", (record_id,))
+        row = cur.fetchone()
+        conn.close()
+        if row is None:
+            return None
+        return DeviceRepairRecord(**dict(row))
+
+    @staticmethod
+    def get_by_device(device_id, page=1, per_page=20):
+        """获取设备的维修记录列表（支持分页）"""
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) as total FROM repair_record WHERE device_id = %s",
+            (device_id,)
+        )
+        total = cur.fetchone()["total"]
+        offset = (page - 1) * per_page
+        cur.execute(
+            """SELECT * FROM repair_record WHERE device_id = %s
+                ORDER BY performed_at DESC LIMIT %s OFFSET %s""",
+            (device_id, per_page, offset)
+        )
+        rows = cur.fetchall()
+        conn.close()
+        records = [DeviceRepairRecord(**dict(row)) for row in rows]
+        pagination = {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": (total + per_page - 1) // per_page
+        }
+        return records, pagination
+
+    def save(self):
+        """保存维修记录"""
+        conn = get_db()
+        cur = conn.cursor()
+        if self.id is None:
+            cur.execute(
+                """INSERT INTO repair_record
+                   (device_id, content, result, performed_by, performed_at, parts_used, created_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, NOW())""",
+                (self.device_id, self.content, self.result,
+                 self.performed_by, self.performed_at, self.parts_used)
+            )
+            self.id = cur.lastrowid
+        conn.commit()
+        conn.close()
+        return self
+
+    def delete(self):
+        """删除维修记录"""
+        if self.id is None:
+            return False
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("DELETE FROM repair_record WHERE id = %s", (self.id,))
+        conn.commit()
+        conn.close()
+        return True

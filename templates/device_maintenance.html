@@ -1,19 +1,62 @@
 {% extends 'base.html' %}
 {% block content %}
 {# 设备维护计划页面 #}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-1">{{ device.device_name }}</h3>
-    <div class="text-muted">{{ device.device_code }} · {{ device.model or '-' }} · {{ device.location or '-' }}</div>
+<div class="device-detail-page">
+  {# 设备头部信息卡 #}
+  <div class="device-header-card">
+    <div class="device-header-left">
+      <div class="device-meta">
+        <span class="meta-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          {{ device.device_code }}
+        </span>
+        {% if device.model %}
+        <span class="meta-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+          {{ device.model }}
+        </span>
+        {% endif %}
+        {% if device.location %}
+        <span class="meta-item">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          {{ device.location }}
+        </span>
+        {% endif %}
+      </div>
+      <h1 class="device-title">{{ device.device_name }}</h1>
+    </div>
+    <div class="device-header-actions">
+      <a href="{{ url_for('devices.device_detail', device_id=device.id) }}" class="btn-upload" style="background: var(--gray-100); color: var(--gray-700);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
+        返回设备详情
+      </a>
+      {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
+      <button class="btn-edit" onclick="showAddPlanModal()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        添加维护计划
+      </button>
+      {% endif %}
+    </div>
   </div>
-  <div class="btn-group">
-    <a class="btn btn-outline-secondary" href="{{ url_for('devices.device_detail', device_id=device.id) }}">返回设备详情</a>
-    {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
-    <button class="btn btn-primary" onclick="showAddPlanModal()">
-      <i data-lucide="plus"></i>
-      添加维护计划
-    </button>
-    {% endif %}
+
+  {# 标签页 #}
+  <div class="page-tabs">
+    <a class="tab-item" href="{{ url_for('devices.device_detail', device_id=device.id) }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+      设备详情
+    </a>
+    <a class="tab-item active" href="{{ url_for('maintenance.maintenance_plans', device_id=device.id) }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      维护计划
+    </a>
+    <a class="tab-item" href="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      维护历史
+    </a>
+    <a class="tab-item" href="{{ url_for('maintenance.repair_records', device_id=device.id) }}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      维修记录
+    </a>
   </div>
 </div>
 

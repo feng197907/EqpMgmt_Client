@@ -266,18 +266,25 @@ def _migrate_mysql_columns(cur):
     migrations = [
         ("documents", "calibration_due_date",
          "ALTER TABLE documents ADD COLUMN calibration_due_date DATE DEFAULT NULL"),
+        # repair_record 表（增量创建）
+        ("repair_record", "_table",
+         "CREATE TABLE IF NOT EXISTS repair_record (id INT AUTO_INCREMENT PRIMARY KEY, device_id INT NOT NULL, content VARCHAR(2000) NOT NULL, result VARCHAR(50) NOT NULL, performed_by VARCHAR(255) NOT NULL, performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, parts_used VARCHAR(1000), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
     ]
     for table, col, ddl in migrations:
         try:
-            cur.execute(
-                "SELECT COUNT(*) as cnt FROM information_schema.COLUMNS "
-                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
-                (table, col)
-            )
-            row = cur.fetchone()
-            exists = row["cnt"] if isinstance(row, dict) else row[0]
-            if not exists:
+            if col == "_table":
+                # 新表创建（增量）
                 cur.execute(ddl)
+            else:
+                cur.execute(
+                    "SELECT COUNT(*) as cnt FROM information_schema.COLUMNS "
+                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+                    (table, col)
+                )
+                row = cur.fetchone()
+                exists = row["cnt"] if isinstance(row, dict) else row[0]
+                if not exists:
+                    cur.execute(ddl)
         except Exception:
             pass
 
@@ -444,6 +451,19 @@ def _init_mysql_tables(cur, conn):
                 parts_used VARCHAR(1000),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (plan_id) REFERENCES maintenance_plan(id) ON DELETE CASCADE,
+                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """),
+        ("repair_record", """
+            CREATE TABLE IF NOT EXISTS repair_record (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                device_id INT NOT NULL,
+                content VARCHAR(2000) NOT NULL,
+                result VARCHAR(50) NOT NULL,
+                performed_by VARCHAR(255) NOT NULL,
+                performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                parts_used VARCHAR(1000),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """),
@@ -637,6 +657,19 @@ def _init_sqlite_tables(cur, conn):
                 FOREIGN KEY (device_id) REFERENCES devices(id)
             )
         """),
+        ("repair_record", """
+            CREATE TABLE IF NOT EXISTS repair_record (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                result TEXT NOT NULL,
+                performed_by TEXT NOT NULL,
+                performed_at TEXT NOT NULL DEFAULT (datetime('now')),
+                parts_used TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (device_id) REFERENCES devices(id)
+            )
+        """),
         ("device_status_requests", """
             CREATE TABLE IF NOT EXISTS device_status_requests (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -685,13 +718,19 @@ def _migrate_sqlite_columns(cur):
         ("borrow_records", "remarks",              "ALTER TABLE borrow_records ADD COLUMN remarks TEXT"),
         ("borrow_records", "created_at",           "ALTER TABLE borrow_records ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
         ("documents",      "calibration_due_date", "ALTER TABLE documents ADD COLUMN calibration_due_date DATE DEFAULT NULL"),
+        # repair_record 表（增量创建）
+        ("repair_record", "_table", "CREATE TABLE IF NOT EXISTS repair_record (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id INTEGER NOT NULL, content TEXT NOT NULL, result TEXT NOT NULL, performed_by TEXT NOT NULL, performed_at TEXT NOT NULL DEFAULT (datetime('now')), parts_used TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (device_id) REFERENCES devices(id))"),
     ]
     for table, col, ddl in migrations:
         try:
-            cur.execute(f"PRAGMA table_info({table})")
-            cols = {row["name"] for row in cur.fetchall()}
-            if col not in cols:
+            if col == "_table":
+                # 新表创建（增量）
                 cur.execute(ddl)
+            else:
+                cur.execute(f"PRAGMA table_info({table})")
+                cols = {row["name"] for row in cur.fetchall()}
+                if col not in cols:
+                    cur.execute(ddl)
         except Exception:
             pass
 

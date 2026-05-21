@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-{# 设备维护历史页面 #}
+{# 设备维修记录页面 #}
 <div class="device-detail-page">
   {# 设备头部信息卡 #}
   <div class="device-header-card">
@@ -30,6 +30,12 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"/></svg>
         返回设备详情
       </a>
+      {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
+      <a href="{{ url_for('maintenance.new_repair_form', device_id=device.id) }}" class="btn-edit">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        添加维修记录
+      </a>
+      {% endif %}
     </div>
   </div>
 
@@ -43,53 +49,21 @@
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
       维护计划
     </a>
-    <a class="tab-item active" href="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">
+    <a class="tab-item" href="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
       维护历史
     </a>
-    <a class="tab-item" href="{{ url_for('maintenance.repair_records', device_id=device.id) }}">
+    <a class="tab-item active" href="{{ url_for('maintenance.repair_records', device_id=device.id) }}">
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
       维修记录
     </a>
   </div>
 </div>
 
-{# 筛选栏 #}
-<div class="filter-bar">
-  <form class="d-flex flex-wrap gap-3 align-items-center" method="get" action="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">
-    <div class="form-group mb-0" style="min-width: 150px;">
-      <select class="form-select" name="type">
-        <option value="">全部类型</option>
-        {% for type, label in maintenance_types %}
-        <option value="{{ type }}" {% if selected_type == type %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="form-group mb-0" style="min-width: 150px;">
-      <select class="form-select" name="year">
-        <option value="">全部年份</option>
-        {% for year in range(2024, 2027) %}
-        <option value="{{ year }}" {% if selected_year == year|string %}selected{% endif %}>{{ year }}年</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="filter-bar-actions">
-      <button class="btn btn-primary" type="submit">
-        <i data-lucide="search"></i>
-        筛选
-      </button>
-      <a class="btn btn-secondary" href="{{ url_for('maintenance.maintenance_history', device_id=device.id) }}">
-        <i data-lucide="rotate-ccw"></i>
-        重置
-      </a>
-    </div>
-  </form>
-</div>
-
-{# 维护记录列表 #}
+{# 维修记录列表 #}
 <div class="card">
   <div class="card-header">
-    <span>维护记录</span>
+    <span>维修记录列表</span>
     <span class="text-muted" style="font-weight: 400;">共 {{ pagination.total }} 条记录</span>
   </div>
   <div class="table-wrapper">
@@ -97,12 +71,11 @@
     <table class="table">
       <thead>
         <tr>
-          <th>维护时间</th>
-          <th>类型</th>
-          <th>维护内容摘要</th>
+          <th>维修时间</th>
+          <th>维修内容</th>
           <th>结果</th>
           <th>执行人</th>
-          <th>下次到期日</th>
+          <th>备件使用</th>
           <th>操作</th>
         </tr>
       </thead>
@@ -110,7 +83,6 @@
         {% for record in records %}
         <tr>
           <td>{{ record.performed_at.strftime('%Y-%m-%d') if record.performed_at else '-' }}</td>
-          <td>{{ record.maintenance_type_label }}</td>
           <td class="text-truncate" style="max-width: 300px;" title="{{ record.content }}">
             {{ record.content[:50] }}{% if record.content|length > 50 %}...{% endif %}
           </td>
@@ -118,10 +90,12 @@
             <span class="badge {{ record.result_class }}">{{ record.result_text }}</span>
           </td>
           <td>{{ record.performed_by }}</td>
-          <td>{{ record.next_due_date }}</td>
+          <td class="text-truncate" style="max-width: 200px;" title="{{ record.parts_used or '' }}">
+            {{ record.parts_used[:30] if record.parts_used else '-' }}{% if record.parts_used and record.parts_used|length > 30 %}...{% endif %}
+          </td>
           <td>
             {% if current_user.is_authenticated and current_user.is_admin %}
-            <form method="post" action="{{ url_for('maintenance.delete_record', device_id=device.id, record_id=record.id) }}" class="d-inline" onsubmit="return confirm('确定删除这条维护记录吗？此操作不可恢复。');">
+            <form method="post" action="{{ url_for('maintenance.delete_repair_record', device_id=device.id, record_id=record.id) }}" class="d-inline" onsubmit="return confirm('确定删除这条维修记录吗？此操作不可恢复。');">
               <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
             </form>
             {% else %}
@@ -142,13 +116,13 @@
       <div class="d-flex gap-2">
         {% if pagination.page > 1 %}
         <a class="btn btn-sm btn-outline-secondary"
-           href="{{ url_for('maintenance.maintenance_history', device_id=device.id, type=selected_type, year=selected_year, page=pagination.page-1) }}">
+           href="{{ url_for('maintenance.repair_records', device_id=device.id, page=pagination.page-1) }}">
           上一页
         </a>
         {% endif %}
         {% if pagination.page < pagination.pages %}
         <a class="btn btn-sm btn-outline-secondary"
-           href="{{ url_for('maintenance.maintenance_history', device_id=device.id, type=selected_type, year=selected_year, page=pagination.page+1) }}">
+           href="{{ url_for('maintenance.repair_records', device_id=device.id, page=pagination.page+1) }}">
           下一页
         </a>
         {% endif %}
@@ -158,7 +132,10 @@
 
     {% else %}
     <div class="text-center text-muted p-4">
-      <p>暂无维护记录</p>
+      <p>暂无维修记录</p>
+      {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
+      <a class="btn btn-primary" href="{{ url_for('maintenance.new_repair_form', device_id=device.id) }}">添加维修记录</a>
+      {% endif %}
     </div>
     {% endif %}
   </div>

@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block content %}
+{# 维修记录表单页面 #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h3 class="mb-1">添加维修记录</h3>
+    <div class="text-muted">{{ device.device_code }} · {{ device.device_name }}</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{{ url_for('maintenance.repair_records', device_id=device.id) }}">返回</a>
+</div>
+
+<div class="card" style="max-width: 800px; margin: 0 auto;">
+  <div class="card-header">
+    <span>维修信息</span>
+  </div>
+  <div class="card-body">
+    <form method="post" action="{{ url_for('maintenance.submit_repair_record', device_id=device.id) }}">
+      <div class="form-group">
+        <label class="form-label">设备</label>
+        <div class="form-control-plaintext">{{ device.device_name }} ({{ device.device_code }})</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="performed_at">维修日期</label>
+        <input type="date" class="form-control" id="performed_at" name="performed_at" style="max-width: 300px;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="content">维修内容 *</label>
+        <textarea class="form-control" id="content" name="content" rows="4" required placeholder="填写维修了哪些内容，例如：更换了XX部件、修复了XX问题..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">维修结果 *</label>
+        <div class="d-flex gap-3">
+          {% for result, label in results %}
+          <label class="form-check">
+            <input type="radio" name="result" value="{{ result }}" required>
+            <span>{{ label }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="parts_used">备件使用（选填）</label>
+        <input type="text" class="form-control" id="parts_used" name="parts_used" placeholder="填写使用的备件信息">
+      </div>
+
+      <div class="form-group d-flex gap-2 justify-content-end">
+        <a href="{{ url_for('maintenance.repair_records', device_id=device.id) }}" class="btn btn-outline-secondary">取消</a>
+        <button type="submit" class="btn btn-primary">提交记录</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

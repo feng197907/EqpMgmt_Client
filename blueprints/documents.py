@@ -1,6 +1,11 @@
 # 文档 Blueprint
-from flask import Blueprint, flash, redirect, render_template, request, send_from_directory, url_for
+from datetime import datetime
+from io import BytesIO
+
+from flask import Blueprint, flash, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from werkzeug.utils import secure_filename
 
 from config import (
@@ -340,3 +345,118 @@ def document_history(doc_id):
 
 # 需要 os 模块用于路径拼接
 import os
+
+
+def _create_excel_response(wb, filename):
+    """将 Workbook 转为 Flask send_file 响应"""
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(
+        output,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+def _set_header_style(cell):
+    """设置表头样式"""
+    cell.font = Font(bold=True, color="FFFFFF")
+    cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    cell.alignment = Alignment(horizontal="center", vertical="center")
+
+
+def _set_border(cell):
+    """设置单元格边框"""
+    thin = Side(style="thin", color="000000")
+    cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+
+@documents_bp.route("/documents/export")
+@login_required
+def export_documents():
+    """导出文档列表为 Excel"""
+    query = request.args.get("q", "").strip()
+    device_query = request.args.get("device", "").strip()
+    uploader = request.args.get("uploader", "").strip()
+    doc_type = request.args.get("doc_type", "").strip()
+    status = request.args.get("status", "").strip()
+    start_date = request.args.get("start_date", "").strip()
+    end_date = request.args.get("end_date", "").strip()
+
+    sql = (
+        "SELECT d.*, dev.device_code, dev.device_name "
+        "FROM documents d JOIN devices dev ON dev.id = d.device_id WHERE d.is_deleted = 0"
+    )
+    params = []
+    if query:
+        sql += " AND d.doc_name LIKE %s"
+        params.append(f"%{query}%")
+    if device_query:
+        sql += " AND (dev.device_code LIKE %s OR dev.device_name LIKE %s)"
+        params.extend([f"%{device_query}%", f"%{device_query}%"])
+    if uploader:
+        sql += " AND d.uploaded_by LIKE %s"
+        params.append(f"%{uploader}%")
+    if doc_type:
+        sql += " AND d.doc_type = %s"
+        params.append(doc_type)
+    if status:
+        sql += " AND d.status = %s"
+        params.append(status)
+    if start_date:
+        sql += " AND DATE(d.upload_time) >= DATE(%s)"
+        params.append(start_date)
+    if end_date:
+        sql += " AND DATE(d.upload_time) <= DATE(%s)"
+        params.append(end_date)
+    sql += " ORDER BY d.upload_time DESC"
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(sql, params)
+    rows = cur.fetchall()
+    conn.close()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "文档列表"
+
+    headers = ["设备编码", "设备名称", "文档名称", "类型", "版本", "状态", "上传人", "上传时间"]
+    ws.append(headers)
+    for cell in ws[1]:
+        _set_header_style(cell)
+        _set_border(cell)
+
+    for row in rows:
+        ws.append([
+            row["device_code"] or "-",
+            row["device_name"] or "-",
+            row["doc_name"] or "-",
+            DOC_TYPE_LABELS.get(row["doc_type"], row["doc_type"]),
+            f"v{row['version']}",
+            DOC_STATUS_LABELS.get(row["status"], row["status"]),
+            row["uploaded_by"] or "-",
+            row["upload_time"] or "-",
+        ])
+
+    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        for cell in row:
+            _set_border(cell)
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if cell.value:
+                    max_length = max(max_length, len(str(cell.value)))
+            except Exception:
+                pass
+        adjusted_width = min(max_length + 2, 50)
+        ws.column_dimensions[column].width = adjusted_width
+
+    filename = f"documents_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return _create_excel_response(wb, filename)

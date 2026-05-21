@@ -90,10 +90,10 @@
         {% endif %}
       </h3>
       <div class="data-table-actions">
-        <button class="btn btn-sm btn-outline-secondary" onclick="exportDevices()">
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('auth.export_devices', q=query, show_inactive=1 if show_inactive else '') }}">
           <i data-lucide="download"></i>
           导出
-        </button>
+        </a>
       </div>
     </div>
 
@@ -253,44 +253,6 @@
 function toggleSearchCard() {
   const card = document.getElementById('searchCard');
   card.classList.toggle('collapsed');
-}
-
-// 导出设备列表
-function exportDevices() {
-  const table = document.getElementById('devicesTable');
-  const rows = table.querySelectorAll('tbody tr');
-  
-  if (rows.length === 0 || (rows.length === 1 && rows[0].querySelector('.empty-state-box'))) {
-    alert('没有可导出的数据');
-    return;
-  }
-  
-  let csv = '\uFEFF';
-  const headers = ['设备编码', '设备名称', '型号', '位置', '状态'];
-  csv += headers.join(',') + '\n';
-  
-  rows.forEach(row => {
-    if (!row.querySelector('.empty-state-box')) {
-      const cells = row.querySelectorAll('td');
-      const rowData = [
-        cells[0].textContent.trim(),
-        cells[1].textContent.trim(),
-        cells[2].textContent.trim(),
-        cells[3].textContent.trim(),
-        cells[4].textContent.trim()
-      ].map(text => {
-        text = text.replace(/"/g, '""');
-        return '"' + text + '"';
-      });
-      csv += rowData.join(',') + '\n';
-    }
-  });
-  
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'devices_' + new Date().toISOString().slice(0,10) + '.csv';
-  link.click();
 }
 
 // 重新初始化图标

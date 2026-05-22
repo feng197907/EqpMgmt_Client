@@ -38,6 +38,9 @@ def device_detail(device_id):
     grouped = {key: [] for key, _ in DOC_TYPES}
     for row in rows:
         grouped.setdefault(row["doc_type"], []).append(row)
+    # 获取审批流程设置
+    approval_enabled = get_system_setting("approval_enabled", "true")
+    
     return render_template(
         "device_detail.html",
         device=device,
@@ -46,6 +49,7 @@ def device_detail(device_id):
         doc_type_labels=DOC_TYPE_LABELS,
         doc_status_labels=DOC_STATUS_LABELS,
         device_status_labels=DEVICE_STATUS_LABELS,
+        approval_enabled=approval_enabled,
     )
 
 

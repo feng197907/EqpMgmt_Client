@@ -146,9 +146,11 @@ def create_app():
     return app
 
 
-# 创建应用实例（用于测试和直接运行）
-app = create_app()
-
+# 创建应用实例（仅当直接运行时创建，避免 import 副作用）
 if __name__ == "__main__":
+    app = create_app()
     app.run(debug=True, use_reloader=False)
+else:
+    # 被其他模块导入时（如 pytest、gunicorn），不自动创建实例
+    app = None
 

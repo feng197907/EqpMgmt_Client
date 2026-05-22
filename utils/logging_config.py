@@ -10,8 +10,9 @@ from flask import Flask, request, g
 def setup_logging(app: Flask):
     """配置 Flask 应用的日志系统"""
 
-    # 日志目录
-    log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)).replace('/utils', ''), 'logs')
+    # 日志目录（项目根目录下的 logs/）
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    log_dir = os.path.join(project_root, 'logs')
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
 

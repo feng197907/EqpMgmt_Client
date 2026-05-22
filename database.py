@@ -235,6 +235,29 @@ def get_db_cursor():
     return conn.cursor(), conn
 
 
+@contextmanager
+def get_db_context():
+    """数据库连接上下文管理器，自动 commit/rollback + close。
+    
+    用法：
+        with get_db_context() as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT ...")
+            rows = cur.fetchall()
+    
+    正常退出自动 commit，异常自动 rollback，finally 块自动 close。
+    """
+    conn = get_db()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 # ============================================================
 # SQL 占位符辅助（给调用方参考）
 # ============================================================

@@ -1,0 +1,344 @@
+{#
+  电子签名弹窗组件 - 满足 21 CFR Part 11 合规要求
+
+  使用方式：
+  1. 在页面中引入：{% include "components/esign_modal.html" %}
+  2. 触发签名弹窗：openEsignModal(recordType, recordId, signMeaning, onSubmit)
+     - recordType: 业务类型 (maintenance_plan/document/device_change/maintenance_record)
+     - recordId: 业务记录ID
+     - signMeaning: 签名含义 (approved/reviewed/executed/released)
+     - onSubmit: 签名成功后的回调函数，参数为 {signature_id}
+  3. 可选：设置签名含义默认值，在调用 openEsignModal 时传入
+
+  安全特性：
+  - 用户名预填且只读，防止修改
+  - 密码框 autocomplete="off"
+  - 提交时按钮禁用，防止重复提交
+  - 3次失败后锁定5分钟
+#}
+
+<!-- 电子签名弹窗 -->
+<div class="modal fade" id="esignModal" tabindex="-1" aria-labelledby="esignModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="esignModalLabel">
+          <i data-lucide="pen-tool" style="width:20px;height:20px;vertical-align:middle;margin-right:6px;"></i>
+          电子签名
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+      </div>
+      <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+        <div class="alert alert-info py-2 mb-3" style="font-size:0.85rem;">
+          <i data-lucide="shield-check" style="width:14px;height:14px;vertical-align:middle;"></i>
+          请输入当前账户密码进行电子签名确认。根据 21 CFR Part 11 要求，签名具有法律效力。
+        </div>
+        <form id="esignForm" onsubmit="return false;">
+          <input type="hidden" id="esignRecordType" name="record_type">
+          <input type="hidden" id="esignRecordId" name="record_id">
+
+          <div class="mb-3">
+            <label for="esignUsername" class="form-label">签名人</label>
+            <input type="text" class="form-control" id="esignUsername" name="username"
+                   value="{{ current_user.username if current_user.is_authenticated else '' }}"
+                   readonly
+                   style="background-color: #f8f9fa;">
+            <div class="form-text">签名人即为当前登录用户，不可更改。</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="esignPassword" class="form-label">密码 <span class="text-danger">*</span></label>
+            <input type="password" class="form-control" id="esignPassword" name="password"
+                   autocomplete="off" placeholder="请输入当前账户密码" required>
+            <!-- 错误信息展示区 -->
+            <div id="esignError" class="alert alert-danger mt-2 mb-0 py-2" style="display:none;font-size:0.9rem;font-weight:bold;border:2px solid #dc3545;"></div>
+          </div>
+
+          <div class="mb-3">
+            <label for="esignMeaning" class="form-label">签名含义 <span class="text-danger">*</span></label>
+            <select class="form-select" id="esignMeaning" name="sign_meaning" required>
+              <option value="approved">批准</option>
+              <option value="reviewed">审核</option>
+              <option value="executed">执行确认</option>
+              <option value="released">放行</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="esignRemark" class="form-label">备注</label>
+            <textarea class="form-control" id="esignRemark" name="remark" rows="2"
+                      placeholder="可选，填写签名备注说明"></textarea>
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="d-flex justify-content-end w-100 gap-2">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="esignSubmitBtn" onclick="submitEsign()">
+            <i data-lucide="check-circle" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i>
+            确认签名
+          </button>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  // 签名成功后的回调函数
+  var _esignOnSubmit = null;
+
+  /**
+   * 打开电子签名弹窗
+   * @param {string} recordType - 业务类型
+   * @param {number|string} recordId - 业务记录ID
+   * @param {string} signMeaning - 签名含义 (approved/reviewed/executed/released)
+   * @param {function} onSubmit - 签名成功后的回调函数，参数为 {signature_id}
+   */
+  window.openEsignModal = function(recordType, recordId, signMeaning, onSubmit) {
+    // 检查模态框DOM是否存在
+    var modalEl = document.getElementById('esignModal');
+    if (!modalEl) {
+      console.error('esignModal 元素未找到，请确保页面引入了 esign_modal.html 组件');
+      return;
+    }
+
+    // 重置表单（安全访问，避免空指针）
+    var el;
+    el = document.getElementById('esignRecordType');
+    if (el) el.value = recordType || '';
+    el = document.getElementById('esignRecordId');
+    if (el) el.value = recordId || '';
+    el = document.getElementById('esignPassword');
+    if (el) el.value = '';
+    el = document.getElementById('esignRemark');
+    if (el) el.value = '';
+    el = document.getElementById('esignError');
+    if (el) el.style.display = 'none';
+
+    // 设置签名含义默认值
+    var meaningSelect = document.getElementById('esignMeaning');
+    if (meaningSelect) {
+      meaningSelect.value = signMeaning || 'approved';
+    }
+
+    // 存储回调
+    _esignOnSubmit = (typeof onSubmit === 'function') ? onSubmit : null;
+
+    // 重置按钮状态
+    var submitBtn = document.getElementById('esignSubmitBtn');
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = '<i data-lucide="check-circle" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i> 确认签名';
+    }
+
+    // 显示弹窗
+    var modal = new bootstrap.Modal(modalEl);
+    modal.show();
+
+    // 聚焦密码框
+    setTimeout(function() {
+      var pwdEl = document.getElementById('esignPassword');
+      if (pwdEl) pwdEl.focus();
+    }, 300);
+
+    // 刷新 Lucide 图标
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  };
+
+  /**
+   * 提交电子签名
+   */
+  // 辅助函数：显示错误信息（实时查询 DOM，避免缓存问题）
+  function showEsignError(message) {
+    var el = document.getElementById('esignError');
+    if (!el) {
+      // 如果元素不存在，动态创建并插入到密码框下方
+      var passwordInput = document.getElementById('esignPassword');
+      if (passwordInput && passwordInput.parentNode) {
+        el = document.createElement('div');
+        el.id = 'esignError';
+        el.className = 'alert alert-danger mt-2 mb-0 py-2';
+        el.style.cssText = 'display:none;font-size:0.9rem;font-weight:bold;border:2px solid #dc3545;';
+        passwordInput.parentNode.appendChild(el);
+      }
+    }
+    if (el) {
+      var isAdmin = document.body.getAttribute('data-user-is-admin') === 'true';
+      var isLockout = message.indexOf('锁定') >= 0 || message.indexOf('锁定') >= 0;
+
+      // 构建错误内容（管理员+锁定时追加解锁按钮）
+      var innerHTML = message;
+      if (isAdmin && isLockout) {
+        innerHTML += ' <button class="btn btn-sm btn-outline-warning ms-2" onclick="adminUnlockEsign()" style="font-size:0.8rem;">&#x89e3;&#x9501;</button>';
+      }
+      el.innerHTML = innerHTML;
+      el.style.display = 'block';
+      console.log('错误提示已显示：', message);
+    } else {
+      console.error('esignError 元素无法创建，错误信息：', message);
+    }
+  }
+
+  // 管理员解锁签名验证锁定
+  window.adminUnlockEsign = function() {
+    var usernameEl = document.getElementById('esignUsername');
+    var username = usernameEl ? usernameEl.value : '';
+    if (!username) {
+      alert('无法获取用户名。');
+      return;
+    }
+    if (!confirm('确定要解除用户 ' + username + ' 的签名验证锁定吗？')) return;
+
+    fetch('/esign/api/unlock', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({username: username})
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+      if (data.success) {
+        showEsignError(data.message);
+        // 刷新错误提示为绿色成功提示
+        var el = document.getElementById('esignError');
+        if (el) {
+          el.className = 'alert alert-success mt-2 mb-0 py-2';
+          el.style.cssText = 'display:block;font-size:0.9rem;font-weight:bold;border:2px solid #198754;';
+        }
+      } else {
+        alert(data.message || '解锁失败。');
+      }
+    })
+    .catch(function() {
+      alert('解锁请求失败，请稍后重试。');
+    });
+  };
+
+  // 辅助函数：隐藏错误信息
+  function hideEsignError() {
+    var el = document.getElementById('esignError');
+    if (el) el.style.display = 'none';
+  }
+
+  // 辅助函数：重置提交按钮
+  function resetSubmitBtn() {
+    var btn = document.getElementById('esignSubmitBtn');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="check-circle" style="width:16px;height:16px;vertical-align:middle;margin-right:4px;"></i> 确认签名';
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+    }
+  }
+
+  window.submitEsign = function() {
+    var passwordEl = document.getElementById('esignPassword');
+    var password = passwordEl ? passwordEl.value.trim() : '';
+    var recordTypeEl = document.getElementById('esignRecordType');
+    var recordType = recordTypeEl ? recordTypeEl.value : '';
+    var recordIdEl = document.getElementById('esignRecordId');
+    var recordId = recordIdEl ? recordIdEl.value : '';
+    var meaningEl = document.getElementById('esignMeaning');
+    var signMeaning = meaningEl ? meaningEl.value : '';
+    var remarkEl = document.getElementById('esignRemark');
+    var remark = remarkEl ? remarkEl.value.trim() : '';
+    var usernameEl = document.getElementById('esignUsername');
+    var username = usernameEl ? usernameEl.value : '';
+    var submitBtn = document.getElementById('esignSubmitBtn');
+
+    // 前端校验
+    if (!username) {
+      showEsignError('无法获取当前用户信息，请刷新页面重试。');
+      return;
+    }
+    if (!password) {
+      showEsignError('请输入密码。');
+      return;
+    }
+    if (!recordType || !recordId) {
+      showEsignError('缺少业务记录信息，请刷新页面重试。');
+      return;
+    }
+
+    // 禁用按钮（防重复提交）
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> 验证中...';
+    }
+    hideEsignError();
+
+    // 发送签名验证请求
+    fetch('/esign/api/verify', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username: username,
+        password: password,
+        record_type: recordType,
+        record_id: parseInt(recordId),
+        sign_meaning: signMeaning,
+        remark: remark
+      })
+    })
+    .then(function(response) {
+      return response.text().then(function(text) {
+        var data = null;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          data = null;
+        }
+        if (!response.ok) {
+          // HTTP 错误状态码（400/401/403/429/500），使用后端返回的错误消息
+          var msg = (data && data.message) ? data.message : ('服务器返回错误状态 ' + response.status);
+          throw new Error(msg);
+        }
+        return data || {};
+      });
+    })
+    .then(function(data) {
+      if (data.success) {
+        // 签名成功：关闭弹窗，触发回调
+        var modal = bootstrap.Modal.getInstance(document.getElementById('esignModal'));
+        if (modal) modal.hide();
+
+        // 执行回调
+        if (_esignOnSubmit) {
+          _esignOnSubmit({signature_id: data.signature_id});
+        }
+      } else {
+        // 签名失败：显示错误信息，重置按钮
+        var failMsg = (data && data.message) ? data.message : '签名验证失败。';
+        showEsignError(failMsg);
+        resetSubmitBtn();
+      }
+    })
+    .catch(function(err) {
+      // 提取有意义的错误消息
+      var msg = '网络错误，请重试。';
+      if (err && err.message) {
+        msg = err.message;
+      }
+      showEsignError(msg);
+      resetSubmitBtn();
+    });
+  };
+
+  // 监听 Enter 键提交
+  document.addEventListener('DOMContentLoaded', function() {
+    var passwordInput = document.getElementById('esignPassword');
+    if (passwordInput) {
+      passwordInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submitEsign();
+        }
+      });
+    }
+  });
+})();
+</script>

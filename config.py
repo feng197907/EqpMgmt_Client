@@ -32,7 +32,19 @@ MENU_PERMISSIONS = {
         "key": "user_management",
         "label": "用户管理",
         "icon": "users",
-        "description": "用户列表、审计日志、密码重置",
+        "description": "用户列表、密码重置",
+    },
+    "audit_log": {
+        "key": "audit_log",
+        "label": "审计日志",
+        "icon": "scroll-text",
+        "description": "操作审计追溯记录",
+    },
+    "electronic_signature": {
+        "key": "electronic_signature",
+        "label": "电子签名",
+        "icon": "pen-tool",
+        "description": "签名验证与签名记录",
     },
     "system_settings": {
         "key": "system_settings",
@@ -114,6 +126,8 @@ ROLE_PERMISSIONS = {
         "description": "拥有系统所有功能的完整访问权限",
         "permissions": [
             "user_management",     # 用户管理
+            "audit_log",           # 审计日志
+            "electronic_signature", # 电子签名
             "system_settings",     # 系统设置
             "device_management",   # 设备管理
             "device_operation",    # 设备操作

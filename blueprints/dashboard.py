@@ -293,13 +293,24 @@ def api_due_maintenance():
 
     # 按类型筛选
     if maintenance_type:
-        reminders = [r for r in reminders if r.get("maintenance_type") == maintenance_type]
+        reminders["due_today"] = [r for r in reminders["due_today"] if r.get("maintenance_type") == maintenance_type]
+        reminders["due_within_7days"] = [r for r in reminders["due_within_7days"] if r.get("maintenance_type") == maintenance_type]
+        reminders["overdue"] = [r for r in reminders["overdue"] if r.get("maintenance_type") == maintenance_type]
+        reminders["summary"] = {
+            "due_today_count": len(reminders["due_today"]),
+            "due_7days_count": len(reminders["due_within_7days"]),
+            "overdue_count": len(reminders["overdue"]),
+        }
 
     return jsonify({
         "success": True,
-        "count": len(reminders),
-        "reminders": reminders,
+        "count": reminders["summary"]["due_today_count"] + reminders["summary"]["due_7days_count"] + reminders["summary"]["overdue_count"],
+        "reminders": reminders["due_today"] + reminders["due_within_7days"] + reminders["overdue"],
         "for_login_popup": for_login_popup,
+        "summary": reminders["summary"],
+        "overdue": reminders["overdue"],
+        "due_today": reminders["due_today"],
+        "due_within_7days": reminders["due_within_7days"],
     })
 
 
@@ -320,20 +331,6 @@ def api_calibration_overdue_count():
     all_reminders = build_calibration_reminders(calibration_rows)
     overdue_count = sum(1 for r in all_reminders if r["severity"] == "danger")
     return jsonify({"overdue_count": overdue_count})
-
-    # 如果指定了维护类型，进行筛选
-    if maintenance_type:
-        reminders["due_today"] = [r for r in reminders["due_today"] if r["maintenance_type"] == maintenance_type]
-        reminders["due_within_7days"] = [r for r in reminders["due_within_7days"] if r["maintenance_type"] == maintenance_type]
-        reminders["overdue"] = [r for r in reminders["overdue"] if r["maintenance_type"] == maintenance_type]
-        reminders["summary"] = {
-            "due_today_count": len(reminders["due_today"]),
-            "due_7days_count": len(reminders["due_within_7days"]),
-            "overdue_count": len(reminders["overdue"]),
-        }
-
-    return jsonify(reminders)
-
 
 @dashboard_bp.route("/maintenance/all")
 @login_required

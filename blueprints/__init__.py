@@ -6,6 +6,7 @@ from blueprints.dashboard import dashboard_bp
 from blueprints.device_changes import device_changes_bp
 from blueprints.devices import devices_bp
 from blueprints.documents import documents_bp
+from blueprints.esign import esign_bp
 from blueprints.maintenance import maintenance_bp
 from blueprints.password import password_bp
 from blueprints.search import search_bp
@@ -25,4 +26,5 @@ __all__ = [
     "search_bp",
     "password_bp",
     "settings_bp",
+    "esign_bp",
 ]

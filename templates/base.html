@@ -23,7 +23,7 @@
   <link href="{{ url_for('static', filename='css/pages-enhanced.css') }}?v=2" rel="stylesheet">
   {% block head %}{% endblock %}
 </head>
-<body>
+<body data-user-is-admin="{{ 'true' if current_user.is_authenticated and current_user.is_admin else 'false' }}">
   <!-- 侧边栏 -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
@@ -95,21 +95,31 @@
       {% endif %}
 
       <!-- 用户管理 -->
-      {% if current_user.is_authenticated and current_user.has_menu_permission('user_management') %}
+      {% if current_user.is_authenticated and (current_user.has_menu_permission('user_management') or current_user.has_menu_permission('audit_log') or current_user.has_menu_permission('electronic_signature')) %}
       <div class="nav-group">
         <div class="nav-group-title">用户管理</div>
+        {% if current_user.has_menu_permission('user_management') %}
         <a href="{{ url_for('users.user_list') }}" class="nav-item {% if request.endpoint == 'users.user_list' %}active{% endif %}">
           <i data-lucide="users"></i>
           <span>用户列表</span>
-        </a>
-        <a href="{{ url_for('dashboard.audit_log') }}" class="nav-item {% if request.endpoint == 'dashboard.audit_log' %}active{% endif %}">
-          <i data-lucide="scroll-text"></i>
-          <span>审计日志</span>
         </a>
         <a href="{{ url_for('password.admin_password_resets') }}" class="nav-item {% if request.endpoint == 'password.admin_password_resets' %}active{% endif %}">
           <i data-lucide="key"></i>
           <span>密码重置</span>
         </a>
+        {% endif %}
+        {% if current_user.has_menu_permission('audit_log') %}
+        <a href="{{ url_for('dashboard.audit_log') }}" class="nav-item {% if request.endpoint == 'dashboard.audit_log' %}active{% endif %}">
+          <i data-lucide="scroll-text"></i>
+          <span>审计日志</span>
+        </a>
+        {% endif %}
+        {% if current_user.has_menu_permission('electronic_signature') %}
+        <a href="{{ url_for('esign.esign_records') }}" class="nav-item {% if request.endpoint == 'esign.esign_records' %}active{% endif %}">
+          <i data-lucide="pen-tool"></i>
+          <span>电子签名</span>
+        </a>
+        {% endif %}
       </div>
       {% endif %}
 

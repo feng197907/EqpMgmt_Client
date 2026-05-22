@@ -9,6 +9,7 @@ from openpyxl.styles import Alignment, Font, PatternFill, Side, Border
 
 from config import FIXED_INTERVAL_LABELS, FIXED_INTERVAL_OPTIONS, MAINTENANCE_RESULTS, MAINTENANCE_RESULT_LABELS, MAINTENANCE_TYPE_LABELS, MAINTENANCE_TYPES
 from database import get_db
+from models.electronic_signature import ElectronicSignature, SIGN_MEANINGS
 from models.maintenance import DeviceRepairRecord, MaintenancePlan, MaintenanceRecord
 from utils.audit import log_action
 from utils.decorators import admin_required, permission_required
@@ -257,6 +258,20 @@ def submit_record(device_id, plan_id):
         parts_used=parts_used if parts_used else None,
     )
     record.save()
+
+    # 为执行人自动生成电子签名（21 CFR Part 11 执行确认）
+    ip_address = request.headers.get("X-Forwarded-For", request.remote_addr)
+    esign = ElectronicSignature(
+        record_type="maintenance_record",
+        record_id=record.id,
+        signed_by=current_user.username,
+        signed_by_display=current_user.role_label or current_user.username,
+        sign_meaning="executed",
+        sign_meaning_label=SIGN_MEANINGS["executed"],
+        ip_address=ip_address,
+        remark="维护记录提交：{}".format(MAINTENANCE_RESULT_LABELS.get(result, result)),
+    )
+    esign.save()
 
     # 根据维护结果决定是否更新到期日
     if result == "qualified":

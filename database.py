@@ -2,6 +2,14 @@ import os
 import re
 from contextlib import contextmanager
 
+# 确保 .env 环境变量在模块初始化前加载
+# （database.py 作为顶层模块被导入时，app.py 的 load_dotenv() 尚未执行）
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
 # ============================================================
 # 数据库类型判断（优先级：环境变量 > MySQL可用性）
 # ============================================================
@@ -474,11 +482,27 @@ def _init_mysql_tables(cur, conn):
                 new_status VARCHAR(50) NOT NULL,
                 reason VARCHAR(1000),
                 status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                created_by VARCHAR(255) NOT NULL,
+                requested_by VARCHAR(255) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                processed_by VARCHAR(255),
-                processed_at TIMESTAMP NULL,
+                decided_by VARCHAR(255),
+                decided_at TIMESTAMP NULL,
+                comment TEXT,
                 FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """),
+        ("electronic_signatures", """
+            CREATE TABLE IF NOT EXISTS electronic_signatures (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                record_type VARCHAR(50) NOT NULL COMMENT '业务类型: maintenance_plan/document/device_change/maintenance_record',
+                record_id INT NOT NULL COMMENT '关联业务记录ID',
+                signed_by VARCHAR(255) NOT NULL COMMENT '签名人用户名',
+                signed_by_display VARCHAR(100) NOT NULL COMMENT '签名人显示名',
+                sign_meaning VARCHAR(50) NOT NULL COMMENT '签名含义: approved/reviewed/executed/released',
+                sign_meaning_label VARCHAR(50) NOT NULL COMMENT '签名含义中文: 批准/审核/执行/放行',
+                signed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '签名时间(服务器时间)',
+                ip_address VARCHAR(50) COMMENT '签名IP',
+                remark TEXT COMMENT '备注',
+                is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '软删除标记(审计要求不可物理删除)'
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """),
     ]
@@ -677,11 +701,27 @@ def _init_sqlite_tables(cur, conn):
                 new_status TEXT NOT NULL,
                 reason TEXT,
                 status TEXT NOT NULL DEFAULT 'pending',
-                created_by TEXT NOT NULL,
+                requested_by TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
-                processed_by TEXT,
-                processed_at TEXT,
+                decided_by TEXT,
+                decided_at TEXT,
+                comment TEXT,
                 FOREIGN KEY (device_id) REFERENCES devices(id)
+            )
+        """),
+        ("electronic_signatures", """
+            CREATE TABLE IF NOT EXISTS electronic_signatures (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                record_type TEXT NOT NULL,
+                record_id INTEGER NOT NULL,
+                signed_by TEXT NOT NULL,
+                signed_by_display TEXT NOT NULL,
+                sign_meaning TEXT NOT NULL,
+                sign_meaning_label TEXT NOT NULL,
+                signed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ip_address TEXT,
+                remark TEXT,
+                is_deleted INTEGER NOT NULL DEFAULT 0
             )
         """),
     ]

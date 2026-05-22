@@ -25,6 +25,7 @@ from blueprints import (
     device_changes_bp,
     devices_bp,
     documents_bp,
+    esign_bp,
     maintenance_bp,
     password_bp,
     search_bp,
@@ -66,6 +67,7 @@ def create_app():
     app.register_blueprint(search_bp)  # 全局搜索
     app.register_blueprint(password_bp)  # 密码重置功能
     app.register_blueprint(settings_bp)  # 系统设置
+    app.register_blueprint(esign_bp)  # 电子签名
 
     # 确保上传目录存在
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)

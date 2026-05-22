@@ -109,20 +109,20 @@ def build_calibration_reminders(rows, reminder_window_days=60, cycle_days=365):
 
 
 def ensure_device_change_table(cur):
-    """确保设备状态变更请求表存在"""
+    """确保设备状态变更请求表存在（列名与 database.py 正式 DDL 一致）"""
     cur.execute(
         """
         CREATE TABLE IF NOT EXISTS device_status_requests (
             id INT AUTO_INCREMENT PRIMARY KEY,
             device_id INT NOT NULL,
-            requested_by VARCHAR(255) NOT NULL,
             new_status VARCHAR(50) NOT NULL,
-            reason TEXT,
-            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            reason VARCHAR(1000),
+            status VARCHAR(50) NOT NULL DEFAULT 'pending',
+            created_by VARCHAR(255) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            decided_by VARCHAR(255),
-            decided_at TIMESTAMP NULL,
-            comment TEXT
+            processed_by VARCHAR(255),
+            processed_at TIMESTAMP NULL,
+            FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """
     )

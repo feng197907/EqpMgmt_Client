@@ -235,6 +235,116 @@ function toggleIntervalInput() {
 document.addEventListener('DOMContentLoaded', function() {
   updateIntervalDays();
   toggleIntervalInput();
+  loadMaintenanceSignatureHistory();
 });
+</script>
+
+{# 签名历史区块 #}
+<div class="card shadow-sm mt-3">
+  <div class="card-header">
+    <i data-lucide="clock" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i>
+    签名历史
+  </div>
+  <div class="card-body" id="maintenanceEsignHistoryContainer">
+    <p class="text-muted mb-0" style="font-size:0.875rem;">加载中...</p>
+  </div>
+</div>
+
+<script>
+/**
+ * 加载维护计划相关的签名历史
+ */
+function loadMaintenanceSignatureHistory() {
+  var container = document.getElementById('maintenanceEsignHistoryContainer');
+  if (!container) return;
+
+  // 收集所有维护计划的ID
+  var planIds = [];
+  var rows = document.querySelectorAll('table tbody tr');
+  rows.forEach(function(row) {
+    var link = row.querySelector('a[href*="new_record_form"]');
+    if (link) {
+      var match = link.href.match(/plan_id=(\d+)/);
+      if (match) planIds.push(match[1]);
+    }
+  });
+
+  if (planIds.length === 0) {
+    container.innerHTML = '<p class="text-muted mb-0" style="font-size:0.875rem;">暂无签名记录。</p>';
+    return;
+  }
+
+  var allSignatures = [];
+  var pending = planIds.length;
+
+  planIds.forEach(function(planId) {
+    fetch('/esign/records/maintenance_plan/' + planId)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.signatures && data.signatures.length > 0) {
+          data.signatures.forEach(function(sig) {
+            sig.planId = planId;
+            allSignatures.push(sig);
+          });
+        }
+        pending--;
+        if (pending === 0) {
+          renderMaintenanceSignatures(allSignatures);
+        }
+      })
+      .catch(function() {
+        pending--;
+        if (pending === 0) {
+          renderMaintenanceSignatures(allSignatures);
+        }
+      });
+  });
+}
+
+/**
+ * 渲染签名历史时间线
+ */
+function renderMaintenanceSignatures(signatures) {
+  var container = document.getElementById('maintenanceEsignHistoryContainer');
+
+  if (signatures.length === 0) {
+    container.innerHTML = '<p class="text-muted mb-0" style="font-size:0.875rem;">暂无签名记录。</p>';
+    return;
+  }
+
+  signatures.sort(function(a, b) { return (a.signed_at > b.signed_at) ? -1 : 1; });
+
+  var html = '<div class="timeline" style="position:relative;padding-left:24px;">';
+  signatures.forEach(function(sig) {
+    var meaningClass = 'bg-secondary';
+    if (sig.sign_meaning === 'approved') meaningClass = 'bg-success';
+    else if (sig.sign_meaning === 'reviewed') meaningClass = 'bg-info';
+    else if (sig.sign_meaning === 'executed') meaningClass = 'bg-primary';
+    else if (sig.sign_meaning === 'released') meaningClass = 'bg-warning text-dark';
+
+    html += '<div class="mb-3" style="position:relative;padding-left:16px;border-left:2px solid #dee2e6;">';
+    html += '  <div style="position:absolute;left:-6px;top:2px;width:10px;height:10px;border-radius:50%;background:#0d6efd;"></div>';
+    html += '  <div class="d-flex align-items-center gap-2 mb-1">';
+    html += '    <span class="badge ' + meaningClass + '">' + escapeHtml2(sig.sign_meaning_label) + '</span>';
+    html += '    <strong>' + escapeHtml2(sig.signed_by_display) + '</strong>';
+    html += '    <small class="text-muted">（' + escapeHtml2(sig.signed_by) + '）</small>';
+    html += '  </div>';
+    html += '  <div class="text-muted" style="font-size:0.8rem;">';
+    html += '    <span>' + escapeHtml2(sig.signed_at || '') + '</span>';
+    if (sig.ip_address) html += ' &middot; IP: ' + escapeHtml2(sig.ip_address);
+    if (sig.remark) html += ' &middot; 备注: ' + escapeHtml2(sig.remark);
+    html += '  </div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function escapeHtml2(text) {
+  var div = document.createElement('div');
+  div.textContent = text || '';
+  return div.innerHTML;
+}
 </script>
 {% endblock %}

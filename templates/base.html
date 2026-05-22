@@ -101,11 +101,13 @@
           <i data-lucide="file-text"></i>
           <span>全部文档</span>
         </a>
+        {% if current_user.has_permission('document_approval') %}
         <a href="{{ url_for('approvals.approvals') }}" class="nav-item {% if request.endpoint == 'approvals.approvals' %}active{% endif %}">
           <i data-lucide="clipboard-check"></i>
           <span>待审批</span>
           {% if pending_count > 0 %}<span class="nav-badge">{{ pending_count }}</span>{% endif %}
         </a>
+        {% endif %}
       </div>
       {% endif %}
 

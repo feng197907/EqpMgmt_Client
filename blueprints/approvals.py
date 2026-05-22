@@ -7,14 +7,14 @@ from config import APPROVAL_STEPS, DOC_TYPE_LABELS
 from database import get_db
 from utils.audit import log_action_with_cursor
 from utils.db_utils import commit_with_retry, execute_with_retry
-from utils.decorators import admin_required
+from utils.decorators import permission_required
 from utils.file_utils import compute_doc_hash
 
 approvals_bp = Blueprint("approvals", __name__)
 
 
 @approvals_bp.route("/approvals")
-@admin_required
+@permission_required("document_approval")
 def approvals():
     """审批待办列表"""
     conn = get_db()
@@ -34,7 +34,7 @@ def approvals():
 
 
 @approvals_bp.route("/approvals/<int:request_id>/decide", methods=["POST"])
-@admin_required
+@permission_required("document_approval")
 def decide_approval(request_id):
     """处理审批决策"""
     decision = request.form.get("decision")

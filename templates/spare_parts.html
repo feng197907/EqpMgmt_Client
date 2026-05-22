@@ -1,0 +1,647 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+  .stat-mini-cards { display: flex; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .stat-mini-card { flex: 1; min-width: 140px; background: #fff; border-radius: 8px;
+    padding: 1rem 1.25rem; border: 1px solid var(--border-color, #e5e7eb);
+    display: flex; align-items: center; gap: 0.75rem; }
+  .stat-mini-card .icon-circle { width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .stat-mini-card .icon-circle.danger { background: #fef2f2; color: #dc2626; }
+  .stat-mini-card .icon-circle.warning { background: #fffbeb; color: #d97706; }
+  .stat-mini-card .icon-circle.info { background: #eff6ff; color: #2563eb; }
+  .stat-mini-card .icon-circle.success { background: #f0fdf4; color: #16a34a; }
+  .stat-mini-card .stat-number { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+  .stat-mini-card .stat-label { font-size: 0.75rem; color: #6b7280; }
+  .stock-row-out { background: #fef2f2 !important; }
+  .stock-row-low { background: #fffbeb !important; }
+  .stock-row-over { background: #eff6ff !important; }
+  .stock-row-inactive { opacity: 0.5; }
+  .form-row-inline { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+  .form-row-inline .form-group { margin-bottom: 0; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center justify-content-between w-100">
+    <div>
+      <h1 class="page-title" style="font-size:1.375rem;">备件库存管理</h1>
+      <p class="text-muted" style="margin:0;">管理备件入库、消耗与库存预警</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('spare_part.spare_part_stats') }}" class="btn btn-outline-primary btn-sm">
+        <i data-lucide="bar-chart-3" style="width:16px;height:16px;vertical-align:middle;"></i> 成本统计
+      </a>
+      <a href="{{ url_for('spare_part.alert_list') }}" class="btn btn-outline-warning btn-sm position-relative">
+        <i data-lucide="alert-triangle" style="width:16px;height:16px;vertical-align:middle;"></i> 预警中心
+        {% if alert_count > 0 %}<span class="badge bg-danger ms-1">{{ alert_count }}</span>{% endif %}
+      </a>
+      <a href="{{ url_for('spare_part.inbound_list') }}" class="btn btn-outline-info btn-sm">
+        <i data-lucide="package-plus" style="width:16px;height:16px;vertical-align:middle;"></i> 入库记录
+      </a>
+      <a href="{{ url_for('spare_part.consumption_list') }}" class="btn btn-outline-secondary btn-sm">
+        <i data-lucide="package-minus" style="width:16px;height:16px;vertical-align:middle;"></i> 消耗记录
+      </a>
+      {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
+      <button class="btn btn-primary btn-sm" onclick="showAddPartModal()">
+        <i data-lucide="plus" style="width:16px;height:16px;vertical-align:middle;"></i> 新增备件
+      </button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# 筛选栏 #}
+<div class="card">
+  <div class="card-body" style="padding: 0.75rem 1rem;">
+    <form method="get" action="{{ url_for('spare_part.spare_part_list') }}" class="form-row-inline">
+      <div class="form-group">
+        <input type="text" name="q" class="form-control form-control-sm" placeholder="搜索名称/编码/型号/品牌..."
+               value="{{ search }}" style="min-width:220px;">
+      </div>
+      <div class="form-group">
+        <select name="category" class="form-select form-select-sm" style="min-width:130px;">
+          <option value="">全部分类</option>
+          {% for cat_val, cat_label in categories %}
+          <option value="{{ cat_val }}" {% if selected_category == cat_val %}selected{% endif %}>{{ cat_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <select name="stock" class="form-select form-select-sm" style="min-width:130px;">
+          <option value="">全部库存状态</option>
+          <option value="low" {% if stock_filter == 'low' %}selected{% endif %}>库存不足</option>
+          <option value="out" {% if stock_filter == 'out' %}selected{% endif %}>缺货</option>
+          <option value="normal" {% if stock_filter == 'normal' %}selected{% endif %}>正常</option>
+          <option value="over" {% if stock_filter == 'over' %}selected{% endif %}>库存超量</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm">筛选</button>
+      {% if search or selected_category or stock_filter %}
+      <a href="{{ url_for('spare_part.spare_part_list') }}" class="btn btn-outline-secondary btn-sm">清除</a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{# 备件列表 #}
+<div class="card">
+  <div class="card-header">
+    <span>备件列表</span>
+    <span class="text-muted" style="font-weight:400;">共 {{ pagination.total }} 个备件</span>
+  </div>
+  <div class="table-wrapper">
+    {% if parts %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>备件编码</th>
+          <th>名称</th>
+          <th>分类</th>
+          <th>规格型号</th>
+          <th>品牌</th>
+          <th>库存量</th>
+          <th>安全库存</th>
+          <th>加权均价(元)</th>
+          <th>供应商</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for part in parts %}
+        {% set stock_status = part.stock_status %}
+        <tr class="{% if stock_status[0] == 'out_of_stock' %}stock-row-out{% elif stock_status[0] == 'low_stock' %}stock-row-low{% elif stock_status[0] == 'over_stock' %}stock-row-over{% endif %} {% if not part.is_active %}stock-row-inactive{% endif %}">
+          <td><code style="font-size:0.8rem;">{{ part.code }}</code></td>
+          <td class="fw-medium">{{ part.name }}</td>
+          <td><span class="badge bg-light text-dark">{{ part.category_label }}</span></td>
+          <td>{{ part.specification or '-' }}</td>
+          <td>{{ part.brand or '-' }}</td>
+          <td>
+            <span class="fw-bold {% if stock_status[0] == 'out_of_stock' %}text-danger{% elif stock_status[0] == 'low_stock' %}text-warning{% endif %}">
+              {{ part.current_stock }} {{ part.unit }}
+            </span>
+          </td>
+          <td>{{ part.safety_stock_min }} ~ {{ part.safety_stock_max }}</td>
+          <td>{{ "%.2f"|format(part.weighted_avg_price|float) if part.weighted_avg_price else '-' }}</td>
+          <td>{{ part.supplier_name or '-' }}</td>
+          <td><span class="badge bg-{{ stock_status[2] }}">{{ stock_status[1] }}</span></td>
+          <td>
+            <div class="d-flex gap-1">
+              {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
+              <button class="btn btn-sm btn-outline-success" onclick="showInboundModal({{ part.id }}, '{{ part.code }} {{ part.name }}', {{ part.current_stock }})" title="入库">
+                <i data-lucide="package-plus" style="width:14px;height:14px;"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger" onclick="showConsumeModal({{ part.id }}, '{{ part.code }} {{ part.name }}', {{ part.current_stock }}, '{{ part.unit }}')" title="消耗" {% if part.current_stock <= 0 %}disabled{% endif %}>
+                <i data-lucide="package-minus" style="width:14px;height:14px;"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-primary" onclick="showEditPartModal({{ part.id }}, '{{ part.code }}', '{{ part.name }}', '{{ part.category }}', '{{ part.specification or '' }}', '{{ part.unit }}', '{{ part.brand or '' }}', {{ part.safety_stock_min }}, {{ part.safety_stock_max }}, '{{ part.supplier_name or '' }}', '{{ part.supplier_contact or '' }}', '{{ part.supplier_phone or '' }}', '{{ part.remark or '' }}')" title="编辑">
+                <i data-lucide="pencil" style="width:14px;height:14px;"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-{% if part.is_active %}secondary{% else %}success{% endif %}"
+                      onclick="togglePart({{ part.id }})" title="{% if part.is_active %}停用{% else %}启用{% endif %}">
+                <i data-lucide="{% if part.is_active %}power-off{% else %}play{% endif %}" style="width:14px;height:14px;"></i>
+              </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted p-4">
+      <p>暂无备件记录</p>
+      {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
+      <button class="btn btn-primary" onclick="showAddPartModal()">新增备件</button>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="pagination-wrapper">
+    {% for p in range(1, pagination.pages + 1) %}
+    <a href="{{ url_for('spare_part.spare_part_list', page=p, q=search, category=selected_category, stock=stock_filter) }}"
+       class="page-btn {% if p == pagination.page %}active{% endif %}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+{# ==================== 新增/编辑备件弹窗 ==================== #}
+<div id="addPartModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:1050;">
+  <div style="max-width:720px;width:95%;margin:0;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.08);max-height:90vh;overflow:auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(0,0,0,0.06);">
+      <h3 style="margin:0;font-size:1.125rem;" id="addPartModalTitle">新增备件</h3>
+      <button onclick="hideAddPartModal()" style="background:transparent;border:0;font-size:1.25rem;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <input type="hidden" id="editPartId">
+      <div style="display:flex;flex-wrap:wrap;gap:0.75rem;">
+        <div style="flex:1;min-width:calc(50% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">备件名称 <span style="color:#dc2626;">*</span></label>
+          <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partName" placeholder="如：O型密封圈、轴承SKF6205">
+        </div>
+        <div style="flex:1;min-width:calc(50% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">分类</label>
+          <select style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partCategory">
+            {% for cat_val, cat_label in categories %}
+            <option value="{{ cat_val }}">{{ cat_label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="width:calc(33.33% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">规格型号</label>
+          <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partSpec" placeholder="如：50×3.5mm">
+        </div>
+        <div style="width:calc(33.33% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">单位</label>
+          <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partUnit" value="个" placeholder="个/套/米/升/kg">
+        </div>
+        <div style="width:calc(33.33% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">品牌/制造商</label>
+          <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partBrand" placeholder="如：SKF、NSK">
+        </div>
+        <div style="flex:1;min-width:calc(50% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">安全库存下限</label>
+          <input type="number" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partSafetyMin" value="0" min="0">
+        </div>
+        <div style="flex:1;min-width:calc(50% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">安全库存上限</label>
+          <input type="number" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partSafetyMax" value="9999" min="0">
+        </div>
+        <div style="width:calc(33.33% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">供应商名称</label>
+          <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partSupplierName" placeholder="供应商全称">
+        </div>
+        <div style="width:calc(33.33% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">供应商联系人</label>
+          <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partSupplierContact" placeholder="联系人">
+        </div>
+        <div style="width:calc(33.33% - 0.75rem);">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">供应商电话</label>
+          <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partSupplierPhone" placeholder="联系电话">
+        </div>
+        <div style="flex:1;min-width:100%;">
+          <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">备注</label>
+          <textarea style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partRemark" rows="2" placeholder="备注信息"></textarea>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:12px 20px;border-top:1px solid rgba(0,0,0,0.04);">
+      <button type="button" style="padding:6px 12px;background:#6b7280;color:#fff;border:0;border-radius:6px;font-size:0.875rem;cursor:pointer;" onclick="hideAddPartModal()">取消</button>
+      <button type="button" style="padding:6px 12px;background:#2563eb;color:#fff;border:0;border-radius:6px;font-size:0.875rem;cursor:pointer;" id="partFormSubmitBtn" onclick="submitPartForm()">保存</button>
+    </div>
+  </div>
+</div>
+
+{# ==================== 入库弹窗 ==================== #}
+<div id="inboundModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:1050;">
+  <div style="max-width:500px;width:95%;margin:0;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.08);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(0,0,0,0.06);">
+      <h3 style="margin:0;font-size:1.125rem;">备件入库</h3>
+      <button onclick="hideInboundModal()" style="background:transparent;border:0;font-size:1.25rem;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <input type="hidden" id="inboundPartId">
+      <p style="color:#6b7280;margin-bottom:12px;"><strong id="inboundPartName"></strong> 当前库存：<span id="inboundCurrentStock" style="font-weight:700;"></span></p>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">入库数量 <span style="color:#dc2626;">*</span></label>
+        <input type="number" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="inboundQty" min="1" value="1" required>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">采购单价(元) <span style="color:#dc2626;">*</span></label>
+        <input type="number" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="inboundPrice" step="0.01" min="0" value="0" required>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">批次号</label>
+        <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="inboundBatch" placeholder="批次号（选填）">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">入库日期</label>
+        <input type="date" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="inboundDate" value="{{ now_date }}">
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">备注</label>
+        <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="inboundRemark" placeholder="备注（选填）">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:12px 20px;border-top:1px solid rgba(0,0,0,0.04);">
+      <button type="button" style="padding:6px 12px;background:#6b7280;color:#fff;border:0;border-radius:6px;font-size:0.875rem;cursor:pointer;" onclick="hideInboundModal()">取消</button>
+      <button type="button" style="padding:6px 12px;background:#16a34a;color:#fff;border:0;border-radius:6px;font-size:0.875rem;cursor:pointer;" id="inboundSubmitBtn" onclick="submitInbound()">确认入库</button>
+    </div>
+  </div>
+</div>
+
+{# ==================== 消耗弹窗 ==================== #}
+<div id="consumeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.4);align-items:center;justify-content:center;z-index:1050;">
+  <div style="max-width:500px;width:95%;margin:0;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.08);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(0,0,0,0.06);">
+      <h3 style="margin:0;font-size:1.125rem;">备件消耗</h3>
+      <button onclick="hideConsumeModal()" style="background:transparent;border:0;font-size:1.25rem;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:16px 20px;">
+      <input type="hidden" id="consumePartId">
+      <p style="color:#6b7280;margin-bottom:12px;"><strong id="consumePartName"></strong> 当前库存：<span id="consumeCurrentStock" style="font-weight:700;"></span></p>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">消耗数量 <span style="color:#dc2626;">*</span></label>
+        <input type="number" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="consumeQty" min="1" value="1" required>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">消耗单价(元)</label>
+        <input type="number" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="consumePrice" step="0.01" min="0" value="0" readonly>
+        <small class="text-muted">单价取当前加权平均价</small>
+      </div>
+      <div style="margin-bottom:12px;">
+        <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">消耗原因/备注</label>
+        <input type="text" style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="consumeRemark" placeholder="如：日常维修消耗、意外损坏更换">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:12px 20px;border-top:1px solid rgba(0,0,0,0.04);">
+      <button type="button" style="padding:6px 12px;background:#6b7280;color:#fff;border:0;border-radius:6px;font-size:0.875rem;cursor:pointer;" onclick="hideConsumeModal()">取消</button>
+      <button type="button" style="padding:6px 12px;background:#dc2626;color:#fff;border:0;border-radius:6px;font-size:0.875rem;cursor:pointer;" id="consumeSubmitBtn" onclick="submitConsume()">确认消耗</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+var _editPartId = null;
+var _inboundPartId = null;
+
+// ========== 弹窗辅助 ==========
+function showModal(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'flex';
+  el.style.alignItems = 'center';
+  el.style.justifyContent = 'center';
+  document.body.style.overflow = 'hidden';
+}
+
+function hideModal(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// ========== 获取或创建错误提示元素 ==========
+function getOrCreateError(modalId) {
+  var modal = document.getElementById(modalId);
+  if (!modal) return null;
+  var errEl = modal.querySelector('.part-form-error');
+  if (!errEl) {
+    errEl = document.createElement('div');
+    errEl.className = 'alert alert-danger mt-2 part-form-error';
+    errEl.style.cssText = 'display:none;font-size:0.85rem;';
+    var body = modal.querySelector('div > div > div:nth-child(2)'); // modal body
+    if (body) {
+      body.appendChild(errEl);
+    } else {
+      // fallback: append to inner modal container
+      var inner = modal.firstElementChild;
+      if (inner) inner.appendChild(errEl);
+    }
+  }
+  return errEl;
+}
+
+function showError(modalId, message) {
+  var errEl = getOrCreateError(modalId);
+  if (errEl) {
+    errEl.textContent = message;
+    errEl.style.display = 'block';
+  }
+}
+
+function clearError(modalId) {
+  var errEl = getOrCreateError(modalId);
+  if (errEl) {
+    errEl.style.display = 'none';
+  }
+}
+
+// ========== 安全 getElementById ==========
+function safeVal(id, defaultValue) {
+  var el = document.getElementById(id);
+  return el ? el.value : (defaultValue || '');
+}
+
+function safeSet(id, value) {
+  var el = document.getElementById(id);
+  if (el) el.value = value;
+}
+
+function safeText(id, text) {
+  var el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function safeStyle(id, prop, value) {
+  var el = document.getElementById(id);
+  if (el) el.style[prop] = value;
+}
+
+function safeDisabled(id, val) {
+  var el = document.getElementById(id);
+  if (el) el.disabled = val;
+}
+
+// ========== 新增备件弹窗 ==========
+window.showAddPartModal = function() {
+  _editPartId = null;
+  safeText('addPartModalTitle', '新增备件');
+  safeSet('editPartId', '');
+  safeSet('partName', '');
+  safeSet('partCategory', 'other');
+  safeSet('partSpec', '');
+  safeSet('partUnit', '个');
+  safeSet('partBrand', '');
+  safeSet('partSafetyMin', '0');
+  safeSet('partSafetyMax', '9999');
+  safeSet('partSupplierName', '');
+  safeSet('partSupplierContact', '');
+  safeSet('partSupplierPhone', '');
+  safeSet('partRemark', '');
+  clearError('addPartModal');
+  showModal('addPartModal');
+};
+
+window.showEditPartModal = function(id, code, name, category, spec, unit, brand, safetyMin, safetyMax, supplierName, supplierContact, supplierPhone, remark) {
+  _editPartId = id;
+  safeText('addPartModalTitle', '编辑备件 - ' + code);
+  safeSet('editPartId', id);
+  safeSet('partName', name);
+  safeSet('partCategory', category || 'other');
+  safeSet('partSpec', spec || '');
+  safeSet('partUnit', unit || '个');
+  safeSet('partBrand', brand || '');
+  safeSet('partSafetyMin', safetyMin);
+  safeSet('partSafetyMax', safetyMax);
+  safeSet('partSupplierName', supplierName || '');
+  safeSet('partSupplierContact', supplierContact || '');
+  safeSet('partSupplierPhone', supplierPhone || '');
+  safeSet('partRemark', remark || '');
+  clearError('addPartModal');
+  showModal('addPartModal');
+};
+
+window.hideAddPartModal = function() {
+  hideModal('addPartModal');
+  _editPartId = null;
+};
+
+window.submitPartForm = function() {
+  var name = safeVal('partName', '').trim();
+  var submitBtn = document.getElementById('partFormSubmitBtn');
+
+  if (!name) {
+    showError('addPartModal', '请填写备件名称');
+    return;
+  }
+
+  var data = {
+    name: name,
+    category: safeVal('partCategory', 'other'),
+    specification: safeVal('partSpec', '').trim(),
+    unit: safeVal('partUnit', '个').trim(),
+    brand: safeVal('partBrand', '').trim(),
+    safety_stock_min: parseInt(safeVal('partSafetyMin', '0')) || 0,
+    safety_stock_max: parseInt(safeVal('partSafetyMax', '9999')) || 9999,
+    supplier_name: safeVal('partSupplierName', '').trim(),
+    supplier_contact: safeVal('partSupplierContact', '').trim(),
+    supplier_phone: safeVal('partSupplierPhone', '').trim(),
+    remark: safeVal('partRemark', '').trim(),
+  };
+
+  clearError('addPartModal');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '保存中...';
+  }
+
+  var url = _editPartId
+    ? '/spare-parts/api/spare-parts/' + _editPartId
+    : '/spare-parts/api/spare-parts';
+  var method = _editPartId ? 'PUT' : 'POST';
+
+  fetch(url, {
+    method: method,
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  })
+  .then(function(r) { return r.json().then(function(d) { return {ok:r.ok, data:d}; }); })
+  .then(function(resp) {
+    if (!resp.ok) throw new Error(resp.data.error || '保存失败');
+    hideAddPartModal();
+    location.reload();
+  })
+  .catch(function(err) {
+    showError('addPartModal', err.message);
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '保存';
+    }
+  });
+};
+
+// ========== 入库弹窗 ==========
+window.showInboundModal = function(partId, partName, currentStock) {
+  _inboundPartId = partId;
+  safeText('inboundPartName', partName);
+  safeText('inboundCurrentStock', currentStock);
+  safeSet('inboundQty', '1');
+  safeSet('inboundPrice', '0');
+  safeSet('inboundBatch', '');
+  safeSet('inboundRemark', '');
+  clearError('inboundModal');
+  var today = new Date().toISOString().slice(0,10);
+  safeSet('inboundDate', today);
+  showModal('inboundModal');
+};
+
+window.hideInboundModal = function() {
+  hideModal('inboundModal');
+  _inboundPartId = null;
+};
+
+window.submitInbound = function() {
+  var qty = parseInt(safeVal('inboundQty', '0'));
+  var price = parseFloat(safeVal('inboundPrice', '0'));
+  var submitBtn = document.getElementById('inboundSubmitBtn');
+
+  if (!qty || qty <= 0) {
+    showError('inboundModal', '请输入有效的入库数量');
+    return;
+  }
+
+  clearError('inboundModal');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '提交中...';
+  }
+
+  var data = {
+    quantity: qty,
+    unit_price: isNaN(price) ? 0 : price,
+    batch_no: safeVal('inboundBatch', '').trim(),
+    inbound_date: safeVal('inboundDate', ''),
+    remark: safeVal('inboundRemark', '').trim(),
+  };
+
+  fetch('/spare-parts/api/spare-parts/' + _inboundPartId + '/inbound', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  })
+  .then(function(r) { return r.json().then(function(d) { return {ok:r.ok, data:d}; }); })
+  .then(function(resp) {
+    if (!resp.ok) throw new Error(resp.data.error || '入库失败');
+    alert(resp.data.message || '入库成功');
+    hideInboundModal();
+    location.reload();
+  })
+  .catch(function(err) {
+    showError('inboundModal', err.message);
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '确认入库';
+    }
+  });
+};
+
+// ========== 消耗弹窗 ==========
+window._consumePartId = null;
+
+window.showConsumeModal = function(partId, partName, currentStock, unit) {
+  window._consumePartId = partId;
+  safeText('consumePartName', partName);
+  safeText('consumeCurrentStock', currentStock + ' ' + (unit || '个'));
+  safeSet('consumeQty', '1');
+  safeSet('consumeRemark', '');
+  clearError('consumeModal');
+
+  // 获取加权平均价
+  fetch('/spare-parts/api/spare-parts')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var parts = data.parts || [];
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i].id === partId) {
+          safeSet('consumePrice', (parts[i].weighted_avg_price || 0).toFixed(2));
+          break;
+        }
+      }
+    });
+
+  showModal('consumeModal');
+};
+
+window.hideConsumeModal = function() {
+  hideModal('consumeModal');
+  window._consumePartId = null;
+};
+
+window.submitConsume = function() {
+  var qty = parseInt(safeVal('consumeQty', '0'));
+  var price = parseFloat(safeVal('consumePrice', '0'));
+  var remark = safeVal('consumeRemark', '').trim();
+  var submitBtn = document.getElementById('consumeSubmitBtn');
+
+  if (!qty || qty <= 0) {
+    showError('consumeModal', '请输入有效的消耗数量');
+    return;
+  }
+
+  clearError('consumeModal');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = '提交中...';
+  }
+
+  var data = {
+    spare_part_id: window._consumePartId,
+    quantity: qty,
+    remark: remark
+  };
+
+  fetch('/spare-parts/api/consumptions', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(data)
+  })
+  .then(function(r) { return r.json().then(function(d) { return {ok:r.ok, data:d}; }); })
+  .then(function(resp) {
+    if (!resp.ok) throw new Error(resp.data.error || '消耗失败');
+    alert(resp.data.message || '消耗记录已保存');
+    hideConsumeModal();
+    location.reload();
+  })
+  .catch(function(err) {
+    showError('consumeModal', err.message);
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '确认消耗';
+    }
+  });
+};
+
+// ========== 启用/停用 ==========
+window.togglePart = function(partId) {
+  if (!confirm('确定要切换该备件的启用状态吗？')) return;
+  fetch('/spare-parts/api/spare-parts/' + partId + '/toggle', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'}
+  })
+  .then(function(r) { return r.json().then(function(d) { return {ok:r.ok, data:d}; }); })
+  .then(function(resp) {
+    if (!resp.ok) throw new Error(resp.data.error || '操作失败');
+    location.reload();
+  })
+  .catch(function(err) { alert(err.message); });
+};
+
+})();
+</script>
+{% endblock %}

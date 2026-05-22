@@ -11,6 +11,7 @@ from blueprints.maintenance import maintenance_bp
 from blueprints.password import password_bp
 from blueprints.search import search_bp
 from blueprints.settings import settings_bp
+from blueprints.spare_part import spare_part_bp
 from blueprints.users import users_bp
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "password_bp",
     "settings_bp",
     "esign_bp",
+    "spare_part_bp",
 ]

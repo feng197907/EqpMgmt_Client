@@ -1,8 +1,9 @@
 # 维护计划 Blueprint
 from datetime import datetime
 from io import BytesIO
+import json
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Side, Border
@@ -250,6 +251,7 @@ def submit_record(device_id, plan_id):
     content = request.form.get("content", "").strip()
     result = request.form.get("result", "").strip()
     parts_used = request.form.get("parts_used", "").strip()
+    spare_parts_json = request.form.get("spare_parts_json", "[]").strip()
 
     if not content or not result:
         flash("请填写维护内容和结果。", "warning")
@@ -317,6 +319,83 @@ def submit_record(device_id, plan_id):
     else:
         message = "维护记录已保存（结果为不合格/待处理，到期日未更新）"
         conn.commit()
+
+    # 处理备件消耗
+    spare_parts_items = []
+    try:
+        spare_parts_items = json.loads(spare_parts_json)
+        if not isinstance(spare_parts_items, list):
+            spare_parts_items = []
+    except (json.JSONDecodeError, TypeError):
+        spare_parts_items = []
+
+    # 前端JSON异常时，兜底从数组字段解析（spare_part_id[] + spare_qty[]）
+    if not spare_parts_items:
+        part_ids = request.form.getlist("spare_part_id[]")
+        quantities = request.form.getlist("spare_qty[]")
+        for pid, qty in zip(part_ids, quantities):
+            try:
+                part_id = int(pid)
+                quantity = int(qty)
+            except (TypeError, ValueError):
+                continue
+            if part_id > 0 and quantity > 0:
+                spare_parts_items.append({"spare_part_id": part_id, "quantity": quantity})
+
+    print(f"[DEBUG submit_repair_record] parsed items = {spare_parts_items}, count = {len(spare_parts_items)}", flush=True)
+
+    consumed_count = 0
+    consume_errors = []
+    for item in spare_parts_items:
+        print(f"[DEBUG submit_repair_record] processing item: {item}", flush=True)
+        try:
+            part_id = item.get("spare_part_id")
+            quantity = int(item.get("quantity", 0))
+            print(f"[DEBUG submit_repair_record] part_id={part_id}, quantity={quantity}", flush=True)
+            if not part_id or quantity <= 0:
+                consume_errors.append(f"无效的消耗项: {item}")
+                continue
+
+            from models.spare_part import SparePart, SparePartConsumption
+            part = SparePart.get_by_id(part_id)
+            if part is None:
+                consume_errors.append(f"备件不存在(ID:{part_id})")
+                continue
+            if part.current_stock < quantity:
+                consume_errors.append(f"{part.name} 库存不足")
+                continue
+
+            consumption_price = float(part.weighted_avg_price or 0)
+            part.update_stock(delta=-quantity)
+
+            consumption = SparePartConsumption(
+                spare_part_id=part_id,
+                maintenance_record_id=record.id,
+                quantity=quantity,
+                unit_price=consumption_price,
+                consumed_by=current_user.username,
+                remark=f"维护记录 #{record.id} 消耗",
+            )
+            consumption.save()
+            consumed_count += 1
+
+            # 检查预警
+            from blueprints.spare_part import _check_and_create_alerts
+            _check_and_create_alerts(part)
+
+            log_action(
+                current_user.username, "consume_spare_part", "spare_part_consumptions",
+                consumption.id,
+                f"维护消耗备件：{part.code} {part.name}，数量 {quantity}",
+            )
+        except Exception as e:
+            current_app.logger.error(f"维护记录备件消耗失败: {e}")
+            consume_errors.append(str(e))
+
+    if consumed_count > 0:
+        message += f"，已记录 {consumed_count} 项备件消耗"
+    if consume_errors:
+        message += f"；{len(consume_errors)} 项消耗未写入"
 
     log_action(
         current_user.username, "submit_maintenance_record", "maintenance_record", record.id,
@@ -529,6 +608,16 @@ def repair_records(device_id):
     # 获取维修记录（分页）
     records, pagination = DeviceRepairRecord.get_by_device(device_id, page=page, per_page=per_page)
 
+    # 查询所有维修记录关联的备件消耗
+    from models.spare_part import SparePartConsumption
+    record_ids = [r.id for r in records]
+    spare_parts_map = {}
+    if record_ids:
+        for rid in record_ids:
+            consumptions = SparePartConsumption.get_by_maintenance_record(rid)
+            if consumptions:
+                spare_parts_map[rid] = consumptions
+
     display_records = []
     for record in records:
         if record.result == "qualified":
@@ -543,6 +632,23 @@ def repair_records(device_id):
         else:
             result_text = record.result if record.result else "-"
             result_class = "bg-secondary"
+
+        # 合并备件消耗信息到 parts_used 显示
+        parts_display = record.parts_used or ""
+        consumptions = spare_parts_map.get(record.id, [])
+        if consumptions:
+            consumed_parts = []
+            for c in consumptions:
+                part_name = getattr(c, "name", None) or getattr(c, "spare_part_id", "未知")
+                qty = getattr(c, "quantity", 0)
+                unit = getattr(c, "unit", "")
+                consumed_parts.append(f"{part_name} x{qty}{unit}")
+            consumed_str = "，".join(consumed_parts)
+            if parts_display:
+                parts_display = parts_display + " | " + consumed_str
+            else:
+                parts_display = consumed_str
+
         display_records.append(
             {
                 "id": record.id,
@@ -551,7 +657,7 @@ def repair_records(device_id):
                 "result_text": result_text,
                 "result_class": result_class,
                 "performed_by": record.performed_by,
-                "parts_used": record.parts_used,
+                "parts_used": parts_display,
             }
         )
 
@@ -600,6 +706,11 @@ def submit_repair_record(device_id):
     result = request.form.get("result", "").strip()
     parts_used = request.form.get("parts_used", "").strip()
     performed_at = request.form.get("performed_at", "").strip()
+    spare_parts_json = request.form.get("spare_parts_json", "[]").strip()
+
+    # 调试日志
+    print(f"[DEBUG submit_repair_record] spare_parts_json = {repr(spare_parts_json)}", flush=True)
+    print(f"[DEBUG submit_repair_record] ALL FORM FIELDS: {dict(request.form)}", flush=True)
 
     if not content or not result:
         flash("请填写维修内容和结果。", "warning")
@@ -631,6 +742,90 @@ def submit_repair_record(device_id):
     )
     record.save()
 
+    # 处理备件消耗
+    spare_parts_items = []
+    try:
+        spare_parts_items = json.loads(spare_parts_json)
+        if not isinstance(spare_parts_items, list):
+            spare_parts_items = []
+    except (json.JSONDecodeError, TypeError):
+        spare_parts_items = []
+
+    # 前端JSON异常时，兜底从数组字段解析（spare_part_id[] + spare_qty[]）
+    if not spare_parts_items:
+        part_ids = request.form.getlist("spare_part_id[]")
+        quantities = request.form.getlist("spare_qty[]")
+        for pid, qty in zip(part_ids, quantities):
+            try:
+                part_id = int(pid)
+                quantity = int(qty)
+            except (TypeError, ValueError):
+                continue
+            if part_id > 0 and quantity > 0:
+                spare_parts_items.append({"spare_part_id": part_id, "quantity": quantity})
+
+    print(f"[DEBUG submit_repair_record] parsed items = {spare_parts_items}, count = {len(spare_parts_items)}", flush=True)
+
+    consumed_count = 0
+    consume_errors = []
+    print(f"[DEBUG submit_repair_record] ENTERING consumption loop, {len(spare_parts_items)} items", flush=True)
+    for item in spare_parts_items:
+        print(f"[DEBUG submit_repair_record] processing item: {item}", flush=True)
+        try:
+            part_id = item.get("spare_part_id")
+            quantity = int(item.get("quantity", 0))
+            print(f"[DEBUG submit_repair_record] part_id={part_id}, quantity={quantity}", flush=True)
+            if not part_id or quantity <= 0:
+                consume_errors.append(f"无效的消耗项: {item}")
+                continue
+
+            from models.spare_part import SparePart, SparePartConsumption
+            part = SparePart.get_by_id(part_id)
+            if part is None:
+                consume_errors.append(f"备件不存在(ID:{part_id})")
+                continue
+            if part.current_stock < quantity:
+                consume_errors.append(f"{part.name} 库存不足")
+                continue
+
+            consumption_price = float(part.weighted_avg_price or 0)
+            part.update_stock(delta=-quantity)
+
+            consumption = SparePartConsumption(
+                spare_part_id=part_id,
+                maintenance_record_id=record.id,
+                quantity=quantity,
+                unit_price=consumption_price,
+                consumed_by=current_user.username,
+                remark=f"维修记录 #{record.id} 消耗",
+            )
+            print(f"[DEBUG submit_repair_record] Saving consumption: spare_part_id={part_id}, maintenance_record_id={record.id}, qty={quantity}", flush=True)
+            consumption.save()
+            print(f"[DEBUG submit_repair_record] Consumption saved! id={consumption.id}", flush=True)
+            consumed_count += 1
+
+            # 检查预警
+            from blueprints.spare_part import _check_and_create_alerts
+            _check_and_create_alerts(part)
+
+            log_action(
+                current_user.username, "consume_spare_part", "spare_part_consumptions",
+                consumption.id,
+                f"维修消耗备件：{part.code} {part.name}，数量 {quantity}",
+            )
+        except Exception as e:
+            print(f"[DEBUG submit_repair_record] ERROR in consumption loop: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            current_app.logger.error(f"维修记录备件消耗失败: {e}")
+
+    message = "维修记录已保存。"
+    if consumed_count > 0:
+        message += f"，已记录 {consumed_count} 项备件消耗"
+    if consume_errors:
+        message += f"；{len(consume_errors)} 项消耗未写入"
+        current_app.logger.warning("维修记录备件消耗失败详情: %s", " | ".join(consume_errors[:5]))
+
     log_action(
         current_user.username, "submit_repair_record", "repair_record", record.id,
         f"提交设备 {device['device_code']} 的维修记录，结果：{result}",
@@ -638,7 +833,7 @@ def submit_repair_record(device_id):
 
     conn.close()
 
-    flash("维修记录已保存。", "success")
+    flash(message, "success")
     return redirect(url_for("maintenance.repair_records", device_id=device_id))
 
 

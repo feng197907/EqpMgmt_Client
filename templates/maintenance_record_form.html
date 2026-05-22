@@ -1,4 +1,9 @@
 {% extends 'base.html' %}
+{% block head %}
+<style>
+  .spare-part-table th, .spare-part-table td { vertical-align: middle; }
+</style>
+{% endblock %}
 {% block content %}
 {# 维护记录表单页面 #}
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -14,7 +19,7 @@
     <span>维护信息</span>
   </div>
   <div class="card-body">
-    <form method="post" action="{{ url_for('maintenance.submit_record', device_id=device.id, plan_id=plan.id) }}">
+    <form method="post" action="{{ url_for('maintenance.submit_record', device_id=device.id, plan_id=plan.id) }}" id="maintenanceForm" onsubmit="prepareSparePartsJson()">
       <div class="form-group">
         <label class="form-label">设备</label>
         <div class="form-control-plaintext">{{ device.device_name }} ({{ device.device_code }})</div>
@@ -52,6 +57,31 @@
         <input type="text" class="form-control" id="parts_used" name="parts_used" placeholder="填写使用的备件信息">
       </div>
 
+      {# 备件消耗记录区块 #}
+      <div class="form-group">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <label class="form-label mb-0">消耗备件明细（选填，自动扣减库存）</label>
+          <button type="button" class="btn btn-sm btn-outline-success" onclick="addSparePartRow()">
+            <i data-lucide="plus" style="width:14px;height:14px;"></i> 添加备件
+          </button>
+        </div>
+        <table class="table table-sm spare-part-table" id="sparePartTable">
+          <thead>
+            <tr>
+              <th style="width:55%;">备件</th>
+              <th style="width:25%;">消耗数量</th>
+              <th style="width:20%;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="sparePartTbody">
+            <tr id="sparePartEmptyRow">
+              <td colspan="3" class="text-muted text-center">点击"添加备件"选择消耗的备件</td>
+            </tr>
+          </tbody>
+        </table>
+        <input type="hidden" name="spare_parts_json" id="sparePartsJson" value="[]">
+      </div>
+
       <div class="form-group d-flex gap-2 justify-content-end">
         <button type="button" class="btn btn-secondary" onclick="history.back()">取消</button>
         <button type="submit" class="btn btn-primary">提交记录</button>
@@ -59,4 +89,59 @@
     </form>
   </div>
 </div>
+
+<script>
+var sparePartRowIdx = 0;
+var allParts = [];
+
+fetch('/spare-parts/api/spare-parts')
+  .then(function(r) { return r.json(); })
+  .then(function(data) { allParts = data.parts || []; })
+  .catch(function() {});
+
+function addSparePartRow() {
+  var emptyRow = document.getElementById('sparePartEmptyRow');
+  if (emptyRow) emptyRow.style.display = 'none';
+
+  var idx = sparePartRowIdx++;
+  var optionsHtml = '<option value="">-- 选择备件 --</option>';
+  allParts.forEach(function(p) {
+    optionsHtml += '<option value="' + p.id + '" data-stock="' + (p.current_stock || 0) + '" data-unit="' + (p.unit || '') + '">' + p.display + '</option>';
+  });
+
+  var tr = document.createElement('tr');
+  tr.id = 'spareRow-' + idx;
+  tr.innerHTML = '<td><select class="form-select form-select-sm" id="sparePart-' + idx + '" name="spare_part_id[]">' + optionsHtml + '</select></td>'
+    + '<td><input type="number" class="form-control form-control-sm" id="spareQty-' + idx + '" name="spare_qty[]" value="1" min="1" style="width:80px;"></td>'
+    + '<td><button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById(\'spareRow-' + idx + '\').remove();checkEmpty()">&times;</button></td>';
+  document.getElementById('sparePartTbody').appendChild(tr);
+}
+
+function checkEmpty() {
+  var tbody = document.getElementById('sparePartTbody');
+  var visible = false;
+  tbody.querySelectorAll('tr').forEach(function(tr) {
+    if (tr.style.display !== 'none') visible = true;
+  });
+  if (!visible) {
+    var emptyRow = document.getElementById('sparePartEmptyRow');
+    if (emptyRow) emptyRow.style.display = '';
+  }
+}
+
+function prepareSparePartsJson() {
+  var items = [];
+  for (var i = 0; i < sparePartRowIdx; i++) {
+    var partSel = document.getElementById('sparePart-' + i);
+    var qtyEl = document.getElementById('spareQty-' + i);
+    if (!partSel || !qtyEl) continue;
+    var partId = partSel.value;
+    var qty = parseInt(qtyEl.value);
+    if (partId && qty && qty > 0) {
+      items.push({ spare_part_id: parseInt(partId), quantity: qty });
+    }
+  }
+  document.getElementById('sparePartsJson').value = JSON.stringify(items);
+}
+</script>
 {% endblock %}

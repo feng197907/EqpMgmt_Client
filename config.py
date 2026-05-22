@@ -58,6 +58,12 @@ MENU_PERMISSIONS = {
         "icon": "bell",
         "description": "用户故事、提醒通知",
     },
+    "spare_part_management": {
+        "key": "spare_part_management",
+        "label": "备件库存管理",
+        "icon": "package",
+        "description": "备件库存、入库、消耗与成本统计",
+    },
 }
 
 # 默认权限（所有用户默认拥有的权限）
@@ -133,6 +139,7 @@ ROLE_PERMISSIONS = {
             "device_operation",    # 设备操作
             "device_calibration", # 设备校准
             "device_maintenance", # 设备维护
+            "spare_part_management", # 备件库存管理
             "document_approval",  # 文档审批
             "document_upload",    # 文档上传
             "document_archive",    # 文档归档
@@ -160,6 +167,7 @@ ROLE_PERMISSIONS = {
             "device_operation",   # 设备操作
             "device_calibration", # 设备校准
             "device_maintenance", # 设备维护
+            "spare_part_management", # 备件库存管理
             "document_view",      # 文档查看
             "document_upload",    # 文档上传
             "calibration_records", # 校准记录

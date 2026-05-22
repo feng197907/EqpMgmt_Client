@@ -32,6 +32,43 @@
   {% endfor %}
 </div>
 
+{# 备件库存预警卡片 #}
+{% if current_user.is_authenticated and current_user.has_menu_permission('spare_part_management') and (spare_alert_count > 0 or spare_low_stock_count > 0 or spare_out_stock_count > 0) %}
+<div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="card border-warning">
+      <div class="card-header" style="background: #fffbeb;">
+        <i data-lucide="package" style="width:18px;height:18px;vertical-align:middle;margin-right:4px;"></i>
+        <span>备件库存预警</span>
+        <a href="{{ url_for('spare_part.spare_part_list') }}" class="btn btn-sm btn-outline-warning ms-auto">查看详情</a>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-danger" style="font-size:1rem;">{{ spare_out_stock_count }}</span>
+              <span class="text-muted">缺货备件</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-warning text-dark" style="font-size:1rem;">{{ spare_low_stock_count }}</span>
+              <span class="text-muted">低库存备件</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge bg-danger" style="font-size:1rem;">{{ spare_alert_count }}</span>
+              <span class="text-muted">未解决预警</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <!-- 筛选栏 -->
 <div class="filter-bar">
   <form class="d-flex flex-wrap gap-3 align-items-center w-100" method="get" action="{{ url_for('dashboard.dashboard') }}">

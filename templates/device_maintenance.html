@@ -86,7 +86,7 @@
       </thead>
       <tbody>
         {% for item in plans %}
-        <tr>
+        <tr id="plan-row-{{ item.plan.id }}" data-plan-id="{{ item.plan.id }}">
           <td>
             <span class="fw-medium">{{ item.plan.maintenance_type_label }}</span>
           </td>
@@ -333,6 +333,22 @@ document.addEventListener('DOMContentLoaded', function() {
   updateIntervalDays();
   toggleIntervalInput();
   loadMaintenanceSignatureHistory();
+
+  // 如果 URL 中有 plan_id 参数，高亮并滚动到对应计划行
+  var urlParams = new URLSearchParams(window.location.search);
+  var highlightPlanId = urlParams.get('plan_id');
+  if (highlightPlanId) {
+    var row = document.getElementById('plan-row-' + highlightPlanId);
+    if (row) {
+      row.style.backgroundColor = '#fff3cd';
+      row.style.transition = 'background-color 0.5s ease';
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 3 秒后移除高亮
+      setTimeout(function() {
+        row.style.backgroundColor = '';
+      }, 3000);
+    }
+  }
 });
 </script>
 

@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% block head %}
+<style>
+  .stat-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card { background: #fff; border-radius: 8px; padding: 1.25rem; border: 1px solid var(--border-color, #e5e7eb); }
+  .stat-card .value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
+  .stat-card .label { font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem; }
+  .chart-card { background: #fff; border-radius: 8px; padding: 1rem; border: 1px solid var(--border-color, #e5e7eb); margin-bottom: 1rem; }
+  .chart-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 0.75rem 0; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center justify-content-between w-100">
+    <div>
+      <h1 class="page-title" style="font-size:1.375rem;">备件成本统计看板</h1>
+      <p class="text-muted" style="margin:0;">设备备件消耗经济学分析</p>
+    </div>
+    <a href="{{ url_for('spare_part.spare_part_list') }}" class="btn btn-outline-secondary btn-sm">
+      <i data-lucide="arrow-left" style="width:16px;height:16px;"></i> 返回备件列表
+    </a>
+  </div>
+</div>
+
+{# 概览统计卡片 #}
+<div class="stat-card-grid">
+  <div class="stat-card">
+    <div class="value">{{ total_parts }}</div>
+    <div class="label">备件种类</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color: #d97706;">{{ low_stock_count }}</div>
+    <div class="label">低库存预警</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color: #dc2626;">{{ out_of_stock_count }}</div>
+    <div class="label">缺货备件</div>
+  </div>
+  <div class="stat-card">
+    <div class="value">¥{{ "%.0f"|format(total_stock_value) }}</div>
+    <div class="label">总库存金额</div>
+  </div>
+  <div class="stat-card">
+    <div class="value" style="color: #2563eb;">¥{{ "%.0f"|format(month_consumption) }}</div>
+    <div class="label">本月消耗金额</div>
+  </div>
+</div>
+
+{# 按设备统计 TOP10 #}
+<div class="chart-card">
+  <h3>设备备件消耗 TOP10（按金额）</h3>
+  {% if device_stats %}
+  <div class="table-wrapper">
+    <table class="table table-sm">
+      <thead>
+        <tr><th>设备编码</th><th>设备名称</th><th>消耗次数</th><th>消耗金额(元)</th></tr>
+      </thead>
+      <tbody>
+        {% for row in device_stats %}
+        <tr>
+          <td><code>{{ row.device_code }}</code></td>
+          <td>{{ row.device_name }}</td>
+          <td>{{ row.consumption_count }}</td>
+          <td class="fw-bold">¥{{ "%.2f"|format(row.total_cost|float) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-muted">暂无备件消耗数据</p>
+  {% endif %}
+</div>
+
+{# 按备件统计 TOP10 #}
+<div class="chart-card">
+  <h3>消耗量 TOP10 备件</h3>
+  {% if part_stats %}
+  <div class="table-wrapper">
+    <table class="table table-sm">
+      <thead>
+        <tr><th>备件编码</th><th>名称</th><th>规格</th><th>累计消耗量</th><th>累计金额(元)</th></tr>
+      </thead>
+      <tbody>
+        {% for row in part_stats %}
+        <tr>
+          <td><code>{{ row.code }}</code></td>
+          <td>{{ row.name }}</td>
+          <td>{{ row.specification or '-' }}</td>
+          <td>{{ row.total_qty }} {{ row.unit }}</td>
+          <td class="fw-bold">¥{{ "%.2f"|format(row.total_cost|float) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-muted">暂无备件消耗数据</p>
+  {% endif %}
+</div>
+
+{# 按供应商统计 #}
+<div class="chart-card">
+  <h3>供应商采购统计 TOP10</h3>
+  {% if supplier_stats %}
+  <div class="table-wrapper">
+    <table class="table table-sm">
+      <thead>
+        <tr><th>供应商</th><th>采购次数</th><th>采购总额(元)</th></tr>
+      </thead>
+      <tbody>
+        {% for row in supplier_stats %}
+        <tr>
+          <td>{{ row.supplier_name }}</td>
+          <td>{{ row.inbound_count }}</td>
+          <td class="fw-bold">¥{{ "%.2f"|format(row.total_amount|float) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-muted">暂无供应商采购数据</p>
+  {% endif %}
+</div>
+
+{# 按维修类型统计 #}
+<div class="chart-card">
+  <h3>维修类型备件消耗对比</h3>
+  {% if type_stats %}
+  <div class="table-wrapper">
+    <table class="table table-sm">
+      <thead>
+        <tr><th>维护类型</th><th>消耗批次</th><th>消耗金额(元)</th></tr>
+      </thead>
+      <tbody>
+        {% for row in type_stats %}
+        <tr>
+          <td>
+            {% if row.maintenance_type == 'calibration' %}校准
+            {% elif row.maintenance_type == 'maintenance' %}保养
+            {% elif row.maintenance_type == 'inspection' %}巡检
+            {% elif row.maintenance_type == 'repair' %}维修
+            {% else %}{{ row.maintenance_type }}{% endif %}
+          </td>
+          <td>{{ row.count }}</td>
+          <td class="fw-bold">¥{{ "%.2f"|format(row.total_cost|float) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="text-muted">暂无按维修类型的消耗数据</p>
+  {% endif %}
+</div>
+{% endblock %}

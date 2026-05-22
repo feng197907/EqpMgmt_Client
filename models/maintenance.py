@@ -14,6 +14,9 @@ def _normalize_date(value):
     if isinstance(value, date):
         return value
     if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None
         return datetime.strptime(value, "%Y-%m-%d").date()
     return value
 

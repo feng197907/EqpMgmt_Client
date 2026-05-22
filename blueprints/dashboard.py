@@ -57,6 +57,20 @@ def dashboard():
     list_params = params + [per_page, offset]
     cur.execute(list_sql, list_params)
     devices = [dict(r) for r in cur.fetchall()]
+
+    # 备件预警统计
+    try:
+        cur.execute("SELECT COUNT(*) as cnt FROM spare_part_alerts WHERE is_resolved = 0")
+        spare_alert_count = cur.fetchone()["cnt"]
+        cur.execute("SELECT COUNT(*) as cnt FROM spare_parts WHERE is_active = 1 AND current_stock <= safety_stock_min AND current_stock > 0")
+        spare_low_stock_count = cur.fetchone()["cnt"]
+        cur.execute("SELECT COUNT(*) as cnt FROM spare_parts WHERE is_active = 1 AND current_stock <= 0")
+        spare_out_stock_count = cur.fetchone()["cnt"]
+    except Exception:
+        spare_alert_count = 0
+        spare_low_stock_count = 0
+        spare_out_stock_count = 0
+
     conn.close()
     pagination = {"page": page, "per_page": per_page, "total": total, "pages": (total + per_page - 1) // per_page}
     return render_template(
@@ -67,6 +81,9 @@ def dashboard():
         selected_status=status_filter,
         q=q,
         pagination=pagination,
+        spare_alert_count=spare_alert_count,
+        spare_low_stock_count=spare_low_stock_count,
+        spare_out_stock_count=spare_out_stock_count,
     )
 
 

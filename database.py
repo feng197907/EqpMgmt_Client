@@ -271,18 +271,37 @@ def init_db():
 
 def _migrate_mysql_columns(cur):
     """MySQL 增量升级：添加历史遗留列（安全，幂等）"""
+    print("[DB] Running MySQL column migrations...")
     migrations = [
         ("documents", "calibration_due_date",
          "ALTER TABLE documents ADD COLUMN calibration_due_date DATE DEFAULT NULL"),
         # repair_record 表（增量创建）
         ("repair_record", "_table",
          "CREATE TABLE IF NOT EXISTS repair_record (id INT AUTO_INCREMENT PRIMARY KEY, device_id INT NOT NULL, content VARCHAR(2000) NOT NULL, result VARCHAR(50) NOT NULL, performed_by VARCHAR(255) NOT NULL, performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, parts_used VARCHAR(1000), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
+        # maintenance_plan 新增列（增量）
+        ("maintenance_plan", "is_closed",
+         "ALTER TABLE maintenance_plan ADD COLUMN is_closed TINYINT NOT NULL DEFAULT 0"),
+        ("maintenance_plan", "closed_at",
+         "ALTER TABLE maintenance_plan ADD COLUMN closed_at TIMESTAMP NULL DEFAULT NULL"),
+        ("maintenance_plan", "closed_by",
+         "ALTER TABLE maintenance_plan ADD COLUMN closed_by VARCHAR(255) NULL DEFAULT NULL"),
+        ("maintenance_plan", "close_reason",
+         "ALTER TABLE maintenance_plan ADD COLUMN close_reason TEXT NULL DEFAULT NULL"),
+        # spare_parts 系列表（增量创建）
+        ("spare_parts", "_table",
+         "CREATE TABLE IF NOT EXISTS spare_parts (id INT AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE, name VARCHAR(200) NOT NULL, category VARCHAR(50) NOT NULL DEFAULT 'other', specification VARCHAR(200), unit VARCHAR(20) NOT NULL DEFAULT '个', brand VARCHAR(100), safety_stock_min INT NOT NULL DEFAULT 0, safety_stock_max INT NOT NULL DEFAULT 9999, current_stock INT NOT NULL DEFAULT 0, weighted_avg_price DECIMAL(10,2) DEFAULT 0, supplier_name VARCHAR(200), supplier_contact VARCHAR(100), supplier_phone VARCHAR(50), supplier_doc_path VARCHAR(500), remark TEXT, is_active TINYINT NOT NULL DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
+        ("spare_part_inbounds", "_table",
+         "CREATE TABLE IF NOT EXISTS spare_part_inbounds (id INT AUTO_INCREMENT PRIMARY KEY, spare_part_id INT NOT NULL, quantity INT NOT NULL, unit_price DECIMAL(10,2) NOT NULL DEFAULT 0, batch_no VARCHAR(50), inbound_date DATE NOT NULL, doc_path VARCHAR(500), remark TEXT, created_by VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
+        ("spare_part_consumptions", "_table",
+         "CREATE TABLE IF NOT EXISTS spare_part_consumptions (id INT AUTO_INCREMENT PRIMARY KEY, spare_part_id INT NOT NULL, maintenance_record_id INT, quantity INT NOT NULL, unit_price DECIMAL(10,2) NOT NULL DEFAULT 0, batch_no VARCHAR(50), consumed_by VARCHAR(255) NOT NULL, consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, remark TEXT, FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
+        ("spare_part_alerts", "_table",
+         "CREATE TABLE IF NOT EXISTS spare_part_alerts (id INT AUTO_INCREMENT PRIMARY KEY, spare_part_id INT NOT NULL, alert_type VARCHAR(50) NOT NULL, current_stock INT NOT NULL, threshold INT NOT NULL, is_resolved TINYINT NOT NULL DEFAULT 0, resolved_at TIMESTAMP NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
     ]
     for table, col, ddl in migrations:
         try:
             if col == "_table":
-                # 新表创建（增量）
                 cur.execute(ddl)
+                print(f"[DB] Created table {table} (if not exists)")
             else:
                 cur.execute(
                     "SELECT COUNT(*) as cnt FROM information_schema.COLUMNS "
@@ -293,8 +312,14 @@ def _migrate_mysql_columns(cur):
                 exists = row["cnt"] if isinstance(row, dict) else row[0]
                 if not exists:
                     cur.execute(ddl)
-        except Exception:
-            pass
+                    print(f"[DB] Added column {table}.{col}")
+                else:
+                    print(f"[DB] Column {table}.{col} already exists, skipping")
+        except Exception as e:
+            import traceback
+            print(f"[DB] Migration error for {table}.{col}: {e}")
+            traceback.print_exc()
+            raise
 
 
 def _init_mysql_tables(cur, conn):
@@ -507,6 +532,71 @@ def _init_mysql_tables(cur, conn):
                 ip_address VARCHAR(50) COMMENT '签名IP',
                 remark TEXT COMMENT '备注',
                 is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '软删除标记(审计要求不可物理删除)'
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """),
+        ("spare_parts", """
+            CREATE TABLE IF NOT EXISTS spare_parts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(50) NOT NULL UNIQUE,
+                name VARCHAR(200) NOT NULL,
+                category VARCHAR(50) NOT NULL DEFAULT 'other',
+                specification VARCHAR(200),
+                unit VARCHAR(20) NOT NULL DEFAULT '个',
+                brand VARCHAR(100),
+                safety_stock_min INT NOT NULL DEFAULT 0,
+                safety_stock_max INT NOT NULL DEFAULT 9999,
+                current_stock INT NOT NULL DEFAULT 0,
+                weighted_avg_price DECIMAL(10,2) DEFAULT 0,
+                supplier_name VARCHAR(200),
+                supplier_contact VARCHAR(100),
+                supplier_phone VARCHAR(50),
+                supplier_doc_path VARCHAR(500),
+                remark TEXT,
+                is_active TINYINT NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """),
+        ("spare_part_inbounds", """
+            CREATE TABLE IF NOT EXISTS spare_part_inbounds (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                spare_part_id INT NOT NULL,
+                quantity INT NOT NULL,
+                unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+                batch_no VARCHAR(50),
+                inbound_date DATE NOT NULL,
+                doc_path VARCHAR(500),
+                remark TEXT,
+                created_by VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """),
+        ("spare_part_consumptions", """
+            CREATE TABLE IF NOT EXISTS spare_part_consumptions (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                spare_part_id INT NOT NULL,
+                maintenance_record_id INT,
+                quantity INT NOT NULL,
+                unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
+                batch_no VARCHAR(50),
+                consumed_by VARCHAR(255) NOT NULL,
+                consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                remark TEXT,
+                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """),
+        ("spare_part_alerts", """
+            CREATE TABLE IF NOT EXISTS spare_part_alerts (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                spare_part_id INT NOT NULL,
+                alert_type VARCHAR(50) NOT NULL,
+                current_stock INT NOT NULL,
+                threshold INT NOT NULL,
+                is_resolved TINYINT NOT NULL DEFAULT 0,
+                resolved_at TIMESTAMP NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """),
     ]
@@ -732,6 +822,71 @@ def _init_sqlite_tables(cur, conn):
                 is_deleted INTEGER NOT NULL DEFAULT 0
             )
         """),
+        ("spare_parts", """
+            CREATE TABLE IF NOT EXISTS spare_parts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                code TEXT NOT NULL UNIQUE,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'other',
+                specification TEXT,
+                unit TEXT NOT NULL DEFAULT '个',
+                brand TEXT,
+                safety_stock_min INTEGER NOT NULL DEFAULT 0,
+                safety_stock_max INTEGER NOT NULL DEFAULT 9999,
+                current_stock INTEGER NOT NULL DEFAULT 0,
+                weighted_avg_price REAL DEFAULT 0,
+                supplier_name TEXT,
+                supplier_contact TEXT,
+                supplier_phone TEXT,
+                supplier_doc_path TEXT,
+                remark TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """),
+        ("spare_part_inbounds", """
+            CREATE TABLE IF NOT EXISTS spare_part_inbounds (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                spare_part_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL DEFAULT 0,
+                batch_no TEXT,
+                inbound_date TEXT NOT NULL,
+                doc_path TEXT,
+                remark TEXT,
+                created_by TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
+            )
+        """),
+        ("spare_part_consumptions", """
+            CREATE TABLE IF NOT EXISTS spare_part_consumptions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                spare_part_id INTEGER NOT NULL,
+                maintenance_record_id INTEGER,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL DEFAULT 0,
+                batch_no TEXT,
+                consumed_by TEXT NOT NULL,
+                consumed_at TEXT NOT NULL DEFAULT (datetime('now')),
+                remark TEXT,
+                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
+            )
+        """),
+        ("spare_part_alerts", """
+            CREATE TABLE IF NOT EXISTS spare_part_alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                spare_part_id INTEGER NOT NULL,
+                alert_type TEXT NOT NULL,
+                current_stock INTEGER NOT NULL,
+                threshold INTEGER NOT NULL,
+                is_resolved INTEGER NOT NULL DEFAULT 0,
+                resolved_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
+            )
+        """),
     ]
 
     for _name, _ddl in tables:
@@ -768,19 +923,36 @@ def _migrate_sqlite_columns(cur):
         ("documents",      "calibration_due_date", "ALTER TABLE documents ADD COLUMN calibration_due_date DATE DEFAULT NULL"),
         # repair_record 表（增量创建）
         ("repair_record", "_table", "CREATE TABLE IF NOT EXISTS repair_record (id INTEGER PRIMARY KEY AUTOINCREMENT, device_id INTEGER NOT NULL, content TEXT NOT NULL, result TEXT NOT NULL, performed_by TEXT NOT NULL, performed_at TEXT NOT NULL DEFAULT (datetime('now')), parts_used TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (device_id) REFERENCES devices(id))"),
+        # maintenance_plan 新增列（增量）
+        ("maintenance_plan", "is_closed",
+         "ALTER TABLE maintenance_plan ADD COLUMN is_closed TINYINT NOT NULL DEFAULT 0"),
+        ("maintenance_plan", "closed_at",
+         "ALTER TABLE maintenance_plan ADD COLUMN closed_at TIMESTAMP NULL DEFAULT NULL"),
+        ("maintenance_plan", "closed_by",
+         "ALTER TABLE maintenance_plan ADD COLUMN closed_by VARCHAR(255) NULL DEFAULT NULL"),
+        ("maintenance_plan", "close_reason",
+         "ALTER TABLE maintenance_plan ADD COLUMN close_reason TEXT NULL DEFAULT NULL"),
+        # spare_parts 系列表（增量创建）
+        ("spare_parts", "_table", "CREATE TABLE IF NOT EXISTS spare_parts (id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT NOT NULL UNIQUE, name TEXT NOT NULL, category TEXT NOT NULL DEFAULT 'other', specification TEXT, unit TEXT NOT NULL DEFAULT '个', brand TEXT, safety_stock_min INTEGER NOT NULL DEFAULT 0, safety_stock_max INTEGER NOT NULL DEFAULT 9999, current_stock INTEGER NOT NULL DEFAULT 0, weighted_avg_price REAL DEFAULT 0, supplier_name TEXT, supplier_contact TEXT, supplier_phone TEXT, supplier_doc_path TEXT, remark TEXT, is_active INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')))"),
+        ("spare_part_inbounds", "_table", "CREATE TABLE IF NOT EXISTS spare_part_inbounds (id INTEGER PRIMARY KEY AUTOINCREMENT, spare_part_id INTEGER NOT NULL, quantity INTEGER NOT NULL, unit_price REAL NOT NULL DEFAULT 0, batch_no TEXT, inbound_date TEXT NOT NULL, doc_path TEXT, remark TEXT, created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id))"),
+        ("spare_part_consumptions", "_table", "CREATE TABLE IF NOT EXISTS spare_part_consumptions (id INTEGER PRIMARY KEY AUTOINCREMENT, spare_part_id INTEGER NOT NULL, maintenance_record_id INTEGER, quantity INTEGER NOT NULL, unit_price REAL NOT NULL DEFAULT 0, batch_no TEXT, consumed_by TEXT NOT NULL, consumed_at TEXT NOT NULL DEFAULT (datetime('now')), remark TEXT, FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id))"),
+        ("spare_part_alerts", "_table", "CREATE TABLE IF NOT EXISTS spare_part_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, spare_part_id INTEGER NOT NULL, alert_type TEXT NOT NULL, current_stock INTEGER NOT NULL, threshold INTEGER NOT NULL, is_resolved INTEGER NOT NULL DEFAULT 0, resolved_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id))"),
     ]
     for table, col, ddl in migrations:
         try:
             if col == "_table":
-                # 新表创建（增量）
                 cur.execute(ddl)
+                print(f"[DB] Created table {table} (if not exists)")
             else:
                 cur.execute(f"PRAGMA table_info({table})")
                 cols = {row["name"] for row in cur.fetchall()}
                 if col not in cols:
                     cur.execute(ddl)
-        except Exception:
-            pass
+                    print(f"[DB] Added column {table}.{col}")
+        except Exception as e:
+            import traceback
+            print(f"[DB] Migration error for {table}.{col}: {e}")
+            traceback.print_exc()
 
 
 def ensure_column(cur, table_name, column_name, ddl_sql):

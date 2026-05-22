@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center justify-content-between w-100">
+    <div>
+      <h1 class="page-title" style="font-size:1.375rem;">备件入库记录</h1>
+      <p class="text-muted" style="margin:0;">所有备件的入库历史</p>
+    </div>
+    <a href="{{ url_for('spare_part.spare_part_list') }}" class="btn btn-outline-secondary btn-sm">
+      <i data-lucide="arrow-left" style="width:16px;height:16px;"></i> 返回备件列表
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span>入库记录</span>
+    <span class="text-muted" style="font-weight:400;">共 {{ pagination.total }} 条</span>
+  </div>
+  <div class="table-wrapper">
+    {% if inbounds %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>备件编码</th>
+          <th>备件名称</th>
+          <th>规格型号</th>
+          <th>入库数量</th>
+          <th>单价(元)</th>
+          <th>金额(元)</th>
+          <th>批次号</th>
+          <th>入库日期</th>
+          <th>操作人</th>
+          <th>时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in inbounds %}
+        <tr>
+          <td><code style="font-size:0.8rem;">{{ row.code }}</code></td>
+          <td>{{ row.name }}</td>
+          <td>{{ row.specification or '-' }}</td>
+          <td class="fw-bold text-success">+{{ row.quantity }} {{ row.unit }}</td>
+          <td>¥{{ "%.2f"|format(row.unit_price|float) }}</td>
+          <td>¥{{ "%.2f"|format(row.quantity * row.unit_price|float) }}</td>
+          <td>{{ row.batch_no or '-' }}</td>
+          <td>{{ row.inbound_date }}</td>
+          <td>{{ row.created_by }}</td>
+          <td style="font-size:0.8rem;color:#6b7280;">{{ row.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted p-4"><p>暂无入库记录</p></div>
+    {% endif %}
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="pagination-wrapper">
+    {% for p in range(1, pagination.pages + 1) %}
+    <a href="{{ url_for('spare_part.inbound_list', page=p) }}" class="page-btn {% if p == pagination.page %}active{% endif %}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

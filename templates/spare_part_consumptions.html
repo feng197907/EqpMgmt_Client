@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center justify-content-between w-100">
+    <div>
+      <h1 class="page-title" style="font-size:1.375rem;">备件消耗记录</h1>
+      <p class="text-muted" style="margin:0;">维修过程中消耗的备件明细</p>
+    </div>
+    <a href="{{ url_for('spare_part.spare_part_list') }}" class="btn btn-outline-secondary btn-sm">
+      <i data-lucide="arrow-left" style="width:16px;height:16px;"></i> 返回备件列表
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span>消耗记录</span>
+    <span class="text-muted" style="font-weight:400;">共 {{ pagination.total }} 条</span>
+  </div>
+  <div class="table-wrapper">
+    {% if consumptions %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>备件编码</th>
+          <th>备件名称</th>
+          <th>规格型号</th>
+          <th>消耗数量</th>
+          <th>单价(元)</th>
+          <th>金额(元)</th>
+          <th>关联设备</th>
+          <th>消耗人</th>
+          <th>消耗时间</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in consumptions %}
+        <tr>
+          <td><code style="font-size:0.8rem;">{{ row.code }}</code></td>
+          <td>{{ row.name }}</td>
+          <td>{{ row.specification or '-' }}</td>
+          <td class="fw-bold text-danger">-{{ row.quantity }} {{ row.unit }}</td>
+          <td>¥{{ "%.2f"|format(row.unit_price|float) }}</td>
+          <td>¥{{ "%.2f"|format(row.quantity * row.unit_price|float) }}</td>
+          <td>
+            {% if row.device_code %}
+            <a href="{{ url_for('devices.device_detail', device_id=row.device_id or 0) }}">{{ row.device_code }} {{ row.device_name or '' }}</a>
+            {% else %}-{% endif %}
+          </td>
+          <td>{{ row.consumed_by }}</td>
+          <td style="font-size:0.8rem;">{{ row.consumed_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted p-4"><p>暂无消耗记录</p></div>
+    {% endif %}
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="pagination-wrapper">
+    {% for p in range(1, pagination.pages + 1) %}
+    <a href="{{ url_for('spare_part.consumption_list', page=p) }}" class="page-btn {% if p == pagination.page %}active{% endif %}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

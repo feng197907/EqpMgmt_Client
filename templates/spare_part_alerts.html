@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="page-header">
+  <div class="d-flex align-items-center justify-content-between w-100">
+    <div>
+      <h1 class="page-title" style="font-size:1.375rem;">备件预警中心</h1>
+      <p class="text-muted" style="margin:0;">低库存、超量库存及呆滞预警</p>
+    </div>
+    <a href="{{ url_for('spare_part.spare_part_list') }}" class="btn btn-outline-secondary btn-sm">
+      <i data-lucide="arrow-left" style="width:16px;height:16px;"></i> 返回备件列表
+    </a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span>未解决预警</span>
+    <span class="text-muted" style="font-weight:400;">共 {{ pagination.total }} 条</span>
+  </div>
+  <div class="table-wrapper">
+    {% if alerts %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>备件编码</th>
+          <th>备件名称</th>
+          <th>预警类型</th>
+          <th>触发时库存</th>
+          <th>当前库存</th>
+          <th>阈值</th>
+          <th>触发时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in alerts %}
+        {% set alert_type = row.alert_type %}
+        <tr>
+          <td><code style="font-size:0.8rem;">{{ row.code }}</code></td>
+          <td class="fw-medium">{{ row.name }}</td>
+          <td>
+            {% if alert_type == 'low_stock' %}
+            <span class="badge bg-danger">低库存预警</span>
+            {% elif alert_type == 'over_stock' %}
+            <span class="badge bg-info">超量库存</span>
+            {% elif alert_type == 'idle' %}
+            <span class="badge bg-secondary">呆滞预警</span>
+            {% else %}
+            <span class="badge bg-light text-dark">{{ alert_type }}</span>
+            {% endif %}
+          </td>
+          <td>{{ row.current_stock }}</td>
+          <td>{{ row.latest_stock or row.current_stock }}</td>
+          <td>{{ row.threshold }}</td>
+          <td style="font-size:0.8rem;">{{ row.created_at }}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-success" onclick="resolveAlert({{ row.id }})">
+              <i data-lucide="check" style="width:14px;height:14px;"></i> 已解决
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="text-center text-muted p-4">
+      <i data-lucide="check-circle" style="width:32px;height:32px;color:#16a34a;"></i>
+      <p class="mt-2">暂无预警，所有备件库存正常！</p>
+    </div>
+    {% endif %}
+  </div>
+  {% if pagination.pages > 1 %}
+  <div class="pagination-wrapper">
+    {% for p in range(1, pagination.pages + 1) %}
+    <a href="{{ url_for('spare_part.alert_list', page=p) }}" class="page-btn {% if p == pagination.page %}active{% endif %}">{{ p }}</a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<script>
+function resolveAlert(alertId) {
+  if (!confirm('确认该预警已解决吗？')) return;
+  fetch('/spare-parts/api/alerts/' + alertId + '/resolve', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'}
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    alert(data.message || '已解决');
+    location.reload();
+  })
+  .catch(function(err) { alert('操作失败: ' + err.message); });
+}
+</script>
+{% endblock %}

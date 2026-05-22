@@ -30,6 +30,7 @@ from blueprints import (
     password_bp,
     search_bp,
     settings_bp,
+    spare_part_bp,
     users_bp,
 )
 from extensions import login_manager
@@ -68,6 +69,7 @@ def create_app():
     app.register_blueprint(password_bp)  # 密码重置功能
     app.register_blueprint(settings_bp)  # 系统设置
     app.register_blueprint(esign_bp)  # 电子签名
+    app.register_blueprint(spare_part_bp)  # 备件库存管理
 
     # 确保上传目录存在
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)

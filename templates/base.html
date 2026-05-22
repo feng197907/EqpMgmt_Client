@@ -78,6 +78,21 @@
       </div>
       {% endif %}
 
+      <!-- 备件库存管理 -->
+      {% if current_user.is_authenticated and current_user.has_menu_permission('spare_part_management') %}
+      <div class="nav-group">
+        <div class="nav-group-title">库存管理</div>
+        <a href="{{ url_for('spare_part.spare_part_list') }}" class="nav-item {% if request.endpoint and request.endpoint.startswith('spare_part') %}active{% endif %}">
+          <i data-lucide="package"></i>
+          <span>备件库存</span>
+        </a>
+        <a href="{{ url_for('spare_part.spare_part_stats') }}" class="nav-item {% if request.endpoint == 'spare_part.spare_part_stats' %}active{% endif %}">
+          <i data-lucide="bar-chart-3"></i>
+          <span>成本统计</span>
+        </a>
+      </div>
+      {% endif %}
+
       <!-- 文档中心 -->
       {% if current_user.is_authenticated and current_user.has_menu_permission('document_center') %}
       <div class="nav-group">
@@ -407,7 +422,7 @@
           html += '<h5 class="text-danger mb-2">🔴 已逾期 (' + data.overdue.length + '台)</h5>';
           html += '<ul class="list-group mb-3">';
           data.overdue.forEach(function(item) {
-            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
+            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance?plan_id=' + item.plan_id + '" onclick="closeMaintenanceReminder()">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
           });
           html += '</ul>';
         }
@@ -416,7 +431,7 @@
           html += '<h5 class="text-danger mb-2">🔴 今日到期 (' + data.due_today.length + '台)</h5>';
           html += '<ul class="list-group mb-3">';
           data.due_today.forEach(function(item) {
-            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
+            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance?plan_id=' + item.plan_id + '" onclick="closeMaintenanceReminder()">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
           });
           html += '</ul>';
         }
@@ -425,7 +440,7 @@
           html += '<h5 class="text-warning mb-2">🟡 7日内到期 (' + data.due_within_7days.length + '台)</h5>';
           html += '<ul class="list-group mb-3">';
           data.due_within_7days.forEach(function(item) {
-            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
+            html += '<li class="list-group-item"><a href="/device/' + item.device_id + '/maintenance?plan_id=' + item.plan_id + '" onclick="closeMaintenanceReminder()">' + item.device_code + ' ' + item.device_name + '</a> - ' + item.maintenance_type_label + '</li>';
           });
           html += '</ul>';
         }

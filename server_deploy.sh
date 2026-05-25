@@ -30,13 +30,33 @@ echo ""
 
 # 0. 检查 Python 版本
 log_info "[0/5] 检查 Python 版本..."
-PYTHON_BIN=$(which python3.11 || which python3 || which python)
-if [ -z "$PYTHON_BIN" ]; then
+
+# 优先使用已知的 Python 3.11 路径
+if [ -x "/usr/local/python3.11/bin/python3.11" ]; then
+    PYTHON_BIN="/usr/local/python3.11/bin/python3.11"
+elif [ -x "/usr/bin/python3.11" ]; then
+    PYTHON_BIN="/usr/bin/python3.11"
+else
+    PYTHON_BIN=$(which python3.11 || which python3 || which python)
+fi
+
+if [ -z "$PYTHON_BIN" ] || [ ! -x "$PYTHON_BIN" ]; then
     log_error "未找到 Python！请安装 Python 3.7+"
     exit 1
 fi
 log_info "使用 Python: $PYTHON_BIN"
 $PYTHON_BIN --version
+
+# 验证 Python 版本 >= 3.7
+PYTHON_VERSION=$($PYTHON_BIN -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 7 ]); then
+    log_error "Python 版本过低 ($PYTHON_VERSION)，需要 3.7+"
+    exit 1
+fi
+log_success "Python 版本检查通过: $PYTHON_VERSION"
 
 # 1. 拉取最新代码
 log_info "[1/5] 拉取最新代码..."

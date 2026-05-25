@@ -101,7 +101,17 @@ $VENV_PYTHON -m pip install --upgrade pip \
 # ── [3/7] 拉取最新代码 ────────────────────────────────────────────────────
 log_info "[3/7] 拉取最新代码..."
 OLD_REQ_HASH=$(md5sum "$PROJECT_DIR/requirements.txt" 2>/dev/null | awk '{print $1}')
-git pull origin main
+
+# 如有本地冲突，放弃本地修改，强制与远程保持一致
+if ! git diff --quiet 2>/dev/null; then
+    log_warning "检测到本地有修改，将丢弃本地变更并强制同步远程代码..."
+    git reset --hard HEAD
+    git clean -fd
+fi
+
+git fetch origin main
+git reset --hard origin/main
+
 NEW_REQ_HASH=$(md5sum "$PROJECT_DIR/requirements.txt" 2>/dev/null | awk '{print $1}')
 
 # ── [4/7] 安装/更新依赖（仅 requirements.txt 有变动时）────────────────────

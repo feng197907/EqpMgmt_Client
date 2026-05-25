@@ -161,7 +161,7 @@ def admin_reset_password(request_id):
         return redirect(url_for("password.admin_password_resets"))
 
     # 更新用户密码
-    hashed_password = generate_password_hash(new_password)
+    hashed_password = generate_password_hash(new_password, method='pbkdf2:sha256')
     cur.execute(
         "UPDATE users SET password = %s WHERE id = %s",
         (hashed_password, reset_req["user_id"]),

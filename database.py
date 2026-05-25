@@ -995,7 +995,7 @@ def _ensure_default_user(cur, username, password, role, db_type='mysql'):
         cur.execute("SELECT id FROM users WHERE username = ?", (username,))
 
     if cur.fetchone() is None:
-        hashed = generate_password_hash(password)
+        hashed = generate_password_hash(password, method='pbkdf2:sha256')
         if db_type == 'mysql':
             cur.execute(
                 "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",

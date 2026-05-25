@@ -82,7 +82,7 @@ def admin_user(app, db_conn):
     cur = db_conn.cursor()
     cur.execute(
         "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-        ("testadmin", generate_password_hash("admin123"), "admin", "active"),
+        ("testadmin", generate_password_hash("admin123", method='pbkdf2:sha256'), "admin", "active"),
     )
     db_conn.commit()
 
@@ -99,7 +99,7 @@ def normal_user(app, db_conn):
     cur = db_conn.cursor()
     cur.execute(
         "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-        ("testuser", generate_password_hash("user123"), "equipment_engineer", "active"),
+        ("testuser", generate_password_hash("user123", method='pbkdf2:sha256'), "equipment_engineer", "active"),
     )
     db_conn.commit()
 
@@ -116,7 +116,7 @@ def qa_manager_user(app, db_conn):
     cur = db_conn.cursor()
     cur.execute(
         "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-        ("testqa", generate_password_hash("qa123"), "qa_manager", "active"),
+        ("testqa", generate_password_hash("qa123", method='pbkdf2:sha256'), "qa_manager", "active"),
     )
     db_conn.commit()
 
@@ -289,7 +289,7 @@ class TestForgotPassword:
         cur = db_conn.cursor()
         cur.execute(
             "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-            ("resetuser", generate_password_hash("pass123"), "equipment_engineer", "active"),
+            ("resetuser", generate_password_hash("pass123", method='pbkdf2:sha256'), "equipment_engineer", "active"),
         )
         db_conn.commit()
 
@@ -315,7 +315,7 @@ class TestForgotPassword:
         cur = db_conn.cursor()
         cur.execute(
             "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-            ("dupuser", generate_password_hash("pass123"), "equipment_engineer", "active"),
+            ("dupuser", generate_password_hash("pass123", method='pbkdf2:sha256'), "equipment_engineer", "active"),
         )
         db_conn.commit()
 
@@ -337,7 +337,7 @@ class TestForgotPassword:
         cur = db_conn.cursor()
         cur.execute(
             "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-            ("disableduser", generate_password_hash("pass123"), "equipment_engineer", "disabled"),
+            ("disableduser", generate_password_hash("pass123", method='pbkdf2:sha256'), "equipment_engineer", "disabled"),
         )
         db_conn.commit()
 
@@ -406,7 +406,7 @@ class TestAdminPasswordReset:
         cur = db_conn.cursor()
         cur.execute(
             "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-            ("shortpwduser", generate_password_hash("oldpwd"), "equipment_engineer", "active"),
+            ("shortpwduser", generate_password_hash("oldpwd", method='pbkdf2:sha256'), "equipment_engineer", "active"),
         )
         cur.execute("SELECT id FROM users WHERE username = 'shortpwduser'")
         user_id = cur.fetchone()["id"]
@@ -441,7 +441,7 @@ class TestAdminPasswordReset:
         cur = db_conn.cursor()
         cur.execute(
             "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-            ("resetok", generate_password_hash("oldpwd"), "equipment_engineer", "active"),
+            ("resetok", generate_password_hash("oldpwd", method='pbkdf2:sha256'), "equipment_engineer", "active"),
         )
         cur.execute("SELECT id FROM users WHERE username = 'resetok'")
         user_id = cur.fetchone()["id"]
@@ -483,7 +483,7 @@ class TestAdminPasswordReset:
         cur = db_conn.cursor()
         cur.execute(
             "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-            ("canceluser", generate_password_hash("oldpwd"), "equipment_engineer", "active"),
+            ("canceluser", generate_password_hash("oldpwd", method='pbkdf2:sha256'), "equipment_engineer", "active"),
         )
         cur.execute("SELECT id FROM users WHERE username = 'canceluser'")
         user_id = cur.fetchone()["id"]
@@ -520,7 +520,7 @@ class TestAdminPasswordReset:
         cur = db_conn.cursor()
         cur.execute(
             "INSERT OR IGNORE INTO users (username, password, role, status) VALUES (?, ?, ?, ?)",
-            ("processeduser", generate_password_hash("pwd"), "equipment_engineer", "active"),
+            ("processeduser", generate_password_hash("pwd", method='pbkdf2:sha256'), "equipment_engineer", "active"),
         )
         cur.execute("SELECT id FROM users WHERE username = 'processeduser'")
         user_id = cur.fetchone()["id"]

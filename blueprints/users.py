@@ -75,7 +75,7 @@ def create_user():
     conn = get_db()
     cur = conn.cursor()
     try:
-        hashed = generate_password_hash(password)
+        hashed = generate_password_hash(password, method='pbkdf2:sha256')
         cur.execute(
             "INSERT INTO users (username, password, role, permissions) VALUES (%s, %s, %s, %s)",
             (username, hashed, role, permissions_str),

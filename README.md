@@ -153,6 +153,21 @@ volumes:
 
 这时应用容器和 MySQL 容器都启动后，再访问 `http://localhost:5000`。
 
+推荐把密码改成 `.env` 变量，不要明文写在 Compose 文件中：
+
+```bash
+cp .env.mysql.example .env
+# 编辑 .env，填入真实密码
+
+docker compose -f docker-compose-mysql.yml -f docker-compose-mysql.override.yml up --build -d
+```
+
+停止服务：
+
+```bash
+docker compose -f docker-compose-mysql.yml -f docker-compose-mysql.override.yml down
+```
+
 ### 访问系统
 
 > 🌐 **http://127.0.0.1:5000**

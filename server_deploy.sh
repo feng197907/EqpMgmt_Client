@@ -100,14 +100,21 @@ $VENV_PYTHON -m pip install --upgrade pip \
 
 # ── [3/7] 拉取最新代码 ────────────────────────────────────────────────────
 log_info "[3/7] 拉取最新代码..."
+OLD_REQ_HASH=$(md5sum "$PROJECT_DIR/requirements.txt" 2>/dev/null | awk '{print $1}')
 git pull origin main
+NEW_REQ_HASH=$(md5sum "$PROJECT_DIR/requirements.txt" 2>/dev/null | awk '{print $1}')
 
-# ── [4/7] 安装/更新依赖 ───────────────────────────────────────────────────
-log_info "[4/7] 安装/更新依赖..."
-$VENV_PIP install -r "$PROJECT_DIR/requirements.txt" \
-    -i http://mirrors.tencentyun.com/pypi/simple \
-    --trusted-host mirrors.tencentyun.com \
-    --disable-pip-version-check 2>&1 | grep -v "WARNING:" || true
+# ── [4/7] 安装/更新依赖（仅 requirements.txt 有变动时）────────────────────
+if [ "$OLD_REQ_HASH" != "$NEW_REQ_HASH" ]; then
+    log_info "[4/7] requirements.txt 有变动，安装/更新依赖..."
+    $VENV_PIP install -r "$PROJECT_DIR/requirements.txt" \
+        -i http://mirrors.tencentyun.com/pypi/simple \
+        --trusted-host mirrors.tencentyun.com \
+        --disable-pip-version-check 2>&1 | grep -v "WARNING:" || true
+    log_success "依赖安装完成"
+else
+    log_info "[4/7] requirements.txt 无变动，跳过依赖安装"
+fi
 
 # ── [5/7] 检查 gunicorn 是否可用 ───────────────────────────────────────────
 USE_GUNICORN=false

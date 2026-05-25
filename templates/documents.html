@@ -80,7 +80,7 @@
           </div>
           <div class="form-group mb-0">
             <label class="form-label">文档类型</label>
-            <select class="form-control form-select" name="doc_type">
+            <select class="form-select" name="doc_type">
               <option value="">全部类型</option>
               {% for value, label in doc_types %}
               <option value="{{ value }}" {% if doc_type == value %}selected{% endif %}>{{ label }}</option>
@@ -89,7 +89,7 @@
           </div>
           <div class="form-group mb-0">
             <label class="form-label">文档状态</label>
-            <select class="form-control form-select" name="status">
+            <select class="form-select" name="status">
               <option value="">全部状态</option>
               {% for key, label in doc_status_labels.items() %}
               <option value="{{ key }}" {% if status == key %}selected{% endif %}>{{ label }}</option>

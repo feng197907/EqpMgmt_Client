@@ -1,8 +1,11 @@
 # 备件库存管理 Blueprint
 from datetime import datetime
+from io import BytesIO
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 from database import get_db
 from models.spare_part import (
@@ -20,8 +23,48 @@ spare_part_bp = Blueprint("spare_part", __name__, url_prefix="/spare-parts")
 
 
 # ============================================================
-# 页面路由
+# Excel 导出辅助函数（与其他 Blueprint 保持一致风格）
 # ============================================================
+
+
+def _excel_response(wb, filename):
+    """将 Workbook 转为 Flask send_file 响应"""
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+def _header_style(cell):
+    """蓝色加粗表头"""
+    cell.font = Font(bold=True, color="FFFFFF")
+    cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+    cell.alignment = Alignment(horizontal="center", vertical="center")
+
+
+def _border(cell):
+    """细边框"""
+    thin = Side(style="thin", color="000000")
+    cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+
+def _auto_width(ws):
+    """自动调整列宽"""
+    for col in ws.columns:
+        max_len = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            try:
+                if cell.value:
+                    max_len = max(max_len, len(str(cell.value)))
+            except Exception:
+                pass
+        ws.column_dimensions[col_letter].width = min(max_len + 2, 50)
 
 
 @spare_part_bp.route("/")
@@ -61,6 +104,92 @@ def spare_part_list():
         stock_filter=stock_filter,
         alert_count=alert_count,
     )
+
+
+@spare_part_bp.route("/export")
+@login_required
+def spare_part_export():
+    """导出备件列表为 Excel（与设备列表导出风格一致）"""
+    category = request.args.get("category", "").strip()
+    search = request.args.get("q", "").strip()
+    stock_filter = request.args.get("stock", "").strip()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    conditions = ["sp.is_active = 1"]
+    params = []
+    if category:
+        conditions.append("sp.category = %s")
+        params.append(category)
+    if search:
+        conditions.append("(sp.code LIKE %s OR sp.name LIKE %s OR sp.specification LIKE %s OR sp.brand LIKE %s)")
+        like = f"%{search}%"
+        params.extend([like, like, like, like])
+    if stock_filter == "low":
+        conditions.append("sp.current_stock > 0 AND sp.current_stock <= sp.safety_stock_min")
+    elif stock_filter == "out":
+        conditions.append("sp.current_stock <= 0")
+    elif stock_filter == "normal":
+        conditions.append("sp.current_stock > sp.safety_stock_min")
+    elif stock_filter == "over":
+        conditions.append("sp.safety_stock_max > 0 AND sp.current_stock >= sp.safety_stock_max")
+
+    where = "WHERE " + " AND ".join(conditions)
+    cur.execute(
+        f"""SELECT sp.code, sp.name, sp.category, sp.specification, sp.unit,
+                   sp.brand, sp.current_stock, sp.safety_stock_min, sp.safety_stock_max,
+                   sp.weighted_avg_price, sp.supplier_name, sp.supplier_contact,
+                   sp.supplier_phone, sp.remark, sp.created_at
+            FROM spare_parts sp
+            {where}
+            ORDER BY sp.created_at DESC, sp.id DESC""",
+        params,
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "备件列表"
+
+    headers = ["序号", "备件编码", "备件名称", "分类", "规格型号", "单位", "品牌",
+               "库存量", "安全库存下限", "安全库存上限", "加权均价(元)",
+               "供应商", "供应商联系人", "供应商电话", "备注", "创建时间"]
+    ws.append(headers)
+    for cell in ws[1]:
+        _header_style(cell)
+        _border(cell)
+
+    for i, row in enumerate(rows, 1):
+        ws.append([
+            i,
+            row["code"] or "",
+            row["name"] or "",
+            SPARE_PART_CATEGORY_LABELS.get(row["category"], row["category"] or ""),
+            row["specification"] or "",
+            row["unit"] or "",
+            row["brand"] or "",
+            row["current_stock"],
+            row["safety_stock_min"],
+            row["safety_stock_max"],
+            round(float(row["weighted_avg_price"] or 0), 2),
+            row["supplier_name"] or "",
+            row["supplier_contact"] or "",
+            row["supplier_phone"] or "",
+            row["remark"] or "",
+            str(row["created_at"]) if row["created_at"] else "",
+        ])
+
+    for data_row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        for cell in data_row:
+            _border(cell)
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    _auto_width(ws)
+
+    filename = f"备件列表_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return _excel_response(wb, filename)
 
 
 @spare_part_bp.route("/stats")
@@ -210,6 +339,163 @@ def inbound_list():
         inbounds=rows,
         pagination=pagination,
     )
+
+
+@spare_part_bp.route("/inbounds/export")
+@login_required
+def inbound_export():
+    """导出入库记录为 Excel（与设备列表导出风格一致）"""
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    conditions = []
+    params = []
+    if date_from:
+        conditions.append("si.inbound_date >= %s")
+        params.append(date_from)
+    if date_to:
+        conditions.append("si.inbound_date <= %s")
+        params.append(date_to)
+
+    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    cur.execute(
+        f"""SELECT si.id, sp.code, sp.name, sp.specification, sp.unit,
+                   si.quantity, si.unit_price,
+                   (si.quantity * si.unit_price) AS total_amount,
+                   si.batch_no, si.inbound_date, si.created_by, si.created_at, si.remark
+            FROM spare_part_inbounds si
+            JOIN spare_parts sp ON sp.id = si.spare_part_id
+            {where_clause}
+            ORDER BY si.inbound_date DESC, si.id DESC""",
+        params,
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "备件入库记录"
+
+    headers = ["序号", "备件编码", "备件名称", "规格型号", "单位",
+               "入库数量", "单价(元)", "金额(元)", "批次号",
+               "入库日期", "操作人", "录入时间", "备注"]
+    ws.append(headers)
+    for cell in ws[1]:
+        _header_style(cell)
+        _border(cell)
+
+    for i, row in enumerate(rows, 1):
+        ws.append([
+            i,
+            row["code"] or "",
+            row["name"] or "",
+            row["specification"] or "",
+            row["unit"] or "",
+            row["quantity"],
+            round(float(row["unit_price"] or 0), 2),
+            round(float(row["total_amount"] or 0), 2),
+            row["batch_no"] or "",
+            str(row["inbound_date"]) if row["inbound_date"] else "",
+            row["created_by"] or "",
+            str(row["created_at"]) if row["created_at"] else "",
+            row["remark"] or "",
+        ])
+
+    for data_row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        for cell in data_row:
+            _border(cell)
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    _auto_width(ws)
+
+    filename = f"备件入库记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return _excel_response(wb, filename)
+
+
+@spare_part_bp.route("/consumptions/export")
+@login_required
+def consumption_export():
+    """导出消耗记录为 Excel（与设备列表导出风格一致）"""
+    date_from = request.args.get("date_from", "").strip()
+    date_to = request.args.get("date_to", "").strip()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    conditions = []
+    params = []
+    if date_from:
+        conditions.append("sc.consumed_at >= %s")
+        params.append(date_from)
+    if date_to:
+        conditions.append("sc.consumed_at <= %s")
+        params.append(date_to + " 23:59:59")
+
+    where_clause = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    cur.execute(
+        f"""SELECT sc.id, sp.code, sp.name, sp.specification, sp.unit,
+                   sc.quantity, sc.unit_price,
+                   (sc.quantity * sc.unit_price) AS total_amount,
+                   COALESCE(d_mr.device_code, d_rr.device_code) as device_code,
+                   COALESCE(d_mr.device_name, d_rr.device_name) as device_name,
+                   sc.maintenance_record_id,
+                   sc.consumed_by, sc.consumed_at, sc.remark
+            FROM spare_part_consumptions sc
+            LEFT JOIN spare_parts sp ON sp.id = sc.spare_part_id
+            LEFT JOIN maintenance_record mr ON mr.id = sc.maintenance_record_id
+            LEFT JOIN devices d_mr ON d_mr.id = mr.device_id
+            LEFT JOIN repair_record rr ON rr.id = sc.maintenance_record_id
+            LEFT JOIN devices d_rr ON d_rr.id = rr.device_id
+            {where_clause}
+            ORDER BY sc.consumed_at DESC, sc.id DESC""",
+        params,
+    )
+    rows = cur.fetchall()
+    conn.close()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "备件消耗记录"
+
+    headers = ["序号", "备件编码", "备件名称", "规格型号", "单位",
+               "消耗数量", "单价(元)", "金额(元)",
+               "关联设备编码", "关联设备名称", "维修记录ID",
+               "消耗人", "消耗时间", "备注"]
+    ws.append(headers)
+    for cell in ws[1]:
+        _header_style(cell)
+        _border(cell)
+
+    for i, row in enumerate(rows, 1):
+        ws.append([
+            i,
+            row["code"] or "",
+            row["name"] or "",
+            row["specification"] or "",
+            row["unit"] or "",
+            row["quantity"],
+            round(float(row["unit_price"] or 0), 2),
+            round(float(row["total_amount"] or 0), 2),
+            row["device_code"] or "",
+            row["device_name"] or "",
+            row["maintenance_record_id"] or "",
+            row["consumed_by"] or "",
+            str(row["consumed_at"]) if row["consumed_at"] else "",
+            row["remark"] or "",
+        ])
+
+    for data_row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+        for cell in data_row:
+            _border(cell)
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+
+    _auto_width(ws)
+
+    filename = f"备件消耗记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    return _excel_response(wb, filename)
 
 
 @spare_part_bp.route("/consumptions")

@@ -596,12 +596,65 @@ textarea.form-control {
   resize: vertical;
 }
 
+/* 覆盖 Bootstrap 的 form-control-sm，确保与 form-select-sm 高度一致 */
+.form-control-sm {
+  min-height: 31px;
+  height: 31px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+}
+
 .form-select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 1rem center;
   padding-right: 2.5rem;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: var(--border-radius, 6px);
+  padding: 0 2.5rem 0 1rem;
+  font-size: var(--text-sm);
+  color: var(--text-primary, #1f2937);
+  background-color: #fff;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  cursor: pointer;
+  /* 与 .form-control 高度一致 */
+  height: 40px;
+  line-height: normal;
+  box-sizing: border-box;
+  /* 移除浏览器默认的 select 内部 padding */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.form-select:hover {
+  border-color: var(--color-primary, #2563eb);
+}
+
+.form-select:focus {
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  outline: none;
+}
+
+.form-select:disabled {
+  background-color: var(--gray-100, #f3f4f6);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.form-select.form-select-sm {
+  padding: 0.25rem 2rem 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  border-radius: var(--border-radius-sm, 4px);
+  background-position: right 0.75rem center;
+  background-size: 14px;
+  /* 与 .form-control-sm 高度一致: calc(1.5em + .5rem + 2px) ≈ 31px */
+  min-height: 31px;
+  height: 31px;
+  line-height: 1.5;
+  box-sizing: border-box;
 }
 
 .form-hint {

@@ -22,32 +22,33 @@
 </style>
 {% endblock %}
 {% block content %}
-<div class="page-header">
-  <div class="d-flex align-items-center justify-content-between w-100">
-    <div>
-      <h1 class="page-title" style="font-size:1.375rem;">备件库存管理</h1>
-      <p class="text-muted" style="margin:0;">管理备件入库、消耗与库存预警</p>
-    </div>
-    <div class="d-flex gap-2">
-      <a href="{{ url_for('spare_part.spare_part_stats') }}" class="btn btn-outline-primary btn-sm">
-        <i data-lucide="bar-chart-3" style="width:16px;height:16px;vertical-align:middle;"></i> 成本统计
-      </a>
-      <a href="{{ url_for('spare_part.alert_list') }}" class="btn btn-outline-warning btn-sm position-relative">
-        <i data-lucide="alert-triangle" style="width:16px;height:16px;vertical-align:middle;"></i> 预警中心
-        {% if alert_count > 0 %}<span class="badge bg-danger ms-1">{{ alert_count }}</span>{% endif %}
-      </a>
-      <a href="{{ url_for('spare_part.inbound_list') }}" class="btn btn-outline-info btn-sm">
-        <i data-lucide="package-plus" style="width:16px;height:16px;vertical-align:middle;"></i> 入库记录
-      </a>
-      <a href="{{ url_for('spare_part.consumption_list') }}" class="btn btn-outline-secondary btn-sm">
-        <i data-lucide="package-minus" style="width:16px;height:16px;vertical-align:middle;"></i> 消耗记录
-      </a>
-      {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
-      <button class="btn btn-primary btn-sm" onclick="showAddPartModal()">
-        <i data-lucide="plus" style="width:16px;height:16px;vertical-align:middle;"></i> 新增备件
-      </button>
-      {% endif %}
-    </div>
+<div class="page-hero">
+  <div>
+    <h1 class="page-hero-title">
+      <i data-lucide="package"></i>
+      备件库存管理
+    </h1>
+    <p class="page-hero-subtitle">管理备件入库、消耗与库存预警</p>
+  </div>
+  <div class="page-hero-actions">
+    <a href="{{ url_for('spare_part.spare_part_stats') }}" class="btn btn-outline">
+      <i data-lucide="bar-chart-3"></i> 成本统计
+    </a>
+    <a href="{{ url_for('spare_part.alert_list') }}" class="btn btn-outline position-relative">
+      <i data-lucide="alert-triangle"></i> 预警中心
+      {% if alert_count > 0 %}<span class="badge bg-danger ms-1">{{ alert_count }}</span>{% endif %}
+    </a>
+    <a href="{{ url_for('spare_part.inbound_list') }}" class="btn btn-outline">
+      <i data-lucide="package-plus"></i> 入库记录
+    </a>
+    <a href="{{ url_for('spare_part.consumption_list') }}" class="btn btn-outline">
+      <i data-lucide="package-minus"></i> 消耗记录
+    </a>
+    {% if current_user.is_authenticated and current_user.has_permission('device_maintenance') %}
+    <button class="btn btn-success" onclick="showAddPartModal()">
+      <i data-lucide="plus"></i> 新增备件
+    </button>
+    {% endif %}
   </div>
 </div>
 
@@ -86,9 +87,20 @@
 
 {# 备件列表 #}
 <div class="card">
-  <div class="card-header">
-    <span>备件列表</span>
-    <span class="text-muted" style="font-weight:400;">共 {{ pagination.total }} 个备件</span>
+  <div class="data-table-header">
+    <h3 class="data-table-title">
+      <i data-lucide="package"></i>
+      备件列表
+      {% if parts %}
+      <span class="data-table-count">{{ pagination.total }}</span>
+      {% endif %}
+    </h3>
+    <div class="data-table-actions">
+      <a class="btn btn-sm btn-outline-primary" href="{{ url_for('spare_part.spare_part_export', q=search, category=selected_category, stock=stock_filter) }}">
+        <i data-lucide="download"></i>
+        导出
+      </a>
+    </div>
   </div>
   <div class="table-wrapper">
     {% if parts %}
@@ -184,7 +196,7 @@
         </div>
         <div style="flex:1;min-width:calc(50% - 0.75rem);">
           <label style="display:block;font-size:0.85rem;font-weight:500;margin-bottom:4px;">分类</label>
-          <select style="display:block;width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.875rem;" id="partCategory">
+          <select class="form-select" id="partCategory">
             {% for cat_val, cat_label in categories %}
             <option value="{{ cat_val }}">{{ cat_label }}</option>
             {% endfor %}

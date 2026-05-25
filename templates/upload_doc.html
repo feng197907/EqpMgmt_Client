@@ -389,7 +389,7 @@ function renderFileList() {
         <span class="file-list-size">${formatFileSize(file.size)}</span>
       </div>
       <div class="file-list-type">
-        <select name="doc_type_per_file_${i}" data-index="${i}" class="file-type-select">
+        <select name="doc_type_per_file_${i}" data-index="${i}" class="form-select form-select-sm">
           ${buildTypeOptions(item.doc_type)}
         </select>
       </div>
@@ -401,7 +401,7 @@ function renderFileList() {
   }
 
   // 绑定类型变更
-  fileList.querySelectorAll('.file-type-select').forEach(select => {
+  fileList.querySelectorAll('.form-select').forEach(select => {
     select.addEventListener('change', (e) => {
       const idx = parseInt(e.target.dataset.index);
       selectedFiles[idx].doc_type = e.target.value;

@@ -1,13 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
-<div class="page-header">
-  <div class="d-flex align-items-center justify-content-between w-100">
-    <div>
-      <h1 class="page-title" style="font-size:1.375rem;">备件预警中心</h1>
-      <p class="text-muted" style="margin:0;">低库存、超量库存及呆滞预警</p>
-    </div>
-    <a href="{{ url_for('spare_part.spare_part_list') }}" class="btn btn-outline-secondary btn-sm">
-      <i data-lucide="arrow-left" style="width:16px;height:16px;"></i> 返回备件列表
+<div class="page-hero">
+  <div>
+    <h1 class="page-hero-title">
+      <i data-lucide="alert-triangle"></i>
+      备件预警中心
+    </h1>
+    <p class="page-hero-subtitle">低库存、超量库存及呆滞预警</p>
+  </div>
+  <div class="page-hero-actions">
+    <a href="{{ url_for('spare_part.spare_part_list') }}" class="btn btn-outline">
+      <i data-lucide="arrow-left"></i> 返回备件列表
     </a>
   </div>
 </div>

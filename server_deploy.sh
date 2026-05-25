@@ -102,15 +102,19 @@ $VENV_PYTHON -m pip install --upgrade pip \
 log_info "[3/7] 拉取最新代码..."
 OLD_REQ_HASH=$(md5sum "$PROJECT_DIR/requirements.txt" 2>/dev/null | awk '{print $1}')
 
-# 如有本地冲突，放弃本地修改，强制与远程保持一致
-if ! git diff --quiet 2>/dev/null; then
+# 如有本地修改，先丢弃，避免冲突
+if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
     log_warning "检测到本地有修改，将丢弃本地变更并强制同步远程代码..."
     git reset --hard HEAD
     git clean -fd
 fi
 
-git fetch origin main
+# 强制拉取远程最新代码（丢弃所有本地提交和修改）
+log_info "正在 fetch 远程分支..."
+git fetch --all --prune
+log_info "正在重置到远程 main 分支..."
 git reset --hard origin/main
+log_info "当前提交: $(git log --oneline -1 2>/dev/null || echo '未知')"
 
 NEW_REQ_HASH=$(md5sum "$PROJECT_DIR/requirements.txt" 2>/dev/null | awk '{print $1}')
 

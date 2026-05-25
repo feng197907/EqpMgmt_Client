@@ -1,5 +1,6 @@
 # DMS 设备管理系统 - Flask 应用工厂
 import os
+import sys
 
 from dotenv import load_dotenv
 
@@ -148,8 +149,22 @@ def create_app():
 
 # 创建应用实例（仅当直接运行时创建，避免 import 副作用）
 if __name__ == "__main__":
-    app = create_app()
-    app.run(debug=True, use_reloader=False)
+    import traceback
+    try:
+        app = create_app()
+        # 绑定到所有网络接口，允许外部访问
+        # port 通过环境变量配置，默认 5000
+        port = int(os.environ.get('PORT', 5000))
+        app.run(host='0.0.0.0', port=port, debug=True, use_reloader=False)
+    except Exception as e:
+        # 启动异常写入错误日志
+        import logging
+        logger = logging.getLogger('error')
+        logger.error(f'[STARTUP ERROR] 应用启动失败: {str(e)}', exc_info=True)
+        # 同时输出到 stderr，确保能在 app.log 中看到
+        print(f'[STARTUP ERROR] {str(e)}', file=sys.stderr)
+        traceback.print_exc()
+        sys.exit(1)
 else:
     # 被其他模块导入时（如 pytest、gunicorn），不自动创建实例
     app = None

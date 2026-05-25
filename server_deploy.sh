@@ -90,10 +90,12 @@ export PYTHONUNBUFFERED=1
 
 # 使用完整路径启动，避免环境变量问题
 log_info "启动命令: $PYTHON_BIN app.py"
-nohup $PYTHON_BIN "$PROJECT_DIR/app.py" > "$PROJECT_DIR/app.log" 2>&1 &
+# 使用 setsid 创建新的会话，确保进程不因终端关闭而退出
+setsid nohup $PYTHON_BIN "$PROJECT_DIR/app.py" > "$PROJECT_DIR/app.log" 2>&1 &
 SERVER_PID=$!
 echo $SERVER_PID > "$PROJECT_DIR/app.pid"
 log_info "服务已启动，PID: $SERVER_PID"
+log_info "使用 setsid 确保进程后台稳定运行"
 
 # 验证进程确实用正确的 Python 运行
 sleep 1

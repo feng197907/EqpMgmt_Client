@@ -4,18 +4,35 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![Flask](https://img.shields.io/badge/Flask-3.0-green.svg)
+![Bootstrap](https://img.shields.io/badge/Bootstrap-5.3-purple.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 ![Status](https://img.shields.io/badge/Status-Production-brightgreen.svg)
 
-**轻量级设备档案与文档管理系统 | 开箱即用 | 支持自动化部署**
+**面向制药企业的 GMP 合规设备档案与文档管理系统**
 
-[功能介绍](#功能介绍) • [快速开始](#快速开始) • [系统截图](#系统截图) • [部署指南](#部署指南) • [项目结构](#项目结构)
+开箱即用 · 14 模块化 Blueprint · SQLite/MySQL 双数据库 · 78 条路由
+
+[快速开始](#快速开始) · [功能概览](#功能概览) · [文档体系](#文档体系) · [部署指南](#部署指南) · [项目结构](#项目结构)
 
 </div>
 
 ---
 
-## 功能介绍
+## 文档体系
+
+完整的文档体系已建立，根据不同角色导航到相应文档：
+
+| 文档 | 受众 | 内容 |
+|------|------|------|
+| 📖 [使用手册](docs/使用手册.md) | 最终用户 | 功能操作指南、角色权限说明、常见问题 |
+| 🏗️ [架构文档](docs/ARCHITECTURE.md) | 开发者 / 架构师 | 系统架构、Blueprint 设计、数据层、权限模型 |
+| 💻 [开发指南](docs/DEVELOPMENT.md) | 贡献者 | 环境搭建、项目结构、编码规范、测试指南 |
+| 🚀 [部署指南](docs/DEPLOYMENT.md) | 运维人员 | 本地/生产部署、MySQL 配置、Webhook 自动部署 |
+| 📡 [API 参考](docs/API_REFERENCE.md) | 集成开发者 | 78 条路由完整参数、请求/响应示例、错误码 |
+
+---
+
+## 功能概览
 
 ### 📋 核心功能
 

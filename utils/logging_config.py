@@ -20,9 +20,10 @@ def setup_logging(app: Flask):
     app_log_file = os.path.join(log_dir, 'app.log')
     error_log_file = os.path.join(log_dir, 'error.log')
 
-    # 日志格式
+    # 日志格式（含精确时间）
     formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s in %(module)s: %(message)s'
+        '[%(asctime)s.%(msecs)03d] %(levelname)s in %(module)s: %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
 
     # 1. 应用日志 (INFO 级别)

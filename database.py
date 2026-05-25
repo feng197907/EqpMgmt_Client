@@ -97,6 +97,18 @@ def _convert_placeholder(sql):
         return sql.replace('%s', '?')
 
 
+def _normalize_sql_for_sqlite(sql):
+    """把少量常见 MySQL 语法改写成 SQLite 可执行语法。"""
+    sql = sql.replace('NOW()', 'CURRENT_TIMESTAMP')
+    sql = re.sub(r"DATE_FORMAT\(([^,]+),\s*'%%Y-%%m'\)", r"strftime('%Y-%m', \1)", sql)
+    sql = re.sub(r"DATE_FORMAT\(([^,]+),\s*'%Y-%m'\)", r"strftime('%Y-%m', \1)", sql)
+    sql = sql.replace('INT AUTO_INCREMENT PRIMARY KEY', 'INTEGER PRIMARY KEY AUTOINCREMENT')
+    sql = sql.replace('BIGINT AUTO_INCREMENT PRIMARY KEY', 'INTEGER PRIMARY KEY AUTOINCREMENT')
+    sql = sql.replace(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4', ')')
+    sql = sql.replace(') ENGINE=InnoDB', ')')
+    return sql
+
+
 class _SQLiteRow(dict):
     """SQLite Row -> dict 兼容，兼容字典取值"""
     def __getattr__(self, key):
@@ -118,6 +130,8 @@ class CompatibleCursor:
 
     def execute(self, sql, args=None):
         sql = _convert_placeholder(sql)
+        if self._is_sqlite and isinstance(sql, str):
+            sql = _normalize_sql_for_sqlite(sql)
         if args is None:
             self._cur.execute(sql)
         else:

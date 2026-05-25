@@ -110,19 +110,39 @@ def build_calibration_reminders(rows, reminder_window_days=60, cycle_days=365):
 
 def ensure_device_change_table(cur):
     """确保设备状态变更请求表存在（列名与 database.py 正式 DDL 一致）"""
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS device_status_requests (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            device_id INT NOT NULL,
-            new_status VARCHAR(50) NOT NULL,
-            reason VARCHAR(1000),
-            status VARCHAR(50) NOT NULL DEFAULT 'pending',
-            created_by VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            processed_by VARCHAR(255),
-            processed_at TIMESTAMP NULL,
-            FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """
-    )
+    from database import DB_TYPE
+
+    if DB_TYPE == 'sqlite':
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS device_status_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER NOT NULL,
+                new_status TEXT NOT NULL,
+                reason TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_by TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                processed_by TEXT,
+                processed_at TIMESTAMP NULL,
+                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+            )
+            """
+        )
+    else:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS device_status_requests (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                device_id INT NOT NULL,
+                new_status VARCHAR(50) NOT NULL,
+                reason VARCHAR(1000),
+                status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                created_by VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                processed_by VARCHAR(255),
+                processed_at TIMESTAMP NULL,
+                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """
+        )

@@ -112,6 +112,47 @@ docker compose down
 
 默认使用 SQLite，数据会落在本地 `data/` 目录里，上传文件在 `uploads/`，日志在 `logs/`。
 
+### Docker 下切换 MySQL
+
+如果你本地或服务器已经有 MySQL，也可以让 Docker Compose 直接连 MySQL。把 `docker-compose.yml` 里的环境变量改成下面这样：
+
+```yaml
+environment:
+    DB_TYPE: mysql
+    MYSQL_HOST: mysql
+    MYSQL_PORT: 3306
+    MYSQL_USER: dms_user
+    MYSQL_PASSWORD: your_password
+    MYSQL_DATABASE: dms_db
+    SECRET_KEY: change-me-in-production
+    PORT: 5000
+```
+
+如果你希望 MySQL 也由 Compose 一起启动，可以额外加一个 `mysql` 服务：
+
+```yaml
+services:
+    mysql:
+        image: mysql:8.0
+        container_name: equipment-mysql
+        environment:
+            MYSQL_ROOT_PASSWORD: root_password
+            MYSQL_DATABASE: dms_db
+            MYSQL_USER: dms_user
+            MYSQL_PASSWORD: your_password
+        command: --default-authentication-plugin=mysql_native_password
+        ports:
+            - "3306:3306"
+        volumes:
+            - mysql-data:/var/lib/mysql
+        restart: unless-stopped
+
+volumes:
+    mysql-data:
+```
+
+这时应用容器和 MySQL 容器都启动后，再访问 `http://localhost:5000`。
+
 ### 访问系统
 
 > 🌐 **http://127.0.0.1:5000**

@@ -7,7 +7,7 @@ from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
-from database import get_db
+from database import DB_TYPE, get_db
 from models.spare_part import (
     SPARE_PART_CATEGORIES,
     SPARE_PART_CATEGORY_LABELS,
@@ -217,11 +217,18 @@ def spare_part_stats():
     total_stock_value = round(float(row["total_value"] or 0), 2)
 
     # 总消耗金额（本月）
-    cur.execute(
-        "SELECT SUM(sc.quantity * sc.unit_price) as total "
-        "FROM spare_part_consumptions sc "
-        "WHERE DATE_FORMAT(sc.consumed_at, '%%Y-%%m') = DATE_FORMAT(NOW(), '%%Y-%%m')"
-    )
+    if DB_TYPE == "sqlite":
+        cur.execute(
+            "SELECT SUM(sc.quantity * sc.unit_price) as total "
+            "FROM spare_part_consumptions sc "
+            "WHERE strftime('%Y-%m', sc.consumed_at) = strftime('%Y-%m', 'now')"
+        )
+    else:
+        cur.execute(
+            "SELECT SUM(sc.quantity * sc.unit_price) as total "
+            "FROM spare_part_consumptions sc "
+            "WHERE DATE_FORMAT(sc.consumed_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')"
+        )
     row = cur.fetchone()
     month_consumption = round(float(row["total"] or 0), 2)
 

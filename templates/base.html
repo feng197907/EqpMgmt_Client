@@ -199,6 +199,11 @@
       </div>
 
       <div class="topbar-right">
+        <a href="{{ url_for('dashboard.user_manual') }}" class="topbar-manual-btn" aria-label="用户手册" title="打开用户手册">
+          <i data-lucide="book-open"></i>
+          <span>用户手册</span>
+        </a>
+
         {# 设备提醒铃铛 - 维护到期 + 校准到期 #}
         {% if current_user.is_authenticated %}
         <a href="{{ url_for('dashboard.reminders') }}" class="topbar-icon-btn" aria-label="设备提醒" title="维护/校准到期提醒" id="topbarBellBtn">

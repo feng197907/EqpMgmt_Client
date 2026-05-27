@@ -1,4 +1,7 @@
+import importlib
+
 # 看板与提醒 Blueprint
+from pathlib import Path
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 
@@ -12,11 +15,33 @@ from utils.maintenance import build_due_maintenance_reminders
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
+def _load_user_manual_html():
+    """读取并转换用户手册 markdown。"""
+    manual_path = Path(__file__).resolve().parent.parent / "docs" / "使用手册.md"
+    manual_md = manual_path.read_text(encoding="utf-8")
+    markdown_lib = importlib.import_module("markdown")
+    return markdown_lib.markdown(
+        manual_md,
+        extensions=["extra", "fenced_code", "tables", "toc"],
+        output_format="html",
+    )
+
+
 @dashboard_bp.route("/")
 @login_required
 def home():
     """默认首页，跳转到设备看板"""
     return redirect(url_for("dashboard.dashboard"))
+
+
+@dashboard_bp.route("/user-manual")
+def user_manual():
+    """用户手册页面"""
+    return render_template(
+        "user_manual.html",
+        manual_html=_load_user_manual_html(),
+        manual_title="用户手册",
+    )
 
 
 @dashboard_bp.route("/dashboard")

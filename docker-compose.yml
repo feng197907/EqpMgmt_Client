@@ -10,6 +10,7 @@ services:
       DB_PATH: /data/equipment.db
       SECRET_KEY: change-me-in-production
       PORT: 5000
+      TZ: Asia/Shanghai
     volumes:
       - equipment-data:/data
       - equipment-uploads:/app/uploads

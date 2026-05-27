@@ -10,6 +10,14 @@ from flask import Flask, request, g
 def setup_logging(app: Flask):
     """配置 Flask 应用的日志系统"""
 
+    # 强制使用本地时区，避免容器默认 UTC 导致日志时间偏移
+    formatter_converter = time.localtime
+    if hasattr(time, "tzset"):
+        try:
+            time.tzset()
+        except Exception:
+            pass
+
     # 日志目录（项目根目录下的 logs/）
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     log_dir = os.path.join(project_root, 'logs')
@@ -25,6 +33,7 @@ def setup_logging(app: Flask):
         '[%(asctime)s.%(msecs)03d] %(levelname)s in %(module)s: %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
+    formatter.converter = formatter_converter
 
     # 1. 应用日志 (INFO 级别)
     app_logger = logging.getLogger('app')

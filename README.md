@@ -99,7 +99,11 @@ python app.py
 如果你想让别人 3 分钟内看到界面，直接用 Docker Compose：
 
 ```bash
+启动服务
 docker compose up --build -d
+
+停止服务
+docker compose down
 ```
 
 启动完成后访问 `http://localhost:5000`。
@@ -121,7 +125,8 @@ docker compose down
 cp .env.mysql.example .env
 # 编辑 .env，填入真实密码
 
-#!/bin/bash
+echo "🚀 启动服务..."
+docker compose -f docker-compose-mysql.yml -f docker-compose-mysql.override.yml up --build -d
 
 echo "🚀 停止服务..."
 docker compose -f docker-compose-mysql.yml -f docker-compose-mysql.override.yml down

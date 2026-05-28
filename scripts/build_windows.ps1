@@ -83,9 +83,9 @@ $outputNameWithTimestamp = "$($outputName)_$timestamp"
 
 # Ensure virtualenv & packages
 Write-Host "Installing dependencies..." -ForegroundColor Cyan
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install pyinstaller
+python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+python -m pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # ============================================================
 # License generation (optional)

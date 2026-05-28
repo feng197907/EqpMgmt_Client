@@ -213,6 +213,42 @@ if (Test-Path $licenseFile) {
 }
 
 # ============================================================
+# Build NSIS installer (optional)
+# ============================================================
+$installerName = "$($outputName)_Installer_$timestamp.exe"
+$installerPath = Join-Path $releaseDir $installerName
+
+# Check if NSIS is installed
+$makensisPath = @(
+	"${env:ProgramFiles(x86)}\NSIS\makensis.exe",
+	"${env:ProgramFiles}\NSIS\makensis.exe"
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+if ($makensisPath) {
+	Write-Host "`nBuilding NSIS installer..." -ForegroundColor Cyan
+	Write-Host "  Installer: $installerName" -ForegroundColor Yellow
+	
+	$nsiScript = Join-Path $PSScriptRoot '..\installer\dms_installer.nsi'
+	$nsisArgs = @(
+		"/DAPP_EXE=$outputNameWithTimestamp.exe",
+		"/DOUTFILE=$installerPath",
+		"/DAPP_NAME=$outputName",
+		$nsiScript
+	)
+	
+	& $makensisPath @nsisArgs
+	
+	if ($LASTEXITCODE -eq 0) {
+		Write-Host "  Installer built successfully: $installerPath" -ForegroundColor Green
+	} else {
+		Write-Host "  NSIS installer build failed (exit code: $LASTEXITCODE)" -ForegroundColor Red
+	}
+} else {
+	Write-Host "`nSkipping NSIS installer (makensis.exe not found)" -ForegroundColor Gray
+	Write-Host "  Install NSIS from https://nsis.sourceforge.io/ to enable installer creation" -ForegroundColor Gray
+}
+
+# ============================================================
 # Code signing (optional)
 # ============================================================
 if ($signEnabled) {
@@ -249,6 +285,9 @@ if ($signEnabled) {
 Write-Host "`n============================================================" -ForegroundColor Green
 Write-Host "Build finished successfully!" -ForegroundColor Green
 Write-Host "Binary located in: $releaseDir\$outputNameWithTimestamp.exe" -ForegroundColor Green
+if (Test-Path $installerPath) {
+	Write-Host "Installer located in: $releaseDir\$installerName" -ForegroundColor Green
+}
 Write-Host "============================================================" -ForegroundColor Green
 
 # Display configuration summary

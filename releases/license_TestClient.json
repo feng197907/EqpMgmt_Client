@@ -1,0 +1,8 @@
+{
+  "payload": {
+    "name": "TestClient",
+    "issued": "2026-05-28T05:21:18.993988+00:00",
+    "expires": "2026-05-26T05:21:18.993988+00:00"
+  },
+  "signature": "a9xXbVO2XQBbZ/x4gAYia4SOxs1sCCXOkD6vUv4QTHG3TXoHQR73htNhoitF298lfqqCpLez7AUGnMKeDOcd5P9ziHfH+j44aXAlKszZtkFliDbE7f1xdFm/WyXMc5g44SCVJeQFvHwG1nLQnFqfDytqaWrsY9NRzJuf2cPh7/KdjgOLK+Fld1n3FezSOQFmmt2+/4AiM7eKjzyBWXZnoU+7FI3wPGeH6M4pmSwf1bJFwahvoKHLi6UcjTARg7TaPqBDriweFLnzVav72yqnDY6/4sYRNOf8blLpmrOa4vPimwqaqZRva4upYYD/PU+6jNQhjQMyUzIibWfDWUUO8w=="
+}

@@ -54,34 +54,38 @@ def should_enforce_license() -> bool:
 
 def license_search_paths() -> list[str]:
     paths: list[str] = []
-    appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
-    paths.append(str(Path(appdata) / 'DMS' / 'license.json'))
 
     if getattr(sys, 'frozen', False):
         exe_dir = Path(sys.executable).resolve().parent
-        # PyInstaller bundles files in sys._MEIPASS
-        if hasattr(sys, '_MEIPASS'):
-            meipass = Path(sys._MEIPASS)
-            paths.append(str(meipass / 'license.json'))
-            paths.append(str(meipass / 'license_TestUser.json'))
-            # Also check for license files with any name pattern
-            try:
-                for lic_file in meipass.glob('license_*.json'):
-                    paths.append(str(lic_file))
-            except Exception:
-                pass
     else:
         exe_dir = Path.cwd()
 
+    # 1. Check exe/current working directory first (allows overriding bundled license)
     paths.append(str(exe_dir / 'license.json'))
     paths.append(str(exe_dir / 'license_TestUser.json'))
-    # Also check for license files with any name pattern in exe dir
     try:
         for lic_file in exe_dir.glob('license_*.json'):
             if str(lic_file) not in paths:
                 paths.append(str(lic_file))
     except Exception:
         pass
+
+    # 2. Check PyInstaller bundled files (sys._MEIPASS)
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        meipass = Path(sys._MEIPASS)
+        paths.append(str(meipass / 'license.json'))
+        paths.append(str(meipass / 'license_TestUser.json'))
+        try:
+            for lic_file in meipass.glob('license_*.json'):
+                if str(lic_file) not in paths:
+                    paths.append(str(lic_file))
+        except Exception:
+            pass
+
+    # 3. Check APPDATA last (user-level override)
+    appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
+    paths.append(str(Path(appdata) / 'DMS' / 'license.json'))
+
     return paths
 
 
@@ -97,18 +101,21 @@ def resolve_license_path(extra_candidates: Iterable[str] | None = None) -> str |
 
 def resolve_public_key_path(extra_candidates: Iterable[str] | None = None) -> str | None:
     candidates: list[str] = []
+
     if getattr(sys, 'frozen', False):
         exe_dir = Path(sys.executable).resolve().parent
-        # PyInstaller bundles files in sys._MEIPASS
-        if hasattr(sys, '_MEIPASS'):
-            meipass = Path(sys._MEIPASS)
-            candidates.append(str(meipass / 'license_public.pem'))
-            candidates.append(str(meipass / 'certs' / 'license_public.pem'))
     else:
         exe_dir = Path.cwd()
 
+    # 1. Check exe/current working directory first
     candidates.append(str(exe_dir / 'license_public.pem'))
     candidates.append(str(exe_dir / 'certs' / 'license_public.pem'))
+
+    # 2. Check PyInstaller bundled files
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        meipass = Path(sys._MEIPASS)
+        candidates.append(str(meipass / 'license_public.pem'))
+        candidates.append(str(meipass / 'certs' / 'license_public.pem'))
 
     if extra_candidates:
         candidates.extend(list(extra_candidates))

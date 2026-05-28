@@ -35,8 +35,9 @@ def should_enforce_license() -> bool:
         if getattr(sys, 'frozen', False):
             exe_dir = Path(sys.executable).resolve().parent
             config_paths.append(str(exe_dir / 'dms_license_config.json'))
-            if hasattr(sys, '_MEIPASS'):
-                config_paths.append(str(Path(sys._MEIPASS) / 'dms_license_config.json'))
+            meipass = getattr(sys, '_MEIPASS', None)
+            if meipass:
+                config_paths.append(str(Path(meipass) / 'dms_license_config.json'))
         else:
             config_paths.append(str(Path.cwd() / 'dms_license_config.json'))
         
@@ -71,8 +72,9 @@ def license_search_paths() -> list[str]:
         pass
 
     # 2. Check PyInstaller bundled files (sys._MEIPASS)
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        meipass = Path(sys._MEIPASS)
+    meipass_path = getattr(sys, '_MEIPASS', None)
+    if getattr(sys, 'frozen', False) and meipass_path:
+        meipass = Path(meipass_path)
         paths.append(str(meipass / 'license.json'))
         paths.append(str(meipass / 'license_TestUser.json'))
         try:
@@ -112,8 +114,9 @@ def resolve_public_key_path(extra_candidates: Iterable[str] | None = None) -> st
     candidates.append(str(exe_dir / 'certs' / 'license_public.pem'))
 
     # 2. Check PyInstaller bundled files
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        meipass = Path(sys._MEIPASS)
+    meipass_path = getattr(sys, '_MEIPASS', None)
+    if getattr(sys, 'frozen', False) and meipass_path:
+        meipass = Path(meipass_path)
         candidates.append(str(meipass / 'license_public.pem'))
         candidates.append(str(meipass / 'certs' / 'license_public.pem'))
 
@@ -127,8 +130,8 @@ def resolve_public_key_path(extra_candidates: Iterable[str] | None = None) -> st
 
 
 def verify_license(license_path: str, public_key_path: str) -> Tuple[bool, str]:
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives import hashes, serialization  # type: ignore[import]
+    from cryptography.hazmat.primitives.asymmetric import padding  # type: ignore[import]
 
     lic = load_license(license_path)
     if not lic:

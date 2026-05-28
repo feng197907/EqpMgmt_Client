@@ -3,8 +3,8 @@ import sys
 from datetime import datetime, timedelta, timezone
 from base64 import b64encode
 
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes, serialization  # type: ignore[import]
+from cryptography.hazmat.primitives.asymmetric import padding  # type: ignore[import]
 
 
 def load_private(path: str, password: bytes):
@@ -17,7 +17,7 @@ def utc_now():
     return datetime.now(timezone.utc)
 
 
-def make_license(name: str, days_valid: int = 30, expires_at: str = None):
+def make_license(name: str, days_valid: int = 30, expires_at: str | None = None):
     """
     创建许可证 payload
     

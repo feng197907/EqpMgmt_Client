@@ -13,7 +13,7 @@ $configExample = Join-Path $PSScriptRoot '..\build_config.json.example'
 
 if (-not (Test-Path $configFile)) {
 	Write-Host "Configuration file not found: $configFile" -ForegroundColor Yellow
-	Write-Host "Please copy build_config.json.example to build_config.json and edit it." -ForegroundColor Yellow
+	Write-Host "Please copy $configExample to build_config.json and edit it." -ForegroundColor Yellow
 	Write-Host "Using default configuration..." -ForegroundColor Gray
 	
 	# Default configuration

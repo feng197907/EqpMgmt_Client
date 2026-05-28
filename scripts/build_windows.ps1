@@ -6,6 +6,19 @@
 $ErrorActionPreference = 'Stop'
 
 # ============================================================
+# Activate virtual environment
+# ============================================================
+$venvPath = Join-Path $PSScriptRoot '..\.venv'
+$activateScript = Join-Path $venvPath 'Scripts\Activate.ps1'
+if (Test-Path $activateScript) {
+	Write-Host "Activating virtual environment: $venvPath" -ForegroundColor Cyan
+	& $activateScript
+} else {
+	Write-Host "Virtual environment not found at: $venvPath" -ForegroundColor Yellow
+	Write-Host "Using system Python..." -ForegroundColor Yellow
+}
+
+# ============================================================
 # Load configuration from build_config.json
 # ============================================================
 $configFile = Join-Path $PSScriptRoot '..\build_config.json'

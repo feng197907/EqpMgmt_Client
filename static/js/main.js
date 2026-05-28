@@ -159,6 +159,39 @@
     });
   }
 
+  // ==================== 桌面壳窗口控制 ====================
+  const desktopChrome = document.getElementById('desktopChrome');
+  const isDesktopShell = document.body.classList.contains('desktop-shell');
+
+  if (isDesktopShell && desktopChrome) {
+    const titleSpan = desktopChrome.querySelector('.desktop-chrome-page');
+    if (titleSpan && document.title) {
+      titleSpan.textContent = document.title.replace(/\s*-\s*DMS\s*$/i, '').trim() || titleSpan.textContent;
+    }
+
+    async function invokeDesktopAction(action) {
+      if (!window.pywebview || !window.pywebview.api || !window.pywebview.api[action]) {
+        return;
+      }
+      try {
+        await window.pywebview.api[action]();
+      } catch (error) {
+        console.error('Desktop window action failed:', action, error);
+      }
+    }
+
+    desktopChrome.querySelectorAll('[data-window-action]').forEach(function(button) {
+      button.addEventListener('click', function(event) {
+        event.stopPropagation();
+        invokeDesktopAction(button.getAttribute('data-window-action'));
+      });
+    });
+
+    desktopChrome.addEventListener('dblclick', function() {
+      invokeDesktopAction('maximize');
+    });
+  }
+
   // ==================== Lucide 图标动画 ====================
   // 为导航项添加微交互
   document.querySelectorAll('.nav-item').forEach(function(item) {

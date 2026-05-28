@@ -67,7 +67,21 @@ else:
 
 # SQLite 数据库路径
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.environ.get('DB_PATH', os.path.join(BASE_DIR, 'equipment.db'))
+# 默认数据库路径：Windows 下放到 %APPDATA%/DMS，便于普通用户读写
+if os.name == 'nt':
+    _appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
+    _default_db_dir = os.path.join(_appdata, 'DMS')
+    _default_db_path = os.path.join(_default_db_dir, 'equipment.db')
+else:
+    _default_db_path = os.path.join(BASE_DIR, 'equipment.db')
+
+DB_PATH = os.environ.get('DB_PATH', _default_db_path)
+
+# 确保数据库目录存在（避免首次运行权限/路径异常）
+try:
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+except Exception:
+    pass
 
 # MySQL 配置
 MYSQL_CONFIG = {

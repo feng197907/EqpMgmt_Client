@@ -251,9 +251,15 @@ def normalize_role(role):
 
 # 项目根目录
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# 优先使用 per-user 存储（Windows 下使用 %APPDATA%），否则回退到项目目录
+if os.name == 'nt':
+    _appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
+    DEFAULT_DATA_DIR = os.path.join(_appdata, 'DMS')
+else:
+    DEFAULT_DATA_DIR = os.path.join(BASE_DIR, 'data')
 
-# 上传配置
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+# 上传配置（可被环境变量覆盖）
+UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(DEFAULT_DATA_DIR, "uploads"))
 MAX_CONTENT_LENGTH = 50000 * 1024  # ~50MB
 
 # 允许的文件扩展名

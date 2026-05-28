@@ -15,6 +15,121 @@
   overflow: hidden;
 }
 
+body.desktop-shell .sidebar {
+  top: 40px;
+  height: calc(100vh - 40px);
+}
+
+body.desktop-shell .main-wrapper {
+  min-height: calc(100vh - 40px);
+  margin-top: 40px;
+}
+
+body.desktop-shell .topbar {
+  top: 0;
+}
+
+/* ==================== 桌面壳窗口栏 ==================== */
+.desktop-chrome {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px 0 10px;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+  z-index: calc(var(--z-sidebar) + 5);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-app-region: drag;
+}
+
+.desktop-chrome-left,
+.desktop-chrome-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.desktop-appmark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+.desktop-appmark svg,
+.desktop-appmark i {
+  width: 14px;
+  height: 14px;
+}
+
+.desktop-chrome-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.desktop-chrome-appname {
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.desktop-chrome-divider,
+.desktop-chrome-page {
+  color: var(--text-secondary);
+}
+
+.desktop-chrome-page {
+  max-width: 42vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desktop-window-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  -webkit-app-region: no-drag;
+}
+
+.desktop-window-btn:hover {
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--text-primary);
+}
+
+.desktop-window-btn-close:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+.desktop-window-btn svg,
+.desktop-window-btn i {
+  width: 16px;
+  height: 16px;
+}
+
 .sidebar.collapsed {
   width: var(--sidebar-width-collapsed);
 }

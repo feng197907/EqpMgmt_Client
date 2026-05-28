@@ -6,3 +6,5 @@ dms.db
 equipment.db
 uploads/
 .env
+certs/
+*.pfx

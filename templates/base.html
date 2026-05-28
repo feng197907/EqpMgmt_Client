@@ -23,7 +23,32 @@
   <link href="{{ url_for('static', filename='css/pages-enhanced.css') }}?v=2" rel="stylesheet">
   {% block head %}{% endblock %}
 </head>
-<body data-user-is-admin="{{ 'true' if current_user.is_authenticated and current_user.is_admin else 'false' }}">
+<body class="{% if desktop_shell %}desktop-shell{% endif %}" data-user-is-admin="{{ 'true' if current_user.is_authenticated and current_user.is_admin else 'false' }}">
+  {% if desktop_shell %}
+  <div class="desktop-chrome" id="desktopChrome">
+    <div class="desktop-chrome-left">
+      <div class="desktop-appmark">
+        <i data-lucide="box"></i>
+      </div>
+      <div class="desktop-chrome-title">
+        <span class="desktop-chrome-appname">DMS</span>
+        <span class="desktop-chrome-divider">·</span>
+        <span class="desktop-chrome-page">{{ title if title else '设备档案文档管理系统' }}</span>
+      </div>
+    </div>
+    <div class="desktop-chrome-right">
+      <button class="desktop-window-btn" type="button" data-window-action="minimize" aria-label="最小化">
+        <i data-lucide="minus"></i>
+      </button>
+      <button class="desktop-window-btn" type="button" data-window-action="maximize" aria-label="最大化/还原">
+        <i data-lucide="square"></i>
+      </button>
+      <button class="desktop-window-btn desktop-window-btn-close" type="button" data-window-action="close" aria-label="关闭">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+  </div>
+  {% endif %}
   <!-- 侧边栏 -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">

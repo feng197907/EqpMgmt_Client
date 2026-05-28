@@ -139,6 +139,7 @@ def create_app():
             can_view_approvals=can_view_approvals,
             password_reset_count=password_reset_count,
             borrowing_enabled=borrowing_enabled,
+            desktop_shell=os.environ.get('DMS_DESKTOP_SHELL') == '1',
             doc_status_labels=DOC_STATUS_LABELS,
             device_status_labels=DEVICE_STATUS_LABELS,
             MENU_PERMISSIONS=MENU_PERMISSIONS,

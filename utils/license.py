@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Tuple
 from base64 import b64decode
@@ -80,7 +80,12 @@ def verify_license(license_path: str, public_key_path: str) -> Tuple[bool, str]:
     if exp:
         try:
             exp_dt = datetime.fromisoformat(exp)
-            if datetime.utcnow() > exp_dt:
+            # Handle timezone-aware comparison
+            now = datetime.now(timezone.utc)
+            if exp_dt.tzinfo is None:
+                # If expires is naive, assume UTC
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if now > exp_dt:
                 return False, 'license expired'
         except Exception:
             return False, 'invalid expiry'

@@ -5,7 +5,7 @@ a = Analysis(
     ['desktop_launcher.py'],
     pathex=[],
     binaries=[],
-    datas=[('templates', 'templates'), ('static', 'static'), ('uploads', 'uploads'), ('certs/license_TestClient.json', 'certs/license_TestClient.json')],
+    datas=[('templates', 'templates'), ('static', 'static'), ('uploads', 'uploads'), ('dms_license_config.json', 'dms_license_config.json'), ('certs/license_public.pem', 'license_public.pem'), ('certs/license_TestClient.json', 'certs/license_TestClient.json')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

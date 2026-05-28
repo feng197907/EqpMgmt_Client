@@ -16,7 +16,40 @@ def load_license(path: str) -> dict | None:
 
 
 def should_enforce_license() -> bool:
-    return os.environ.get('DMS_LICENSE_REQUIRED', '').strip().lower() in {'1', 'true', 'yes', 'on'}
+    """Check if license enforcement is enabled.
+    
+    Priority:
+    1. Environment variable DMS_LICENSE_REQUIRED
+    2. Build config file (dms_license_config.json) bundled with the executable
+    3. Default: False
+    """
+    # Check environment variable first
+    env_value = os.environ.get('DMS_LICENSE_REQUIRED', '').strip().lower()
+    if env_value in {'1', 'true', 'yes', 'on'}:
+        return True
+    
+    # Check bundled config file (for PyInstaller packages)
+    try:
+        config_paths = []
+        # PyInstaller sets sys.frozen = True
+        if getattr(sys, 'frozen', False):
+            exe_dir = Path(sys.executable).resolve().parent
+            config_paths.append(str(exe_dir / 'dms_license_config.json'))
+            if hasattr(sys, '_MEIPASS'):
+                config_paths.append(str(Path(sys._MEIPASS) / 'dms_license_config.json'))
+        else:
+            config_paths.append(str(Path.cwd() / 'dms_license_config.json'))
+        
+        for config_path in config_paths:
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                if config.get('license', {}).get('required', False):
+                    return True
+    except Exception:
+        pass
+    
+    return False
 
 
 def license_search_paths() -> list[str]:
@@ -24,13 +57,31 @@ def license_search_paths() -> list[str]:
     appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
     paths.append(str(Path(appdata) / 'DMS' / 'license.json'))
 
-    if getattr(os, 'frozen', False):
+    if getattr(sys, 'frozen', False):
         exe_dir = Path(sys.executable).resolve().parent
+        # PyInstaller bundles files in sys._MEIPASS
+        if hasattr(sys, '_MEIPASS'):
+            meipass = Path(sys._MEIPASS)
+            paths.append(str(meipass / 'license.json'))
+            paths.append(str(meipass / 'license_TestUser.json'))
+            # Also check for license files with any name pattern
+            try:
+                for lic_file in meipass.glob('license_*.json'):
+                    paths.append(str(lic_file))
+            except Exception:
+                pass
     else:
         exe_dir = Path.cwd()
 
     paths.append(str(exe_dir / 'license.json'))
     paths.append(str(exe_dir / 'license_TestUser.json'))
+    # Also check for license files with any name pattern in exe dir
+    try:
+        for lic_file in exe_dir.glob('license_*.json'):
+            if str(lic_file) not in paths:
+                paths.append(str(lic_file))
+    except Exception:
+        pass
     return paths
 
 
@@ -46,8 +97,13 @@ def resolve_license_path(extra_candidates: Iterable[str] | None = None) -> str |
 
 def resolve_public_key_path(extra_candidates: Iterable[str] | None = None) -> str | None:
     candidates: list[str] = []
-    if getattr(os, 'frozen', False):
+    if getattr(sys, 'frozen', False):
         exe_dir = Path(sys.executable).resolve().parent
+        # PyInstaller bundles files in sys._MEIPASS
+        if hasattr(sys, '_MEIPASS'):
+            meipass = Path(sys._MEIPASS)
+            candidates.append(str(meipass / 'license_public.pem'))
+            candidates.append(str(meipass / 'certs' / 'license_public.pem'))
     else:
         exe_dir = Path.cwd()
 

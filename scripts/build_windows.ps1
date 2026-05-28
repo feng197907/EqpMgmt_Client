@@ -125,6 +125,38 @@ if (Test-Path $licenseFile) {
 	$add_license = $null
 }
 
+# ============================================================
+# Generate license enforcement config file
+# This file is used by the runtime to check if license is required
+# ============================================================
+$licenseConfigFile = "dms_license_config.json"
+$licenseConfig = @{
+	license = @{
+		required = if ($licenseRequired) { $true } else { $false }
+		name     = $licenseName
+		days     = if ($licenseDays) { $licenseDays } else { 365 }
+	}
+}
+$licenseConfig | ConvertTo-Json -Depth 3 | Out-File -FilePath $licenseConfigFile -Encoding utf8
+Write-Host "License enforcement config: $licenseConfigFile" -ForegroundColor Green
+if ($licenseRequired) {
+	Write-Host "  Enforcement: ENABLED (written to config file)" -ForegroundColor Yellow
+} else {
+	Write-Host "  Enforcement: OPTIONAL (written to config file)" -ForegroundColor Gray
+}
+
+$add_license_config = "$licenseConfigFile;$licenseConfigFile"
+
+# Add public key for license verification
+$publicKeyFile = "certs/license_public.pem"
+if (Test-Path $publicKeyFile) {
+	$add_public_key = "$publicKeyFile;license_public.pem"
+	Write-Host "Public key for verification: $publicKeyFile" -ForegroundColor Green
+} else {
+	$add_public_key = $null
+	Write-Host "Warning: Public key not found at $publicKeyFile" -ForegroundColor Yellow
+}
+
 # Build single-file executable
 Write-Host "`nBuilding executable..." -ForegroundColor Cyan
 
@@ -140,8 +172,13 @@ if ($windowed) {
 $buildArgs += @(
 	"--add-data", $add_templates,
 	"--add-data", $add_static,
-	"--add-data", $add_uploads
+	"--add-data", $add_uploads,
+	"--add-data", $add_license_config
 )
+
+if ($add_public_key) {
+	$buildArgs += @("--add-data", $add_public_key)
+}
 
 if ($add_license) {
 	$buildArgs += @("--add-data", $add_license)

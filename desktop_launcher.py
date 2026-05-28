@@ -42,6 +42,37 @@ def _wait_for_server(url, timeout=15):
 def main():
 	_apply_config_env()
 
+	# License check is optional by default.
+	# It only blocks startup if DMS_LICENSE_REQUIRED is enabled or a license file exists but is invalid.
+	try:
+		import ctypes
+		import logging
+		from utils.license import check_license, resolve_license_path, resolve_public_key_path, should_enforce_license
+
+		pubkey = resolve_public_key_path()
+		license_path = resolve_license_path()
+		if pubkey is None:
+			if should_enforce_license():
+				ctypes.windll.user32.MessageBoxW(0, 'License check failed: public key not found', 'License Check Failed', 0x00000010)
+				return
+			logging.getLogger('app').warning('Public key not found; skipping optional license check.')
+			pubkey = ''
+		ok, msg = check_license(pubkey) if pubkey else (True, 'not required')
+		if not ok:
+			ctypes.windll.user32.MessageBoxW(0, f'License error: {msg}', 'License Check Failed', 0x00000010)
+			return
+		if license_path is None and not should_enforce_license():
+			logging.getLogger('app').warning('License not found; continuing because enforcement is disabled.')
+	except Exception as exc:
+		# If license code itself fails, do not block normal local-client startup unless explicitly required.
+		if should_enforce_license():
+			try:
+				import ctypes
+				ctypes.windll.user32.MessageBoxW(0, f'License check failed: {exc}', 'License', 0x00000010)
+			except Exception:
+				pass
+			return
+
 	from app import create_app
 
 	app = create_app()

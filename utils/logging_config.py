@@ -4,8 +4,17 @@ Flask 应用日志配置模块
 import os
 import time
 import logging
+import uuid
 from logging.handlers import RotatingFileHandler
 from flask import Flask, request, g
+
+
+def _get_user_log_dir():
+    if os.name == 'nt':
+        base = os.environ.get('APPDATA') or os.path.expanduser('~')
+        return os.path.join(base, 'DMS', 'logs')
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(project_root, 'logs')
 
 def setup_logging(app: Flask):
     """配置 Flask 应用的日志系统"""
@@ -18,11 +27,9 @@ def setup_logging(app: Flask):
         except Exception:
             pass
 
-    # 日志目录（项目根目录下的 logs/）
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    log_dir = os.path.join(project_root, 'logs')
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    # 日志目录：Windows 安装版写入用户目录，避免 Program Files 无写权限
+    log_dir = _get_user_log_dir()
+    os.makedirs(log_dir, exist_ok=True)
 
     # 日志文件路径
     app_log_file = os.path.join(log_dir, 'app.log')
@@ -37,6 +44,7 @@ def setup_logging(app: Flask):
 
     # 1. 应用日志 (INFO 级别)
     app_logger = logging.getLogger('app')
+    app_logger.handlers.clear()
     app_logger.setLevel(logging.INFO)
 
     app_file_handler = RotatingFileHandler(
@@ -56,6 +64,7 @@ def setup_logging(app: Flask):
 
     # 2. 错误日志 (ERROR 级别)
     error_logger = logging.getLogger('error')
+    error_logger.handlers.clear()
     error_logger.setLevel(logging.ERROR)
 
     error_file_handler = RotatingFileHandler(
@@ -72,6 +81,7 @@ def setup_logging(app: Flask):
     app.logger.handlers.append(app_file_handler)
     app.logger.handlers.append(console_handler)
     app.logger.setLevel(logging.INFO)
+    app.logger.propagate = False
 
     # 4. 禁用 Werkzeug 默认日志
     log = logging.getLogger('werkzeug')
@@ -110,11 +120,19 @@ def setup_logging(app: Flask):
 
     @app.errorhandler(Exception)
     def handle_exception(error):
-        error_logger.error(f'[EXCEPTION] Unhandled: {str(error)}', exc_info=True)
-        app.logger.error(f'[ERROR] Unhandled: {str(error)}')
-        return {'error': '发生未知错误'}, 500
+        trace_id = uuid.uuid4().hex[:12]
+        error_logger.error(f'[EXCEPTION][{trace_id}] Unhandled: {str(error)}', exc_info=True)
+        app.logger.error(f'[ERROR][{trace_id}] Unhandled: {str(error)}')
+        return {
+            'error': '发生未知错误',
+            'trace_id': trace_id,
+            'log_file': app.config.get('ERROR_LOG_FILE') or app.config.get('APP_LOG_FILE'),
+        }, 500
 
     app.logger.info('日志系统初始化完成 (含请求中间件)')
+    app.config['LOG_DIR'] = log_dir
+    app.config['APP_LOG_FILE'] = app_log_file
+    app.config['ERROR_LOG_FILE'] = error_log_file
 
     return app
 

@@ -1,4 +1,5 @@
 # 文档 Blueprint
+import os
 from datetime import datetime
 from io import BytesIO
 
@@ -9,6 +10,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from werkzeug.utils import secure_filename
 
 from config import (
+    DEFAULT_DATA_DIR,
     DOC_STATUS_LABELS,
     DOC_TYPE_LABELS,
     DOC_TYPES,
@@ -60,7 +62,7 @@ def upload_doc(device_id):
         success_count = 0
         error_msgs = []
         device_dir = ensure_upload_dir(device_id)
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        data_dir = DEFAULT_DATA_DIR
 
         for idx, file in enumerate(files):
             if not file or file.filename == "":
@@ -92,8 +94,8 @@ def upload_doc(device_id):
                 stored_name = f"{doc_type}_{version}_document.{ext}"
             file_path = os.path.join(device_dir, stored_name)
             file.save(file_path)
-            # 存储相对于项目根目录的相对路径，兼容云服务器部署
-            relative_path = os.path.relpath(file_path, base_dir)
+            # 存储相对于用户数据目录的路径，便于安装版与便携版共用
+            relative_path = os.path.relpath(file_path, data_dir)
             cur.execute(
                 "INSERT INTO documents (device_id, doc_type, doc_name, version, file_path, uploaded_by, remarks, status, calibration_due_date) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 (device_id, doc_type, safe_name, version, relative_path, current_user.username, remarks, initial_status, calibration_due_date),

@@ -258,6 +258,11 @@ if os.name == 'nt':
 else:
     DEFAULT_DATA_DIR = os.path.join(BASE_DIR, 'data')
 
+
+def resolve_data_path(*parts):
+    """Resolve a path inside the per-user data directory."""
+    return os.path.join(DEFAULT_DATA_DIR, *parts)
+
 # 上传配置（可被环境变量覆盖）
 UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(DEFAULT_DATA_DIR, "uploads"))
 MAX_CONTENT_LENGTH = 50000 * 1024  # ~50MB

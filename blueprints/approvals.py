@@ -1,4 +1,5 @@
 # 审批 Blueprint
+import os
 from datetime import datetime, timezone
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
@@ -8,7 +9,7 @@ from database import get_db
 from utils.audit import log_action_with_cursor
 from utils.db_utils import commit_with_retry, execute_with_retry
 from utils.decorators import permission_required
-from utils.file_utils import compute_doc_hash
+from utils.file_utils import compute_doc_hash, resolve_doc_path
 
 approvals_bp = Blueprint("approvals", __name__)
 
@@ -56,6 +57,11 @@ def decide_approval(request_id):
         conn.close()
         flash("关联文档不存在。", "warning")
         return redirect(url_for("approvals.approvals"))
+    doc_file_path = resolve_doc_path(doc["file_path"])
+    if not doc_file_path or not os.path.exists(doc_file_path):
+        conn.close()
+        flash(f"关联文档文件不存在：{doc['file_path']}", "danger")
+        return redirect(url_for("approvals.approvals"))
     cur.execute(
         "SELECT * FROM approval_steps WHERE request_id = %s AND status = 'pending' ORDER BY step_order ASC LIMIT 1",
         (request_id,),
@@ -67,7 +73,7 @@ def decide_approval(request_id):
         return redirect(url_for("approvals.approvals"))
     signed_at = datetime.now(timezone.utc).isoformat()
     meaning = "Approved" if decision == "approve" else "Rejected"
-    doc_hash = compute_doc_hash(doc["file_path"], current_user.username, meaning, signed_at)
+    doc_hash = compute_doc_hash(doc_file_path, current_user.username, meaning, signed_at)
     execute_with_retry(
         cur,
         "INSERT INTO signatures (user, meaning, doc_id, doc_version, doc_hash, ip_address, user_agent) VALUES (%s, %s, %s, %s, %s, %s, %s)",

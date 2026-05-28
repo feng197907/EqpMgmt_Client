@@ -218,11 +218,14 @@ if (Test-Path $licenseFile) {
 $installerName = "$($outputName)_Installer_$timestamp.exe"
 $installerPath = Join-Path $releaseDir $installerName
 
-# Check if NSIS is installed
-$makensisPath = @(
-	"${env:ProgramFiles(x86)}\NSIS\makensis.exe",
-	"${env:ProgramFiles}\NSIS\makensis.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
+# Check if NSIS is installed (check PATH first, then common install locations)
+$makensisPath = Get-Command makensis -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue
+if (-not $makensisPath) {
+	$makensisPath = @(
+		"${env:ProgramFiles(x86)}\NSIS\makensis.exe",
+		"${env:ProgramFiles}\NSIS\makensis.exe"
+	) | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
 
 if ($makensisPath) {
 	Write-Host "`nBuilding NSIS installer..." -ForegroundColor Cyan

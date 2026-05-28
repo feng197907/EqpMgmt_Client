@@ -12,10 +12,13 @@
   !define APP_EXE "DMS_Client.exe"
 !endif
 !ifndef OUTFILE
-  !define OUTFILE "..\releases\DMS_Client_Installer.exe"
+  !define OUTFILE "releases\DMS_Client_Installer.exe"
 !endif
 !ifndef INSTALL_DIR
   !define INSTALL_DIR "$PROGRAMFILES64\DMS_Client"
+!endif
+!ifndef SRC_DIR
+  !define SRC_DIR "."
 !endif
 
 SetCompressor /SOLID lzma
@@ -36,14 +39,14 @@ Var StartMenuFolder
 
 Section "Main Files" SEC_MAIN
     SetOutPath "$INSTDIR"
-    File "releases\${APP_EXE}"
+    File "${SRC_DIR}\releases\${APP_EXE}"
     CreateDirectory "$APPDATA\DMS"
     CreateDirectory "$APPDATA\DMS\uploads"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
 Section "Create Desktop Icon" SEC_DESKTOP
-    CreateShortCut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
+    CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
 SectionEnd
 
 Section "Run at Startup" SEC_STARTUP

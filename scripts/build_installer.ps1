@@ -1,5 +1,8 @@
-Set-Location 'D:\EquipmentManagement_client'
 $ErrorActionPreference = 'Stop'
+
+# Change to repo root so NSIS File paths resolve correctly
+$repoRoot = Split-Path $PSScriptRoot -Parent
+Set-Location $repoRoot
 
 # Locate makensis
 $makensis = Get-Command makensis -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue
@@ -33,6 +36,6 @@ $installerPath = Join-Path $releaseDir $installerName
 Write-Host "Building installer for: $exeName"
 Write-Host "Output: $installerPath"
 
-& "$makensis" "/DAPP_EXE=$exeName" "/DOUTFILE=$installerPath" "/DAPP_NAME=DMS_Client" "installer\dms_installer.nsi"
+& "$makensis" "/DAPP_EXE=$exeName" "/DOUTFILE=$installerPath" "/DAPP_NAME=DMS_Client" "/DSRC_DIR=." "installer\dms_installer.nsi"
 if ($LASTEXITCODE -ne 0) { Write-Error "makensis failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 Write-Host "NSIS build finished: $installerPath"

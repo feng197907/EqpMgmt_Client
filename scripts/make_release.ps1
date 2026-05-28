@@ -41,4 +41,4 @@ if (Test-Path 'certs\license_public.pem') {
 }
 
 Compress-Archive -Path (Join-Path $dir '*') -DestinationPath $out -Force
-Write-Host 'Created:' $out
+Write-Host "Created: $out"

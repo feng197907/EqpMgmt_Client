@@ -33,6 +33,6 @@ $installerPath = Join-Path $releaseDir $installerName
 Write-Host "Building installer for: $exeName"
 Write-Host "Output: $installerPath"
 
-& "$makensis" `/DAPP_EXE=$exeName` `/DOUTFILE=$installerPath` `/DAPP_NAME=DMS_Client` "installer\dms_installer.nsi"
+& "$makensis" "/DAPP_EXE=$exeName" "/DOUTFILE=$installerPath" "/DAPP_NAME=DMS_Client" "installer\dms_installer.nsi"
 if ($LASTEXITCODE -ne 0) { Write-Error "makensis failed with exit code $LASTEXITCODE"; exit $LASTEXITCODE }
 Write-Host "NSIS build finished: $installerPath"

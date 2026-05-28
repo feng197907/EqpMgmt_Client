@@ -14,7 +14,9 @@ certs/
 build/
 dist/
 release/
+releases/
 logs/
+*.spec
 *.zip
 .vscode/
 build_config.json

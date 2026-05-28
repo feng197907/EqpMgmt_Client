@@ -251,6 +251,23 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "git-publish-wait",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"scripts\\git_publish.ps1"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
 		}
 	]
 }

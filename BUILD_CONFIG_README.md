@@ -132,8 +132,10 @@
 ### 步骤 3: 查看构建输出
 
 构建完成后，可执行文件位于：
-- `dist\DMS_Client.exe` - 主程序
-- `dist\license_MyCompany.json` - 许可证文件（如果配置了）
+- `releases\DMS_Client.exe` - 主程序
+- `releases\license_MyCompany.json` - 许可证文件（如果配置了）
+
+**注意**：构建输出目录已从 `dist\` 改为 `releases\`，避免与 PyInstaller 默认目录混淆。
 
 ## 授权功能说明
 

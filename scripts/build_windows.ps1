@@ -160,9 +160,17 @@ if (Test-Path $publicKeyFile) {
 # Build single-file executable
 Write-Host "`nBuilding executable..." -ForegroundColor Cyan
 
+# Create releases directory if it doesn't exist
+$releaseDir = "releases"
+if (-not (Test-Path $releaseDir)) {
+	New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+	Write-Host "Created release directory: $releaseDir/" -ForegroundColor Green
+}
+
 $buildArgs = @(
 	'--noconfirm',
-	'--onefile'
+	'--onefile',
+	"--distpath", $releaseDir
 )
 
 if ($windowed) {
@@ -192,10 +200,10 @@ $buildArgs += @(
 # Execute PyInstaller
 pyinstaller @buildArgs
 
-# Copy license to dist folder (for standalone use)
+# Copy license to releases folder (for standalone use)
 if (Test-Path $licenseFile) {
-	Copy-Item $licenseFile -Destination "dist/" -Force
-	Write-Host "License file copied to dist/" -ForegroundColor Green
+	Copy-Item $licenseFile -Destination "$releaseDir/" -Force
+	Write-Host "License file copied to $releaseDir/" -ForegroundColor Green
 }
 
 # ============================================================

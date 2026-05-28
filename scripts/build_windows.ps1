@@ -59,6 +59,12 @@ $signPfxPass = $config.sign.cert_pfx_password
 $signTimestampUrl = $config.sign.timestamp_url
 
 # ============================================================
+# Generate timestamp for output filename
+# ============================================================
+$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+$outputNameWithTimestamp = "$($outputName)_$timestamp"
+
+# ============================================================
 # Build process
 # ============================================================
 
@@ -193,7 +199,7 @@ if ($add_license) {
 }
 
 $buildArgs += @(
-	"--name", $outputName,
+	"--name", $outputNameWithTimestamp,
 	$entryScript
 )
 
@@ -232,7 +238,7 @@ if ($signEnabled) {
 	# Run sign script
 	$signScript = Join-Path $PSScriptRoot 'sign_release.ps1'
 	if (Test-Path $signScript) {
-		& $signScript -DistDir (Join-Path $PSScriptRoot '..\dist')
+		& $signScript -DistDir (Join-Path $PSScriptRoot "..\$releaseDir")
 	} else {
 		Write-Host "Signing script not found: $signScript" -ForegroundColor Yellow
 	}
@@ -242,13 +248,13 @@ if ($signEnabled) {
 
 Write-Host "`n============================================================" -ForegroundColor Green
 Write-Host "Build finished successfully!" -ForegroundColor Green
-Write-Host "Binary located in: dist\$outputName.exe" -ForegroundColor Green
+Write-Host "Binary located in: $releaseDir\$outputNameWithTimestamp.exe" -ForegroundColor Green
 Write-Host "============================================================" -ForegroundColor Green
 
 # Display configuration summary
 Write-Host "`nConfiguration Summary:" -ForegroundColor Cyan
 Write-Host "  Entry script: $entryScript"
-Write-Host "  Output name: $outputName"
+Write-Host "  Output name: $outputNameWithTimestamp"
 
 if (-not [string]::IsNullOrWhiteSpace($licenseName)) {
 	Write-Host "`n  License Configuration:" -ForegroundColor Cyan

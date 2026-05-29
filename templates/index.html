@@ -1,18 +1,14 @@
 {% extends 'base.html' %}
 {% block content %}
-{# 设备列表页 - 增强版 #}
 <div class="page-container">
 
-  {# 页面标题区 #}
-  <div class="page-hero">
-    <div>
-      <h1 class="page-hero-title">
-        <i data-lucide="cpu"></i>
-        设备列表
-      </h1>
-      <p class="page-hero-subtitle">管理所有设备资产信息</p>
-    </div>
-    <div class="page-hero-actions">
+  <!-- 页面标题 -->
+  <div class="page-header">
+    <h1 class="page-title">
+      <i data-lucide="server"></i>
+      设备列表
+    </h1>
+    <div class="page-actions">
       <a href="{{ url_for('dashboard.add_device') }}" class="btn btn-success">
         <i data-lucide="plus"></i>
         新增设备
@@ -20,27 +16,17 @@
     </div>
   </div>
 
-  {# 搜索与筛选 #}
-  <div class="search-card" id="searchCard">
-    <div class="search-card-header" onclick="toggleSearchCard()">
-      <h3 class="search-card-title">
-        <i data-lucide="search"></i>
-        搜索设备
-      </h3>
-      <span class="search-card-toggle">
-        <span>收起</span>
-        <i data-lucide="chevron-up"></i>
-      </span>
-    </div>
-    <div class="search-card-body">
-      <form method="get" id="searchForm" class="search-row">
-        <div class="form-group mb-0">
+  <!-- 搜索与筛选 -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <form method="get" id="searchForm" class="row g-3 align-items-end">
+        <div class="col-md-4">
           <label class="form-label">关键词搜索</label>
           <input class="form-control" name="q" value="{{ query }}" placeholder="设备编码、名称或型号">
         </div>
         {% if current_user.is_admin %}
-        <div class="form-group mb-0 d-flex align-items-end">
-          <div class="form-check">
+        <div class="col-md-2">
+          <div class="form-check mt-4">
             <input class="form-check-input" type="checkbox" name="show_inactive" value="1" id="showInactive" onchange="this.form.submit()"
               {% if show_inactive %}checked{% endif %}>
             <label class="form-check-label" for="showInactive">
@@ -49,7 +35,7 @@
           </div>
         </div>
         {% endif %}
-        <div class="form-group mb-0 d-flex align-items-end gap-2">
+        <div class="col-md-{% if current_user.is_admin %}6{% else %}8{% endif %} d-flex gap-2 justify-content-md-end">
           <button class="btn btn-primary" type="submit">
             <i data-lucide="search"></i>
             搜索
@@ -63,199 +49,118 @@
     </div>
   </div>
 
-  {# 快捷操作面板 #}
-  <div class="quick-actions-panel">
-    <a href="{{ url_for('dashboard.dashboard') }}" class="quick-action-btn">
-      <i data-lucide="layout-dashboard"></i>
-      <span>设备看板</span>
-    </a>
-    <a href="{{ url_for('documents.document_search') }}" class="quick-action-btn">
-      <i data-lucide="file-text"></i>
-      <span>文档检索</span>
-    </a>
-    <a href="{{ url_for('device_changes.device_changes') }}" class="quick-action-btn">
-      <i data-lucide="git-branch"></i>
-      <span>设备变更</span>
-    </a>
-  </div>
-
-  {# 数据表格 #}
-  <div class="data-table-card">
-    <div class="data-table-header">
-      <h3 class="data-table-title">
-        <i data-lucide="server"></i>
+  <!-- 数据表格 -->
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <h5 class="mb-0">
+        <i data-lucide="list"></i>
         设备列表
         {% if devices %}
-        <span class="data-table-count">{{ devices|length }}</span>
+        <span class="badge bg-secondary ms-2">{{ devices|length }}</span>
         {% endif %}
-      </h3>
-      <div class="data-table-actions">
-        <button class="btn btn-sm btn-outline-primary" onclick="window.DMS.doExport(this,'{{ url_for('auth.export_devices') }}?q={{ query|urlencode }}&show_inactive={{ 1 if show_inactive else '' }}')">
-          <i data-lucide="download"></i>
-          导出
-        </button>
-      </div>
+      </h5>
+      <button class="btn btn-sm btn-outline-primary" onclick="window.DMS.doExport(this,'{{ url_for('auth.export_devices') }}?q={{ query|urlencode }}&show_inactive={{ 1 if show_inactive else '' }}')">
+        <i data-lucide="download"></i>
+        导出
+      </button>
     </div>
-
-    <div class="table-responsive">
-      <table class="data-table" id="devicesTable">
-        <thead>
-          <tr>
-            <th>设备编码</th>
-            <th>设备名称</th>
-            <th>型号</th>
-            <th>位置</th>
-            <th>状态</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for device in devices %}
-          <tr class="{% if device.status != 'active' %}row-inactive{% endif %}">
-            <td class="table-cell-mono">{{ device.device_code }}</td>
-            <td>
-              <div class="table-cell-primary">{{ device.device_name }}</div>
-            </td>
-            <td>
-              {% if device.model %}
-              <span class="model-tag">{{ device.model }}</span>
-              {% else %}
-              <span class="text-muted">-</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if device.location %}
-              <span class="location-tag">
-                <i data-lucide="map-pin"></i>
-                {{ device.location }}
-              </span>
-              {% else %}
-              <span class="text-muted">-</span>
-              {% endif %}
-            </td>
-            <td>
-              <span class="status-pill {{ device.status }}">
-                {% if device.status == 'active' %}启用{% else %}停用{% endif %}
-              </span>
-            </td>
-            <td>
-              <div class="table-actions">
-                <a href="{{ url_for('devices.device_detail', device_id=device.id) }}" 
-                   class="table-action-btn primary" title="查看详情">
-                  <i data-lucide="eye"></i>
-                </a>
-                <a href="{{ url_for('devices.device_detail', device_id=device.id) }}?tab=documents" 
-                   class="table-action-btn" title="查看文档">
-                  <i data-lucide="file-text"></i>
-                </a>
-                {% if current_user.is_admin %}
-                <form method="post" action="{{ url_for('devices.toggle_device', device_id=device.id) }}" class="inline-form" onsubmit="return confirm('确定要{{ '启用' if device.status != 'active' else '停用' }}此设备吗？')">
-                  {% if show_inactive %}
-                  <input type="hidden" name="show_inactive" value="1">
-                  {% endif %}
-                  <button class="table-action-btn {% if device.status == 'active' %}warning{% else %}success{% endif %}" 
-                          type="submit" title="{{ '启用' if device.status != 'active' else '停用' }}">
-                    <i data-lucide="{{ 'play' if device.status != 'active' else 'pause' }}"></i>
-                  </button>
-                </form>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0" id="devicesTable">
+          <thead class="table-light">
+            <tr>
+              <th>设备编码</th>
+              <th>设备名称</th>
+              <th>型号</th>
+              <th>位置</th>
+              <th>状态</th>
+              <th style="width: 140px;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for device in devices %}
+            <tr class="{% if device.status != 'active' %}text-muted{% endif %}">
+              <td class="font-monospace">{{ device.device_code }}</td>
+              <td>
+                <strong>{{ device.device_name }}</strong>
+              </td>
+              <td>
+                {% if device.model %}
+                <span class="badge bg-light text-dark">{{ device.model }}</span>
+                {% else %}
+                <span class="text-muted">-</span>
                 {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="6">
-              <div class="empty-state-box">
-                <div class="empty-state-icon">
-                  <i data-lucide="server"></i>
-                </div>
-                <h4 class="empty-state-title">暂无设备</h4>
-                <p class="empty-state-desc">
-                  {% if query %}
-                  没有找到符合条件的设备
-                  {% else %}
-                  还没有添加任何设备到系统中
+              </td>
+              <td>
+                {% if device.location %}
+                <span class="text-muted">
+                  <i data-lucide="map-pin" style="width:14px;height:14px;"></i>
+                  {{ device.location }}
+                </span>
+                {% else %}
+                <span class="text-muted">-</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge {% if device.status == 'active' %}bg-success{% else %}bg-secondary{% endif %}">
+                  {% if device.status == 'active' %}启用{% else %}停用{% endif %}
+                </span>
+              </td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a href="{{ url_for('devices.device_detail', device_id=device.id) }}"
+                     class="btn btn-outline-primary" title="查看详情">
+                    <i data-lucide="eye" style="width:14px;height:14px;"></i>
+                  </a>
+                  <a href="{{ url_for('devices.device_detail', device_id=device.id) }}?tab=documents"
+                     class="btn btn-outline-secondary" title="查看文档">
+                    <i data-lucide="file-text" style="width:14px;height:14px;"></i>
+                  </a>
+                  {% if current_user.is_admin %}
+                  <form method="post" action="{{ url_for('devices.toggle_device', device_id=device.id) }}" class="d-inline" onsubmit="return confirm('确定要{{ '启用' if device.status != 'active' else '停用' }}此设备吗？')">
+                    {% if show_inactive %}
+                    <input type="hidden" name="show_inactive" value="1">
+                    {% endif %}
+                    <button class="btn btn-outline-{% if device.status == 'active' %}warning{% else %}success{% endif %}"
+                            type="submit" title="{{ '启用' if device.status != 'active' else '停用' }}">
+                      <i data-lucide="{{ 'play' if device.status != 'active' else 'pause' }}" style="width:14px;height:14px;"></i>
+                    </button>
+                  </form>
                   {% endif %}
-                </p>
-                <div class="empty-state-action">
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6">
+                <div class="text-center py-5">
+                  <div class="text-muted mb-2">
+                    <i data-lucide="server" style="width:48px;height:48px;opacity:0.3;"></i>
+                  </div>
+                  <h5 class="text-muted">暂无设备</h5>
+                  <p class="text-muted">
+                    {% if query %}
+                    没有找到符合条件的设备
+                    {% else %}
+                    还没有添加任何设备到系统中
+                    {% endif %}
+                  </p>
                   <a href="{{ url_for('dashboard.add_device') }}" class="btn btn-success">
                     <i data-lucide="plus"></i>
                     添加第一个设备
                   </a>
                 </div>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </div>
 
-<style>
-  .row-inactive {
-    opacity: 0.65;
-  }
-  
-  .row-inactive:hover {
-    opacity: 0.85;
-  }
-  
-  .model-tag {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.25rem 0.5rem;
-    font-size: 12px;
-    background: var(--color-gray-100);
-    border-radius: var(--border-radius-sm);
-    color: var(--text-secondary);
-  }
-  
-  .location-tag {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    font-size: 12px;
-    color: var(--text-secondary);
-  }
-  
-  .location-tag svg {
-    width: 14px;
-    height: 14px;
-  }
-  
-  .inline-form {
-    display: inline-flex;
-  }
-  
-  .table-action-btn.warning {
-    color: var(--color-warning);
-  }
-  
-  .table-action-btn.warning:hover {
-    background: var(--color-warning-light);
-    border-color: var(--color-warning);
-  }
-  
-  .table-action-btn.success {
-    color: var(--color-success);
-  }
-  
-  .table-action-btn.success:hover {
-    background: var(--color-success-light);
-    border-color: var(--color-success);
-  }
-</style>
-
 <script>
-// 折叠/展开搜索卡片
-function toggleSearchCard() {
-  const card = document.getElementById('searchCard');
-  card.classList.toggle('collapsed');
-}
-
-// 重新初始化图标
 if (typeof lucide !== 'undefined') {
   lucide.createIcons();
 }

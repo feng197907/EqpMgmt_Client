@@ -17,7 +17,7 @@
   <!-- Custom Styles -->
   <link href="{{ url_for('static', filename='css/variables.css') }}?v=2" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/base.css') }}?v=2" rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/layout.css') }}?v=2" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/layout.css') }}?v=4" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/components.css') }}?v=2" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/pages.css') }}?v=2" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/pages-enhanced.css') }}?v=2" rel="stylesheet">
@@ -207,7 +207,10 @@
           <i data-lucide="menu"></i>
         </button>
         <div class="breadcrumb">
-          <span class="breadcrumb-item">首页</span>
+          <a href="{{ url_for('dashboard.dashboard') }}" class="breadcrumb-home-btn">
+            <i data-lucide="home" style="width:16px;height:16px;"></i>
+            <span>首页</span>
+          </a>
           {% if breadcrumb %}
           <span class="breadcrumb-separator">/</span>
           <span class="breadcrumb-item active">{{ breadcrumb }}</span>

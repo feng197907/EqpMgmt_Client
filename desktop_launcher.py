@@ -138,9 +138,20 @@ def main():
 				pass
 			return
 
+	from flask import request
 	from app import create_app
 
 	app = create_app()
+
+	# 桌面客户端：对静态文件禁用缓存，确保更新立即生效
+	@app.after_request
+	def desktop_no_cache(response):
+		if 'static' in request.path:
+			response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+			response.headers['Pragma'] = 'no-cache'
+			response.headers['Expires'] = '0'
+		return response
+
 	host = os.environ.get('CLIENT_HOST', '127.0.0.1')
 	port = int(os.environ.get('CLIENT_PORT', 5000))
 	url = f'http://{host}:{port}'
@@ -196,6 +207,22 @@ def main():
 		webbrowser.open(url)
 		server_thread.join()
 		return
+
+	# 清理 pywebview/WebView2 缓存目录，避免 webview 加载旧版 CSS/JS
+	try:
+		import shutil
+		import glob
+		_appdata = os.environ.get('APPDATA', '')
+		_localdata = os.environ.get('LOCALAPPDATA', '')
+		for _base in [_appdata, _localdata]:
+			_cache_root = os.path.join(_base, 'pywebview')
+			if os.path.isdir(_cache_root):
+				# 清理 Cache 子目录
+				for _cache_sub in glob.glob(os.path.join(_cache_root, '*', 'Cache')):
+					shutil.rmtree(_cache_sub, ignore_errors=True)
+					_write_startup_probe(f'Cleared WebView2 cache: {_cache_sub}')
+	except Exception as e:
+		_write_startup_probe(f'WebView2 cache cleanup skipped: {e}')
 
 	webview.create_window(
 		'DMS 设备管理系统',

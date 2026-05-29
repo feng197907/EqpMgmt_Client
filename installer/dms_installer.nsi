@@ -11,14 +11,20 @@
 !ifndef APP_EXE
   !define APP_EXE "DMS_Client.exe"
 !endif
+!ifndef APP_EXE_PATH
+  !define APP_EXE_PATH "releases\DMS_Client.exe"
+!endif
+!ifndef APP_INSTALL_EXE
+  !define APP_INSTALL_EXE "DMS_Client.exe"
+!endif
+!ifndef APP_LICENSE_PATH
+  !define APP_LICENSE_PATH ""
+!endif
 !ifndef OUTFILE
   !define OUTFILE "releases\DMS_Client_Installer.exe"
 !endif
 !ifndef INSTALL_DIR
   !define INSTALL_DIR "$PROGRAMFILES64\DMS_Client"
-!endif
-!ifndef SRC_DIR
-  !define SRC_DIR "."
 !endif
 
 SetCompressor /SOLID lzma
@@ -35,29 +41,30 @@ Page directory
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 
-Var StartMenuFolder
-
 Section "Main Files" SEC_MAIN
     SetOutPath "$INSTDIR"
-    File "${SRC_DIR}\releases\${APP_EXE}"
+  File /oname=$INSTDIR\${APP_INSTALL_EXE} ${APP_EXE_PATH}
+!if "${APP_LICENSE_PATH}" != ""
+  File "${APP_LICENSE_PATH}"
+!endif
     CreateDirectory "$APPDATA\DMS"
     CreateDirectory "$APPDATA\DMS\uploads"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
 SectionEnd
 
 Section "Create Desktop Icon" SEC_DESKTOP
-    CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
+  CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_INSTALL_EXE}"
 SectionEnd
 
 Section "Run at Startup" SEC_STARTUP
     ; Write Run key for current user to enable start-on-login
-    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DMS_Client" '"$INSTDIR\${APP_EXE}"'
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DMS_Client" '"$INSTDIR\${APP_INSTALL_EXE}"'
 SectionEnd
 
 Section "Uninstall"
     Delete "$DESKTOP\${APP_NAME}.lnk"
     Delete "$SMPROGRAMS\${APP_NAME}.lnk"
-    Delete "$INSTDIR\${APP_EXE}"
+    Delete "$INSTDIR\${APP_INSTALL_EXE}"
     Delete "$INSTDIR\Uninstall.exe"
     ; Remove run-at-startup registry key if present
     DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "DMS_Client"

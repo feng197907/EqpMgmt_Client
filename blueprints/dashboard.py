@@ -1,4 +1,7 @@
 import importlib
+import html
+import re
+import sys
 
 # 看板与提醒 Blueprint
 from pathlib import Path
@@ -15,11 +18,155 @@ from utils.maintenance import build_due_maintenance_reminders
 dashboard_bp = Blueprint("dashboard", __name__)
 
 
+_EMBEDDED_USER_MANUAL_MD = """# 用户手册
+
+## 快速开始
+
+1. 登录后进入设备看板或文档管理页面。
+2. 使用顶部导航进入审批、借用、维护、备件等功能。
+3. 桌面客户端可直接关闭窗口退出程序。
+
+## 文档管理
+
+- 上传文档后系统会自动记录版本。
+- 文档审批通过后，当前版本会切换为生效状态。
+- 若附件文件缺失，请检查 `%APPDATA%\\DMS\\uploads` 下对应设备目录。
+
+## 常见问题
+
+- 如果运行包里没有单独的 docs 文件，系统会显示这个内置手册。
+- 这是为了避免冻结包缺少 `docs/使用手册.md` 时页面报错。
+"""
+
+
+def _load_user_manual_markdown():
+    """读取用户手册 markdown，缺失时回退到内置版本。"""
+    candidates = [
+        Path(__file__).resolve().parent.parent / "docs" / "使用手册.md",
+    ]
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        candidates.append(Path(meipass) / "docs" / "使用手册.md")
+
+    for manual_path in candidates:
+        try:
+            if manual_path.exists():
+                return manual_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+
+    return _EMBEDDED_USER_MANUAL_MD
+
+
+def _basic_markdown_to_html(markdown_text):
+    """Render a small, safe subset of markdown without external dependencies."""
+    lines = markdown_text.splitlines()
+    html_parts = []
+    in_ul = False
+    in_ol = False
+    in_pre = False
+    paragraph_lines = []
+
+    def close_lists():
+        nonlocal in_ul, in_ol
+        if in_ul:
+            html_parts.append("</ul>")
+            in_ul = False
+        if in_ol:
+            html_parts.append("</ol>")
+            in_ol = False
+
+    def flush_paragraph():
+        nonlocal paragraph_lines
+        if paragraph_lines:
+            text = " ".join(paragraph_lines).strip()
+            if text:
+                html_parts.append(f"<p>{_render_inline_markdown(text)}</p>")
+            paragraph_lines = []
+
+    def _render_inline_markdown(text):
+        escaped = html.escape(text)
+        escaped = re.sub(r"`([^`]+)`", r"<code>\1</code>", escaped)
+        escaped = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", escaped)
+        escaped = re.sub(r"\*([^*]+)\*", r"<em>\1</em>", escaped)
+        return escaped
+
+    for raw_line in lines:
+        line = raw_line.rstrip()
+
+        if in_pre:
+            if line.strip().startswith("```"):
+                html_parts.append("</code></pre>")
+                in_pre = False
+            else:
+                html_parts.append(html.escape(raw_line))
+            continue
+
+        stripped = line.strip()
+        if not stripped:
+            flush_paragraph()
+            close_lists()
+            continue
+
+        if stripped.startswith("```"):
+            flush_paragraph()
+            close_lists()
+            html_parts.append("<pre><code>")
+            in_pre = True
+            continue
+
+        heading_match = re.match(r"^(#{1,6})\s+(.*)$", stripped)
+        if heading_match:
+            flush_paragraph()
+            close_lists()
+            level = len(heading_match.group(1))
+            text = _render_inline_markdown(heading_match.group(2))
+            html_parts.append(f"<h{level}>{text}</h{level}>")
+            continue
+
+        bullet_match = re.match(r"^[-*]\s+(.*)$", stripped)
+        ordered_match = re.match(r"^\d+\.\s+(.*)$", stripped)
+        if bullet_match:
+            flush_paragraph()
+            if in_ol:
+                html_parts.append("</ol>")
+                in_ol = False
+            if not in_ul:
+                html_parts.append("<ul>")
+                in_ul = True
+            html_parts.append(f"<li>{_render_inline_markdown(bullet_match.group(1))}</li>")
+            continue
+
+        if ordered_match:
+            flush_paragraph()
+            if in_ul:
+                html_parts.append("</ul>")
+                in_ul = False
+            if not in_ol:
+                html_parts.append("<ol>")
+                in_ol = True
+            html_parts.append(f"<li>{_render_inline_markdown(ordered_match.group(1))}</li>")
+            continue
+
+        close_lists()
+        paragraph_lines.append(stripped)
+
+    flush_paragraph()
+    close_lists()
+    if in_pre:
+        html_parts.append("</code></pre>")
+
+    return "\n".join(html_parts) if html_parts else ""
+
+
 def _load_user_manual_html():
     """读取并转换用户手册 markdown。"""
-    manual_path = Path(__file__).resolve().parent.parent / "docs" / "使用手册.md"
-    manual_md = manual_path.read_text(encoding="utf-8")
-    markdown_lib = importlib.import_module("markdown")
+    manual_md = _load_user_manual_markdown()
+    try:
+        markdown_lib = importlib.import_module("markdown")
+    except ModuleNotFoundError:
+        return _basic_markdown_to_html(manual_md)
+
     return markdown_lib.markdown(
         manual_md,
         extensions=["extra", "fenced_code", "tables", "toc"],

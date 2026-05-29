@@ -130,10 +130,10 @@
         {% endif %}
       </h3>
       <div class="data-table-actions">
-        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.export_documents', q=query, device=device_query, uploader=uploader, doc_type=doc_type, status=status, start_date=start_date, end_date=end_date) }}">
+        <button id="exportBtn" class="btn btn-sm btn-outline-primary" onclick="exportDocuments(this)">
           <i data-lucide="download"></i>
           导出
-        </a>
+        </button>
       </div>
     </div>
 
@@ -185,7 +185,8 @@
                 </a>
                 {% if row.status in ['active', 'archived'] %}
                 <a href="{{ url_for('documents.download_doc', doc_id=row.id) }}" 
-                   class="table-action-btn success" title="下载">
+                   class="table-action-btn success" title="下载"
+                   onclick="window.DMS.doDownload(this,'{{ url_for('documents.download_doc', doc_id=row.id) }}');return false;">
                   <i data-lucide="download"></i>
                 </a>
                 {% endif %}
@@ -230,6 +231,105 @@
 function toggleSearchCard() {
   const card = document.getElementById('searchCard');
   card.classList.toggle('collapsed');
+}
+
+// 导出文档到Excel
+function exportDocuments(btn) {
+  // 进入加载状态
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>导出中...';
+  btn.classList.remove('btn-outline-primary');
+  btn.classList.add('btn-primary');
+
+  const params = new URLSearchParams();
+  const q = {{ query|tojson }};
+  const device = {{ device_query|tojson }};
+  const uploader = {{ uploader|tojson }};
+  const doc_type = {{ doc_type|tojson }};
+  const status = {{ status|tojson }};
+  const start_date = {{ start_date|tojson }};
+  const end_date = {{ end_date|tojson }};
+  if (q) params.set('q', q);
+  if (device) params.set('device', device);
+  if (uploader) params.set('uploader', uploader);
+  if (doc_type) params.set('doc_type', doc_type);
+  if (status) params.set('status', status);
+  if (start_date) params.set('start_date', start_date);
+  if (end_date) params.set('end_date', end_date);
+
+  var exportUrl = '/documents/export?' + params.toString();
+  var isDesktop = typeof window.pywebview !== 'undefined' && window.pywebview.api;
+
+  if (!isDesktop) {
+    // 浏览器模式：用隐藏 <a download> 触发文件下载，不跳转页面
+    try {
+      var dlA = document.createElement('a');
+      dlA.href = exportUrl;
+      dlA.download = '';
+      dlA.style.display = 'none';
+      document.body.appendChild(dlA);
+      dlA.click();
+      document.body.removeChild(dlA);
+      btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-success');
+    } catch(err) {
+      console.error('导出失败:', err);
+      btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-danger');
+    }
+    setTimeout(function() {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="download"></i> 导出';
+      btn.classList.remove('btn-success', 'btn-danger');
+      btn.classList.add('btn-outline-primary');
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons({ attrs: { target: btn } });
+      }
+    }, 2000);
+    return;
+  }
+
+  // pywebview 桌面壳：通过 JSON 中转获取本地文件路径再用 API 打开
+  fetch(exportUrl, {
+    headers: { 'X-Desktop-Shell': '1' }
+  })
+    .then(function(resp) {
+      if (!resp.ok) {
+        throw new Error('导出失败: ' + resp.status);
+      }
+      return resp.json();
+    })
+    .then(function(data) {
+      if (data.success) {
+        window.pywebview.api.open_file(data.filepath);
+        // 成功状态
+        btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-success');
+      } else {
+        throw new Error(data.error || '导出失败');
+      }
+    })
+    .catch(function(err) {
+      console.error('导出失败:', err);
+      btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-danger');
+    })
+    .finally(function() {
+      // 2秒后恢复按钮
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="download"></i> 导出';
+        btn.classList.remove('btn-success', 'btn-danger');
+        btn.classList.add('btn-outline-primary');
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons({ attrs: { target: btn } });
+        }
+      }, 2000);
+    });
 }
 
 // 初始化图标

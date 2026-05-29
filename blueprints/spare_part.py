@@ -1,6 +1,8 @@
 # 备件库存管理 Blueprint
 from datetime import datetime
 from io import BytesIO
+import os
+import tempfile
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
@@ -38,6 +40,15 @@ def _excel_response(wb, filename):
         as_attachment=True,
         download_name=filename,
     )
+
+
+def _save_excel_to_temp(wb, filename):
+    """将 Workbook 保存到临时目录，返回文件路径"""
+    temp_dir = os.path.join(tempfile.gettempdir(), 'DMS_Exports')
+    os.makedirs(temp_dir, exist_ok=True)
+    filepath = os.path.join(temp_dir, filename)
+    wb.save(filepath)
+    return filepath
 
 
 def _header_style(cell):
@@ -189,6 +200,10 @@ def spare_part_export():
     _auto_width(ws)
 
     filename = f"备件列表_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    if is_desktop:
+        filepath = _save_excel_to_temp(wb, filename)
+        return {"success": True, "filepath": filepath, "filename": filename}
     return _excel_response(wb, filename)
 
 
@@ -419,6 +434,10 @@ def inbound_export():
     _auto_width(ws)
 
     filename = f"备件入库记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    if is_desktop:
+        filepath = _save_excel_to_temp(wb, filename)
+        return {"success": True, "filepath": filepath, "filename": filename}
     return _excel_response(wb, filename)
 
 
@@ -502,6 +521,10 @@ def consumption_export():
     _auto_width(ws)
 
     filename = f"备件消耗记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    if is_desktop:
+        filepath = _save_excel_to_temp(wb, filename)
+        return {"success": True, "filepath": filepath, "filename": filename}
     return _excel_response(wb, filename)
 
 

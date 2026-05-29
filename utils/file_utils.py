@@ -40,12 +40,16 @@ def resolve_doc_path(file_path):
 
     # Legacy packaged paths sometimes look like ../../../Roaming/DMS/uploads/...
     normalized = file_path.replace('/', os.sep).replace('\\', os.sep)
-    markers = [f'Roaming{os.sep}DMS{os.sep}', f'AppData{os.sep}Roaming{os.sep}DMS{os.sep}', f'DMS{os.sep}uploads{os.sep}']
-    for marker in markers:
+    markers = [
+        (f'Roaming{os.sep}DMS{os.sep}uploads{os.sep}', os.path.join(os.environ.get('APPDATA') or os.path.expanduser('~'), 'DMS', 'uploads')),
+        (f'AppData{os.sep}Roaming{os.sep}DMS{os.sep}uploads{os.sep}', os.path.join(os.environ.get('APPDATA') or os.path.expanduser('~'), 'DMS', 'uploads')),
+        (f'DMS{os.sep}uploads{os.sep}', os.path.join(os.environ.get('APPDATA') or os.path.expanduser('~'), 'DMS', 'uploads')),
+    ]
+    for marker, base_dir in markers:
         idx = normalized.find(marker)
         if idx >= 0:
             suffix = normalized[idx + len(marker):]
-            legacy_candidate = os.path.normpath(os.path.join(os.environ.get('APPDATA') or os.path.expanduser('~'), 'DMS', suffix))
+            legacy_candidate = os.path.normpath(os.path.join(base_dir, suffix))
             if os.path.exists(legacy_candidate):
                 return legacy_candidate
 

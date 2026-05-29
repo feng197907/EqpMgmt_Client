@@ -5,6 +5,11 @@
 
 $ErrorActionPreference = 'Stop'
 
+# Normalize all relative paths to the repository root so the script works
+# whether it is launched from the repo root or from the scripts directory.
+$repoRoot = Split-Path $PSScriptRoot -Parent
+Set-Location $repoRoot
+
 # ============================================================
 # Activate virtual environment
 # ============================================================
@@ -21,8 +26,8 @@ if (Test-Path $activateScript) {
 # ============================================================
 # Load configuration from build_config.json
 # ============================================================
-$configFile = Join-Path $PSScriptRoot '..\build_config.json'
-$configExample = Join-Path $PSScriptRoot '..\build_config.json.example'
+$configFile = Join-Path $repoRoot 'build_config.json'
+$configExample = Join-Path $repoRoot 'build_config.json.example'
 
 if (-not (Test-Path $configFile)) {
 	Write-Host "Configuration file not found: $configFile" -ForegroundColor Yellow
@@ -56,6 +61,7 @@ if (-not (Test-Path $configFile)) {
 }
 
 # Extract configuration
+$licenseMode = $config.license.mode
 $licenseName = $config.license.name
 $licenseDays = $config.license.days
 $licenseExpires = $config.license.expires
@@ -65,17 +71,13 @@ $entryScript = $config.build.entry_script
 $outputName = $config.build.output_name
 $windowed = $config.build.windowed
 
+$entryScriptPath = Join-Path $repoRoot $entryScript
+
 $signEnabled = $config.sign.enabled
 $signThumbprint = $config.sign.cert_thumbprint
 $signPfxPath = $config.sign.cert_pfx_path
 $signPfxPass = $config.sign.cert_pfx_password
 $signTimestampUrl = $config.sign.timestamp_url
-
-# ============================================================
-# Generate timestamp for output filename
-# ============================================================
-$timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
-$outputNameWithTimestamp = "$($outputName)_$timestamp"
 
 # ============================================================
 # Build process
@@ -90,11 +92,14 @@ python -m pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
 # ============================================================
 # License generation (optional)
 # ============================================================
-if (-not [string]::IsNullOrWhiteSpace($licenseName)) {
+
+$licenseEnabled = $licenseMode -ne 'free'
+
+if ($licenseEnabled -and -not [string]::IsNullOrWhiteSpace($licenseName)) {
 	Write-Host "`nGenerating license for: $licenseName" -ForegroundColor Cyan
 	
 	# Build the command
-	$licenseCmd = "python scripts/create_license.py `"$licenseName`""
+	$licenseCmd = "python `"$repoRoot\scripts\create_license.py`" `"$licenseName`""
 	
 	if (-not [string]::IsNullOrWhiteSpace($licenseExpires)) {
 		# Use specific expiry date
@@ -114,7 +119,7 @@ if (-not [string]::IsNullOrWhiteSpace($licenseName)) {
 	Invoke-Expression $licenseCmd
 	
 	# Copy license to dist folder (will be bundled with the executable)
-	$licenseSrc = "certs/license_$licenseName.json"
+	$licenseSrc = Join-Path $repoRoot "certs/license_$licenseName.json"
 	if (Test-Path $licenseSrc) {
 		Write-Host "  License file: $licenseSrc" -ForegroundColor Green
 	}
@@ -128,17 +133,21 @@ if (-not [string]::IsNullOrWhiteSpace($licenseName)) {
 		Write-Host "  License enforcement: OPTIONAL" -ForegroundColor Gray
 	}
 } else {
-	Write-Host "`nNo license configuration found (set license.name in build_config.json)" -ForegroundColor Gray
+	Write-Host "`nFree mode selected; skipping license generation" -ForegroundColor Gray
+	$env:DMS_LICENSE_REQUIRED = ''
 }
 
 # Prepare data arguments (PyInstaller on Windows uses semicolon as separator)
 $add_templates = "templates;templates"
 $add_static = "static;static"
 $add_uploads = "uploads;uploads"
+$add_docs = if (Test-Path (Join-Path $repoRoot 'docs')) { "docs;docs" } else { $null }
 
-# Add license file if exists
-$licenseFile = "certs/license_$licenseName.json"
-if (Test-Path $licenseFile) {
+# Add license file only in trial mode
+$licenseFile = if ($licenseEnabled -and -not [string]::IsNullOrWhiteSpace($licenseName)) { "certs/license_$licenseName.json" } else { $null }
+
+$licenseFilePath = if ($licenseFile) { Join-Path $repoRoot $licenseFile } else { $null }
+if ($licenseFilePath -and (Test-Path $licenseFilePath)) {
 	$add_license = "$licenseFile;$licenseFile"
 } else {
 	$add_license = $null
@@ -148,17 +157,19 @@ if (Test-Path $licenseFile) {
 # Generate license enforcement config file
 # This file is used by the runtime to check if license is required
 # ============================================================
-$licenseConfigFile = "dms_license_config.json"
+$licenseConfigFile = 'dms_license_config.json'
+$licenseConfigFilePath = Join-Path $repoRoot $licenseConfigFile
 $licenseConfig = @{
 	license = @{
-		required = if ($licenseRequired) { $true } else { $false }
+		required = if ($licenseEnabled -and $licenseRequired) { $true } else { $false }
+		mode     = if ($licenseEnabled) { 'trial' } else { 'free' }
 		name     = $licenseName
 		days     = if ($licenseDays) { $licenseDays } else { 365 }
 	}
 }
-$licenseConfig | ConvertTo-Json -Depth 3 | Out-File -FilePath $licenseConfigFile -Encoding utf8
-Write-Host "License enforcement config: $licenseConfigFile" -ForegroundColor Green
-if ($licenseRequired) {
+$licenseConfig | ConvertTo-Json -Depth 3 | Out-File -FilePath $licenseConfigFilePath -Encoding utf8
+Write-Host "License enforcement config: $licenseConfigFilePath" -ForegroundColor Green
+if ($licenseEnabled -and $licenseRequired) {
 	Write-Host "  Enforcement: ENABLED (written to config file)" -ForegroundColor Yellow
 } else {
 	Write-Host "  Enforcement: OPTIONAL (written to config file)" -ForegroundColor Gray
@@ -166,25 +177,28 @@ if ($licenseRequired) {
 
 $add_license_config = "$licenseConfigFile;$licenseConfigFile"
 
-# Add public key for license verification
-$publicKeyFile = "certs/license_public.pem"
-if (Test-Path $publicKeyFile) {
-	$add_public_key = "$publicKeyFile;license_public.pem"
-	Write-Host "Public key for verification: $publicKeyFile" -ForegroundColor Green
-} else {
-	$add_public_key = $null
-	Write-Host "Warning: Public key not found at $publicKeyFile" -ForegroundColor Yellow
-}
-
 # Build single-file executable
 Write-Host "`nBuilding executable..." -ForegroundColor Cyan
 
 # Create releases directory if it doesn't exist
-$releaseDir = "releases"
+$releaseDir = Join-Path $repoRoot 'releases'
 if (-not (Test-Path $releaseDir)) {
 	New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
 	Write-Host "Created release directory: $releaseDir/" -ForegroundColor Green
 }
+
+# Remove stale packaged executables, installers, and license exports before building a fresh set.
+Get-ChildItem -Path $releaseDir -File -ErrorAction SilentlyContinue |
+	Where-Object {
+		$_.Name -like 'DMS_Client.exe' -or
+		$_.Name -like 'DMS_Client_*.exe' -or
+		$_.Name -like 'DMS_Client_Installer.exe' -or
+		$_.Name -like 'DMS_Client_Installer_*.exe'
+	} |
+	Remove-Item -Force -ErrorAction SilentlyContinue
+
+Get-ChildItem -Path $releaseDir -Filter 'license*.json' -ErrorAction SilentlyContinue |
+	Remove-Item -Force -ErrorAction SilentlyContinue
 
 $buildArgs = @(
 	'--noconfirm',
@@ -203,8 +217,8 @@ $buildArgs += @(
 	"--add-data", $add_license_config
 )
 
-if ($add_public_key) {
-	$buildArgs += @("--add-data", $add_public_key)
+if ($add_docs) {
+	$buildArgs += @("--add-data", $add_docs)
 }
 
 if ($add_license) {
@@ -212,23 +226,24 @@ if ($add_license) {
 }
 
 $buildArgs += @(
-	"--name", $outputNameWithTimestamp,
-	$entryScript
+	"--name", $outputName,
+	$entryScriptPath
 )
+
 
 # Execute PyInstaller
 pyinstaller @buildArgs
-
-# Copy license to releases folder (for standalone use)
-if (Test-Path $licenseFile) {
-	Copy-Item $licenseFile -Destination "$releaseDir/" -Force
-	Write-Host "License file copied to $releaseDir/" -ForegroundColor Green
+if ($LASTEXITCODE -ne 0) {
+	Write-Error "PyInstaller failed with exit code $LASTEXITCODE"
+	exit $LASTEXITCODE
 }
+
+$builtExePath = Join-Path $releaseDir "$outputName.exe"
 
 # ============================================================
 # Build NSIS installer (optional)
 # ============================================================
-$installerName = "$($outputName)_Installer_$timestamp.exe"
+$installerName = "$($outputName)_Installer.exe"
 $installerPath = Join-Path $releaseDir $installerName
 
 # Check if NSIS is installed (check PATH first, then common install locations)
@@ -241,16 +256,19 @@ if (-not $makensisPath) {
 }
 
 if ($makensisPath) {
+	if ($env:DMS_SKIP_NSIS -eq '1') {
+		Write-Host "`nSkipping NSIS installer (requested by caller)" -ForegroundColor Gray
+	} else {
 	Write-Host "`nBuilding NSIS installer..." -ForegroundColor Cyan
 	Write-Host "  Installer: $installerName" -ForegroundColor Yellow
 	
 	$nsiScript = Join-Path $PSScriptRoot '..\installer\dms_installer.nsi'
-	$nsisArgs = @(
-		"/DAPP_EXE=$outputNameWithTimestamp.exe",
+	$nsisArgs = @("/DAPP_EXE=$outputName.exe",
+		"/DAPP_EXE_PATH=$builtExePath",
+		"/DAPP_INSTALL_EXE=$outputName.exe",
 		"/DOUTFILE=$installerPath",
 		"/DAPP_NAME=$outputName",
-		$nsiScript
-	)
+		$nsiScript)
 	
 	& $makensisPath @nsisArgs
 	
@@ -258,6 +276,8 @@ if ($makensisPath) {
 		Write-Host "  Installer built successfully: $installerPath" -ForegroundColor Green
 	} else {
 		Write-Host "  NSIS installer build failed (exit code: $LASTEXITCODE)" -ForegroundColor Red
+		exit $LASTEXITCODE
+	}
 	}
 } else {
 	Write-Host "`nSkipping NSIS installer (makensis.exe not found)" -ForegroundColor Gray
@@ -290,7 +310,7 @@ if ($signEnabled) {
 	# Run sign script
 	$signScript = Join-Path $PSScriptRoot 'sign_release.ps1'
 	if (Test-Path $signScript) {
-		& $signScript -DistDir (Join-Path $PSScriptRoot "..\$releaseDir")
+		& $signScript -DistDir $releaseDir
 	} else {
 		Write-Host "Signing script not found: $signScript" -ForegroundColor Yellow
 	}
@@ -300,7 +320,7 @@ if ($signEnabled) {
 
 Write-Host "`n============================================================" -ForegroundColor Green
 Write-Host "Build finished successfully!" -ForegroundColor Green
-Write-Host "Binary located in: $releaseDir\$outputNameWithTimestamp.exe" -ForegroundColor Green
+Write-Host "Binary located in: $releaseDir\$outputName.exe" -ForegroundColor Green
 if (Test-Path $installerPath) {
 	Write-Host "Installer located in: $releaseDir\$installerName" -ForegroundColor Green
 }
@@ -309,7 +329,7 @@ Write-Host "============================================================" -Foreg
 # Display configuration summary
 Write-Host "`nConfiguration Summary:" -ForegroundColor Cyan
 Write-Host "  Entry script: $entryScript"
-Write-Host "  Output name: $outputNameWithTimestamp"
+Write-Host "  Output name: $outputName"
 
 if (-not [string]::IsNullOrWhiteSpace($licenseName)) {
 	Write-Host "`n  License Configuration:" -ForegroundColor Cyan

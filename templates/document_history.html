@@ -102,10 +102,10 @@
                 </div>
                 <div class="d-flex gap-2">
                   {% if row.status in ['active', 'archived'] %}
-                  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('documents.download_doc', doc_id=row.id) }}">
+                  <button class="btn btn-sm btn-outline-secondary" onclick="window.DMS.doDownload(this,'{{ url_for('documents.download_doc', doc_id=row.id) }}')">
                     <i data-lucide="download" style="width: 14px; height: 14px;"></i>
                     下载
-                  </a>
+                  </button>
                   {% endif %}
                   <a class="btn btn-sm btn-outline-primary" href="{{ url_for('devices.device_detail', device_id=row.device_id) }}">
                     <i data-lucide="info" style="width: 14px; height: 14px;"></i>

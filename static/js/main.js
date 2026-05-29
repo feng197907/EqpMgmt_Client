@@ -231,9 +231,157 @@
   }
 
   // ==================== 导出公共方法 ====================
+  function doExport(btn, url) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>导出中...';
+    btn.classList.remove('btn-outline-primary');
+    btn.classList.add('btn-primary');
+
+    var isDesktop = typeof window.pywebview !== 'undefined' && window.pywebview.api;
+
+    if (!isDesktop) {
+      // 浏览器模式：用隐藏 <a download> 触发文件下载，不跳转页面
+      try {
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-success');
+      } catch(err) {
+        console.error('导出失败:', err);
+        btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-danger');
+      }
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="download"></i> 导出';
+        btn.classList.remove('btn-success', 'btn-danger');
+        btn.classList.add('btn-outline-primary');
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons({ attrs: { target: btn } });
+        }
+      }, 2000);
+      return;
+    }
+
+    // pywebview 桌面壳：通过 JSON 中转获取本地文件路径再用 API 打开
+    fetch(url, { headers: { 'X-Desktop-Shell': '1' }, credentials: 'same-origin' })
+      .then(function(resp) {
+        if (!resp.ok) { throw new Error('导出失败: ' + resp.status); }
+        return resp.json();
+      })
+      .then(function(data) {
+        if (data.success) {
+          window.pywebview.api.open_file(data.filepath);
+          btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-success');
+        } else {
+          throw new Error(data.error || '导出失败');
+        }
+      })
+      .catch(function(err) {
+        console.error('导出失败:', err);
+        btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-danger');
+      })
+      .finally(function() {
+        setTimeout(function() {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="download"></i> 导出';
+          btn.classList.remove('btn-success', 'btn-danger');
+          btn.classList.add('btn-outline-primary');
+          if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ attrs: { target: btn } });
+          }
+        }, 2000);
+      });
+  }
+
+  // ==================== 通用文件下载方法 ====================
+  function doDownload(btn, url, originalHTML) {
+    btn.disabled = true;
+    originalHTML = originalHTML || btn.innerHTML;
+    var _icon = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>';
+    if (!originalHTML.includes('<svg') && !originalHTML.includes('lucide')) {
+      _icon = '<i data-lucide="download"></i>';
+    }
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>下载中...';
+
+    var isDesktop = typeof window.pywebview !== 'undefined' && window.pywebview.api;
+
+    if (!isDesktop) {
+      // 浏览器模式：用隐藏 <a download> 触发文件下载，不跳转页面
+      try {
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = '';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        btn.innerHTML = _icon.replace('stroke="currentColor"', 'stroke="#198754"');
+        if (btn.classList.contains('action-btn')) btn.style.color = '#198754';
+      } catch(err) {
+        console.error('下载失败:', err);
+        btn.innerHTML = _icon.replace('stroke="currentColor"', 'stroke="#dc3545"');
+        if (btn.classList.contains('action-btn')) btn.style.color = '#dc3545';
+      }
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+        btn.style.color = '';
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons({ attrs: { target: btn } });
+        }
+      }, 2000);
+      return;
+    }
+
+    // pywebview 桌面壳：通过 JSON 中转获取本地文件路径再用 API 打开
+    fetch(url, { headers: { 'X-Desktop-Shell': '1' }, credentials: 'same-origin' })
+      .then(function(resp) {
+        if (!resp.ok) { throw new Error('下载失败: ' + resp.status); }
+        return resp.json();
+      })
+      .then(function(data) {
+        if (data.success) {
+          window.pywebview.api.open_file(data.filepath);
+          btn.innerHTML = _icon.replace('stroke="currentColor"', 'stroke="#198754"').replace('class="table-action-btn success"', 'class="table-action-btn success" style="color:#198754"');
+          if (btn.classList.contains('action-btn')) btn.style.color = '#198754';
+        } else {
+          throw new Error(data.error || '下载失败');
+        }
+      })
+      .catch(function(err) {
+        console.error('下载失败:', err);
+        btn.innerHTML = _icon.replace('stroke="currentColor"', 'stroke="#dc3545"').replace('class="table-action-btn success"', 'class="table-action-btn success" style="color:#dc3545"');
+        if (btn.classList.contains('action-btn')) btn.style.color = '#dc3545';
+      })
+      .finally(function() {
+        setTimeout(function() {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+          btn.style.color = '';
+          if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ attrs: { target: btn } });
+          }
+        }, 2000);
+      });
+  }
+
   window.DMS = {
     toggleSidebar: toggleSidebar,
-    toggleMobileSidebar: toggleMobileSidebar
+    toggleMobileSidebar: toggleMobileSidebar,
+    doExport: doExport,
+    doDownload: doDownload
   };
 
 })();

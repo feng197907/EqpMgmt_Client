@@ -4,8 +4,20 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Tuple
+from typing import Any, Iterable, Tuple, cast
 from base64 import b64decode
+
+
+EMBEDDED_PUBLIC_KEY_PEM = b"""-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyRbvStyaTLkqA1mkOMVR
+fs4GSFiue5C9ebnY/LusSr0jcToGMSg6bYT45iEVKb85w9ZmO4OvlJ4nPf60ZHPQ
+hbp74ArX+l+9Ob8kBVIiwqtzhvCAOffCRH0BRQ/Dz8KA5Bh4SyeSK3MAhq9u6fyo
+4c8WD2hj0IzLXhnYMspEtMPdj3/p97q2DjaQIEyEPG00Wlu00THgjTMti+Y9iBB5
+7M+SYYEDX4ZBZJe8tCQkjl2de5gHcMz/cl5T5Vl1YMmTvo8Qrb2JyfwKAz+LOnAC
+UqbAN2PYaE8FYdtRyBg/pGz25HhPDVTCJXKDp0cZx5mpUKFnLkmomMjqMCKq4jdb
+owIDAQAB
+-----END PUBLIC KEY-----
+"""
 
 
 def load_license(path: str) -> dict | None:
@@ -56,12 +68,29 @@ def should_enforce_license() -> bool:
 def license_search_paths() -> list[str]:
     paths: list[str] = []
 
-    if getattr(sys, 'frozen', False):
-        exe_dir = Path(sys.executable).resolve().parent
-    else:
-        exe_dir = Path.cwd()
+    # Frozen builds should only read the bundled license file that PyInstaller
+    # extracts into the temporary _MEIPASS directory.
+    meipass_path = getattr(sys, '_MEIPASS', None)
+    if getattr(sys, 'frozen', False) and meipass_path:
+        meipass = Path(meipass_path)
+        paths.append(str(meipass / 'license.json'))
+        paths.append(str(meipass / 'license_TestUser.json'))
+        paths.append(str(meipass / 'certs' / 'license.json'))
+        paths.append(str(meipass / 'certs' / 'license_TestUser.json'))
+        try:
+            for lic_file in meipass.glob('license_*.json'):
+                if str(lic_file) not in paths:
+                    paths.append(str(lic_file))
+            for lic_file in (meipass / 'certs').glob('license_*.json'):
+                if str(lic_file) not in paths:
+                    paths.append(str(lic_file))
+        except Exception:
+            pass
 
-    # 1. Check exe/current working directory first (allows overriding bundled license)
+        return paths
+
+    # Non-frozen development mode can still use local source files.
+    exe_dir = Path.cwd()
     paths.append(str(exe_dir / 'license.json'))
     paths.append(str(exe_dir / 'license_TestUser.json'))
     try:
@@ -71,20 +100,7 @@ def license_search_paths() -> list[str]:
     except Exception:
         pass
 
-    # 2. Check PyInstaller bundled files (sys._MEIPASS)
-    meipass_path = getattr(sys, '_MEIPASS', None)
-    if getattr(sys, 'frozen', False) and meipass_path:
-        meipass = Path(meipass_path)
-        paths.append(str(meipass / 'license.json'))
-        paths.append(str(meipass / 'license_TestUser.json'))
-        try:
-            for lic_file in meipass.glob('license_*.json'):
-                if str(lic_file) not in paths:
-                    paths.append(str(lic_file))
-        except Exception:
-            pass
-
-    # 3. Check APPDATA last (user-level override)
+    # Optional user-level override for development runs.
     appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
     paths.append(str(Path(appdata) / 'DMS' / 'license.json'))
 
@@ -158,8 +174,16 @@ def verify_license(license_path: str, public_key_path: str) -> Tuple[bool, str]:
 
     # verify signature
     try:
-        with open(public_key_path, 'rb') as f:
-            pub = serialization.load_pem_public_key(f.read())
+        pub_key_bytes = None
+        if public_key_path:
+            try:
+                with open(public_key_path, 'rb') as f:
+                    pub_key_bytes = f.read()
+            except Exception:
+                pub_key_bytes = None
+        if not pub_key_bytes:
+            pub_key_bytes = EMBEDDED_PUBLIC_KEY_PEM
+        pub = cast(Any, serialization.load_pem_public_key(pub_key_bytes))
     except Exception as e:
         return False, f'public key error: {e}'
 

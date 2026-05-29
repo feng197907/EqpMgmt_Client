@@ -90,10 +90,10 @@
         {% endif %}
       </h3>
       <div class="data-table-actions">
-        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('auth.export_devices', q=query, show_inactive=1 if show_inactive else '') }}">
+        <button class="btn btn-sm btn-outline-primary" onclick="window.DMS.doExport(this,'{{ url_for('auth.export_devices') }}?q={{ query|urlencode }}&show_inactive={{ 1 if show_inactive else '' }}')">
           <i data-lucide="download"></i>
           导出
-        </a>
+        </button>
       </div>
     </div>
 

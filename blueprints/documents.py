@@ -1,5 +1,6 @@
 # 文档 Blueprint
 import os
+import tempfile
 from datetime import datetime
 from io import BytesIO
 
@@ -166,6 +167,15 @@ def download_doc(doc_id):
     # 如果是相对路径，拼接 BASE_DIR
     if not os.path.isabs(file_path):
         file_path = os.path.join(BASE_DIR, file_path)
+
+    # pywebview 桌面壳无法处理文件下载，返回文件路径让前端通过 API 打开
+    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    if is_desktop:
+        if os.path.exists(file_path):
+            return {"success": True, "filepath": file_path, "filename": doc["doc_name"]}
+        else:
+            return {"success": False, "error": "文件不存在，可能已被移动或删除"}
+
     directory = os.path.dirname(file_path)
     filename = os.path.basename(file_path)
     return send_from_directory(
@@ -362,6 +372,15 @@ def _create_excel_response(wb, filename):
     )
 
 
+def _save_excel_to_temp(wb, filename):
+    """将 Workbook 保存到临时目录，返回文件路径"""
+    temp_dir = os.path.join(tempfile.gettempdir(), 'DMS_Exports')
+    os.makedirs(temp_dir, exist_ok=True)
+    filepath = os.path.join(temp_dir, filename)
+    wb.save(filepath)
+    return filepath
+
+
 def _set_header_style(cell):
     """设置表头样式"""
     cell.font = Font(bold=True, color="FFFFFF")
@@ -461,4 +480,11 @@ def export_documents():
         ws.column_dimensions[column].width = adjusted_width
 
     filename = f"documents_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    # pywebview 桌面壳无法处理文件下载，改为保存到磁盘并返回文件路径
+    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    if is_desktop:
+        filepath = _save_excel_to_temp(wb, filename)
+        return {"success": True, "filepath": filepath, "filename": filename}
+
     return _create_excel_response(wb, filename)

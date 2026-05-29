@@ -2,17 +2,18 @@
 
 ## 配置文件
 
-项目使用 `build_config.json` 作为构建配置文件。你可以直接编辑这个文件来配置构建选项。
+项目使用 `build_config.json` 作为构建配置文件。你可以直接编辑这个文件来控制试用版、免费版和代码签名。
 
 ### 配置文件位置
-- **配置文件**: `build_config.json` （实际使用的配置）
-- **配置模板**: `build_config.json.example` （模板文件，不会被使用）
+- 配置文件: `build_config.json`，实际参与构建
+- 配置模板: `build_config.json.example`，仅供复制参考
 
 ### 配置文件结构
 
 ```json
 {
   "license": {
+    "mode": "trial",
     "name": "Default",
     "days": 365,
     "expires": null,
@@ -39,68 +40,62 @@
 
 | 配置项 | 类型 | 说明 | 示例 |
 |--------|------|------|------|
-| `name` | string | 许可证名称（通常是公司或用户名） | `"MyCompany"` |
-| `days` | integer | 授权有效天数（从构建时间算起） | `365` |
-| `expires` | string/null | 指定过期时间（ISO 8601 格式），设置此项会覆盖 `days` | `"2026-12-31T23:59:59"` |
-| `required` | boolean | 是否强制要求授权（true: 无授权无法运行；false: 无授权会警告但可运行） | `true` / `false` |
-
-**使用示例**：
-
-```json
-// 示例 1: 授权 365 天（从构建时间算起）
-"license": {
-  "name": "MyCompany",
-  "days": 365,
-  "expires": null,
-  "required": true
-}
-
-// 示例 2: 授权到指定日期
-"license": {
-  "name": "MyCompany",
-  "days": 365,  // 此值会被 expires 覆盖
-  "expires": "2026-12-31T23:59:59",
-  "required": true
-}
-
-// 示例 3: 不强制授权（软性提醒）
-"license": {
-  "name": "MyCompany",
-  "days": 90,
-  "expires": null,
-  "required": false
-}
-```
+| `mode` | string | 授权模式。`trial` 表示按天数或到期时间生成内嵌授权；`free` 表示不生成授权，长期免费使用 | `"trial"` / `"free"` |
+| `name` | string | 许可证名称，通常是公司名或客户名 | `"MyCompany"` |
+| `days` | integer | 试用天数，从构建时间算起 | `365` |
+| `expires` | string/null | 指定过期时间，ISO 8601 格式。设置后优先于 `days` | `"2026-12-31T23:59:59"` |
+| `required` | boolean | 是否强制授权。`trial` 模式下有效；`free` 模式下会被忽略 | `true` / `false` |
 
 ### 2. build（构建配置）
 
 | 配置项 | 类型 | 说明 | 示例 |
 |--------|------|------|------|
 | `entry_script` | string | 入口脚本文件 | `"desktop_launcher.py"` |
-| `output_name` | string | 输出可执行文件名（不含 .exe） | `"DMS_Client"` |
-| `windowed` | boolean | 是否使用窗口模式（true: 无控制台窗口；false: 显示控制台） | `true` / `false` |
+| `output_name` | string | 输出程序基础名，不含 `.exe` | `"DMS_Client"` |
+| `windowed` | boolean | 是否使用窗口模式。`true` 表示不显示控制台窗口 | `true` / `false` |
 
 ### 3. sign（代码签名配置）
 
 | 配置项 | 类型 | 说明 | 示例 |
 |--------|------|------|------|
 | `enabled` | boolean | 是否启用代码签名 | `true` / `false` |
-| `cert_thumbprint` | string | 证书指纹（证书安装在 Windows 证书存储时使用） | `"a909502dd82ae41433e6f83886b00d4277a32a7b"` |
-| `cert_pfx_path` | string | PFX 证书文件路径（使用 PFX 文件时使用） | `"C:\\certs\\code_sign.pfx"` |
+| `cert_thumbprint` | string | 证书指纹，证书安装在 Windows 证书存储时使用 | `"a909502dd82ae41433e6f83886b00d4277a32a7b"` |
+| `cert_pfx_path` | string | PFX 证书文件路径 | `"C:\\certs\\code_sign.pfx"` |
 | `cert_pfx_password` | string | PFX 证书密码 | `"your-password"` |
 | `timestamp_url` | string | 时间戳服务器 URL | `"http://timestamp.digicert.com"` |
 
-**注意**：`cert_thumbprint` 和 `cert_pfx_path` 只需要设置其中一个。
+> `cert_thumbprint` 和 `cert_pfx_path` 二选一即可。
+
+## 构建行为说明
+
+### 1. 授权处理
+
+当前构建流程只使用内嵌授权，不再依赖外部 `license_*.json` 文件：
+
+1. `trial` 模式会根据 `days` 或 `expires` 生成授权。
+2. 生成的授权会被打包进程序内部。
+3. `free` 模式不会生成授权文件，程序按免费长期使用处理。
+4. 已安装客户端启动时只检查内嵌授权，不依赖 `releases` 或安装目录里的外部授权文件。
+
+### 2. 输出文件
+
+构建后会生成固定名称的文件：
+
+- `releases\DMS_Client.exe` - 主程序
+- `releases\DMS_Client_Installer.exe` - 安装包
+
+旧的时间戳文件会在下一次构建前自动清理。
 
 ## 使用方法
 
 ### 步骤 1: 编辑配置文件
 
-打开 `build_config.json`，修改配置项：
+打开 `build_config.json`，按需修改授权模式：
 
 ```json
 {
   "license": {
+    "mode": "trial",
     "name": "MyCompany",
     "days": 180,
     "expires": null,
@@ -121,6 +116,20 @@
 }
 ```
 
+如果你要长期免费使用，把授权模式改成：
+
+```json
+{
+  "license": {
+    "mode": "free",
+    "name": "",
+    "days": 0,
+    "expires": null,
+    "required": false
+  }
+}
+```
+
 ### 步骤 2: 运行构建脚本
 
 在 PowerShell 中运行：
@@ -129,52 +138,49 @@
 .\scripts\build_windows.ps1
 ```
 
+如果你要同时构建安装包，运行：
+
+```powershell
+.\scripts\build_installer.ps1
+```
+
 ### 步骤 3: 查看构建输出
 
 构建完成后，可执行文件位于：
-- `releases\DMS_Client.exe` - 主程序
-- `releases\license_MyCompany.json` - 许可证文件（如果配置了）
 
-**注意**：构建输出目录已从 `dist\` 改为 `releases\`，避免与 PyInstaller 默认目录混淆。
+- `releases\DMS_Client.exe`
+- `releases\DMS_Client_Installer.exe`
+
+> 不再输出 `releases\license_<name>.json`。授权会被打包进程序内部。
 
 ## 授权功能说明
 
-### 授权验证逻辑
+### 授权检查逻辑
 
-1. **授权文件位置**（按优先级排序）：
-   - `%APPDATA%\DMS\license.json`
-   - 可执行文件所在目录的 `license.json`
-   - 可执行文件所在目录的 `license_<name>.json`
+1. 客户端启动时检查授权。
+2. `trial` 模式下，如果授权过期，会弹出“授权过期，请联系管理员”。
+3. `free` 模式下不生成授权文件，客户端按免费长期使用处理。
 
-2. **授权检查时机**：
-   - 客户端启动时检查授权
-   - 如果 `license.required = true` 且授权无效 → **阻止启动**，显示错误对话框
-   - 如果 `license.required = false` 且授权无效 → **允许启动**，但记录警告日志
+### 运行时日志
 
-3. **授权过期处理**：
-   - 授权过期后，客户端会拒绝启动（如果 `required = true`）
-   - 用户需要联系管理员获取新的授权文件
+程序启动时会写入启动日志，位置为：
+
+- `%APPDATA%\DMS\logs\startup.log`
+
+日志会记录：
+
+- 解析到的 license 文件路径
+- 是否使用了内嵌授权回退
 
 ### 手动创建授权文件
 
-如果你想手动创建授权文件，可以使用 `create_license.py` 脚本：
+如果你要更新试用授权，可以修改 `build_config.json` 后重新构建，构建脚本会重新生成并打包授权。
 
-```bash
-# 授权 365 天
-python scripts/create_license.py MyCompany 365
-
-# 授权到指定日期
-python scripts/create_license.py MyCompany 2026-12-31
-
-# 授权到指定时间
-python scripts/create_license.py MyCompany "2026-12-31T23:59:59"
-```
-
-生成的授权文件位于：`certs\license_<name>.json`
+注意：当前版本不支持通过外部 `license.json` 热更新已安装客户端的授权。
 
 ### 验证授权文件
 
-使用 `verify_license.py` 脚本验证授权文件：
+如果你需要验证生成的授权文件，可以使用：
 
 ```bash
 python scripts/verify_license.py
@@ -188,21 +194,20 @@ python scripts/verify_license.py
 
 ### Q2: 如何禁用授权功能？
 
-**A**: 设置 `license.name` 为空字符串 `""` 或 `null`，或者不配置 `license` 部分。
+**A**: 把 `license.mode` 设为 `free`，然后重新构建。
 
 ### Q3: 授权到期后如何续期？
 
-**A**: 重新构建客户端（修改 `license.days` 或 `license.expires`），或者联系管理员获取新的授权文件。
+**A**: 修改 `license.days` 或 `license.expires` 后重新构建。
 
 ### Q4: 如何在不重新构建的情况下更新授权？
 
-**A**: 将新的授权文件（`license.json`）放到以下任一位置：
-- `%APPDATA%\DMS\license.json`
-- 可执行文件所在目录的 `license.json`
+**A**: 当前版本不支持外部文件热更新授权，需要修改配置后重新构建。
 
 ### Q5: 代码签名失败
 
 **A**: 检查以下事项：
+
 1. 证书文件路径是否正确
 2. 证书密码是否正确
 3. 时间戳服务器是否可访问
@@ -210,11 +215,12 @@ python scripts/verify_license.py
 
 ## 示例配置
 
-### 示例 1: 测试版本（不强制授权）
+### 示例 1: 试用版本，30 天
 
 ```json
 {
   "license": {
+    "mode": "trial",
     "name": "TestClient",
     "days": 30,
     "expires": null,
@@ -223,11 +229,12 @@ python scripts/verify_license.py
 }
 ```
 
-### 示例 2: 正式版本（强制授权，授权 1 年）
+### 示例 2: 试用版本，1 年
 
 ```json
 {
   "license": {
+    "mode": "trial",
     "name": "MyCompany",
     "days": 365,
     "expires": null,
@@ -236,11 +243,12 @@ python scripts/verify_license.py
 }
 ```
 
-### 示例 3: 正式版本（强制授权，授权到指定日期）
+### 示例 3: 试用版本，到指定日期
 
 ```json
 {
   "license": {
+    "mode": "trial",
     "name": "MyCompany",
     "days": 365,
     "expires": "2026-12-31T23:59:59",
@@ -249,11 +257,26 @@ python scripts/verify_license.py
 }
 ```
 
-### 示例 4: 启用代码签名
+### 示例 4: 免费版本，长期使用
 
 ```json
 {
   "license": {
+    "mode": "free",
+    "name": "",
+    "days": 0,
+    "expires": null,
+    "required": false
+  }
+}
+```
+
+### 示例 5: 启用代码签名
+
+```json
+{
+  "license": {
+    "mode": "trial",
     "name": "MyCompany",
     "days": 365,
     "expires": null,
@@ -261,100 +284,10 @@ python scripts/verify_license.py
   },
   "sign": {
     "enabled": true,
-    "cert_pfx_path": "C:\\certs\\code_sign.pfx",
-    "cert_pfx_password": "your-password",
+    "cert_thumbprint": "a909502dd82ae41433e6f83886b00d4277a32a7b",
+    "cert_pfx_path": "",
+    "cert_pfx_password": "",
     "timestamp_url": "http://timestamp.digicert.com"
   }
 }
 ```
-
-### 示例 5: 授权 90 天（不强制，软性提醒）
-
-这是你当前使用的配置。客户端会生成 90 天有效期的许可证，但过期后仍然可以运行（只会显示警告）。
-
-```json
-{
-  "license": {
-    "name": "MyCompany",
-    "days": 90,
-    "expires": null,
-    "required": false
-  }
-}
-```
-
-**配置说明**：
-- ✅ 授权有效期：90 天（从构建时间算起）
-- ✅ 不强制授权：过期后客户端仍可运行
-- ✅ 过期后会记录警告日志
-
-### 示例 6: 授权 180 天（不显示授权提示）
-
-如果你不希望在客户端显示任何授权相关的提示，可以设置 `name` 为空字符串：
-
-```json
-{
-  "license": {
-    "name": "",
-    "days": 180,
-    "expires": null,
-    "required": false
-  }
-}
-```
-
-**配置说明**：
-- ⚠️ 不会生成许可证文件
-- ⚠️ 不会进行授权检查
-- ⚠️ 客户端完全免费使用
-
-### 示例 7: 永久授权（不设置过期时间）
-
-```json
-{
-  "license": {
-    "name": "MyCompany",
-    "days": 99999,
-    "expires": null,
-    "required": false
-  }
-}
-```
-
-**配置说明**：
-- ✅ 授权有效期：99999 天（约 273 年，相当于永久）
-- ✅ 不强制授权
-- ⚠️ 建议设置为 `required: true` 以防止用户修改系统时间绕过授权
-
-## 注意事项
-
-1. **不要提交 `build_config.json` 到 Git**
-   - 此文件包含敏感信息（如证书密码）
-   - 已添加到 `.gitignore`
-
-2. **`build_config.json.example` 可以提交到 Git**
-   - 这是配置模板文件
-   - 不包含敏感信息
-
-3. **私钥安全**
-   - `certs/license_private.pem` 是私钥文件，用于签名授权
-   - 不要将此文件泄露给他人
-   - 已添加到 `.gitignore`
-
-4. **公钥可以公开**
-   - `certs/license_public.pem` 是公钥文件，用于验证授权
-   - 可以随客户端一起分发
-
-## 相关文件
-
-- `build_config.json` - 构建配置文件
-- `build_config.json.example` - 配置模板文件
-- `scripts/build_windows.ps1` - Windows 构建脚本
-- `scripts/create_license.py` - 授权生成脚本
-- `scripts/verify_license.py` - 授权验证脚本
-- `utils/license.py` - 授权验证库
-- `desktop_launcher.py` - 客户端启动器（包含授权检查逻辑）
-
-## 技术支持
-
-如有问题，请提交 Issue 或联系开发者。

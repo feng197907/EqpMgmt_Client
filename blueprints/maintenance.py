@@ -2,6 +2,8 @@
 from datetime import datetime
 from io import BytesIO
 import json
+import os
+import tempfile
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, send_file, url_for
 from flask_login import current_user, login_required
@@ -885,6 +887,15 @@ def _create_excel_response(wb, filename):
     )
 
 
+def _save_excel_to_temp(wb, filename):
+    """将 Workbook 保存到临时目录，返回文件路径"""
+    temp_dir = os.path.join(tempfile.gettempdir(), 'DMS_Exports')
+    os.makedirs(temp_dir, exist_ok=True)
+    filepath = os.path.join(temp_dir, filename)
+    wb.save(filepath)
+    return filepath
+
+
 def _set_header_style(cell):
     """设置表头样式"""
     cell.font = Font(bold=True, color="FFFFFF")
@@ -953,6 +964,10 @@ def export_plans(device_id):
         ws.column_dimensions[column].width = adjusted_width
 
     filename = f"{device['device_code']}_维护计划_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    if is_desktop:
+        filepath = _save_excel_to_temp(wb, filename)
+        return {"success": True, "filepath": filepath, "filename": filename}
     return _create_excel_response(wb, filename)
 
 
@@ -1021,6 +1036,10 @@ def export_history(device_id):
         ws.column_dimensions[column].width = adjusted_width
 
     filename = f"{device['device_code']}_维护历史_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    if is_desktop:
+        filepath = _save_excel_to_temp(wb, filename)
+        return {"success": True, "filepath": filepath, "filename": filename}
     return _create_excel_response(wb, filename)
 
 
@@ -1079,4 +1098,8 @@ def export_repair(device_id):
         ws.column_dimensions[column].width = adjusted_width
 
     filename = f"{device['device_code']}_维修记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    if is_desktop:
+        filepath = _save_excel_to_temp(wb, filename)
+        return {"success": True, "filepath": filepath, "filename": filename}
     return _create_excel_response(wb, filename)

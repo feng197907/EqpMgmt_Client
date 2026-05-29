@@ -39,6 +39,27 @@ def _wait_for_server(url, timeout=15):
 	return False
 
 
+def _get_startup_log_path():
+	base = os.environ.get('APPDATA') or os.path.expanduser('~')
+	log_dir = os.path.join(base, 'DMS', 'logs')
+	os.makedirs(log_dir, exist_ok=True)
+	return os.path.join(log_dir, 'startup.log')
+
+
+def _write_startup_probe(message):
+	startup_log = _get_startup_log_path()
+	timestamp = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+	with open(startup_log, 'a', encoding='utf-8') as log_file:
+		log_file.write(f'[{timestamp}] {message}\n')
+
+
+def _show_license_error(message):
+	import ctypes
+	if message == 'license expired':
+		message = '授权过期，请联系管理员'
+	ctypes.windll.user32.MessageBoxW(0, f'License error: {message}', 'License Check Failed', 0x00000010)
+
+
 def main():
 	_apply_config_env()
 
@@ -47,22 +68,28 @@ def main():
 	try:
 		import ctypes
 		import logging
-		from utils.license import check_license, resolve_license_path, resolve_public_key_path, should_enforce_license
+		from utils.license import verify_license, resolve_license_path, resolve_public_key_path, should_enforce_license
 
+		logger = logging.getLogger('app')
 		pubkey = resolve_public_key_path()
 		license_path = resolve_license_path()
-		if pubkey is None:
+		_write_startup_probe(f'License file resolved to: {license_path or "(not found)"}')
+		_write_startup_probe(f'Public key resolved to: {pubkey or "(not found)"}')
+		if license_path is None:
 			if should_enforce_license():
-				ctypes.windll.user32.MessageBoxW(0, 'License check failed: public key not found', 'License Check Failed', 0x00000010)
+				ctypes.windll.user32.MessageBoxW(0, 'License check failed: license not found', 'License Check Failed', 0x00000010)
 				return
-			logging.getLogger('app').warning('Public key not found; skipping optional license check.')
-			pubkey = ''
-		ok, msg = check_license(pubkey) if pubkey else (True, 'not required')
-		if not ok:
-			ctypes.windll.user32.MessageBoxW(0, f'License error: {msg}', 'License Check Failed', 0x00000010)
-			return
+			logger.warning('License not found; continuing because enforcement is disabled.')
+		else:
+			if pubkey is None:
+				_write_startup_probe('Public key file not found; using embedded public key fallback')
+				logger.warning('Public key not found; using embedded public key fallback.')
+			ok, msg = verify_license(license_path, pubkey or '')
+			if not ok:
+				_show_license_error(msg)
+				return
 		if license_path is None and not should_enforce_license():
-			logging.getLogger('app').warning('License not found; continuing because enforcement is disabled.')
+			logger.warning('License not found; continuing because enforcement is disabled.')
 	except Exception as exc:
 		# If license code itself fails, do not block normal local-client startup unless explicitly required.
 		if should_enforce_license():
@@ -110,6 +137,12 @@ def main():
 		def close(self):
 			try:
 				webview.windows[0].destroy()
+			except Exception:
+				return None
+
+		def open_file(self, filepath):
+			try:
+				os.startfile(filepath)
 			except Exception:
 				return None
 

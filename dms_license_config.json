@@ -2,6 +2,7 @@
     "license":  {
                     "days":  1,
                     "name":  "TestClient",
+                    "mode":  "trial",
                     "required":  true
                 }
 }

@@ -73,7 +73,12 @@ def decide_approval(request_id):
         return redirect(url_for("approvals.approvals"))
     signed_at = datetime.now(timezone.utc).isoformat()
     meaning = "Approved" if decision == "approve" else "Rejected"
-    doc_hash = compute_doc_hash(doc_file_path, current_user.username, meaning, signed_at)
+    try:
+        doc_hash = compute_doc_hash(doc_file_path, current_user.username, meaning, signed_at)
+    except FileNotFoundError:
+        conn.close()
+        flash(f"关联文档文件不存在：{doc['file_path']}", "danger")
+        return redirect(url_for("approvals.approvals"))
     execute_with_retry(
         cur,
         "INSERT INTO signatures (user, meaning, doc_id, doc_version, doc_hash, ip_address, user_agent) VALUES (%s, %s, %s, %s, %s, %s, %s)",

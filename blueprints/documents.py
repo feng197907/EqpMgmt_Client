@@ -4,7 +4,7 @@ import tempfile
 from datetime import datetime
 from io import BytesIO
 
-from flask import Blueprint, flash, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -63,7 +63,9 @@ def upload_doc(device_id):
         success_count = 0
         error_msgs = []
         device_dir = ensure_upload_dir(device_id)
-        data_dir = DEFAULT_DATA_DIR
+        # 用运行时 UPLOAD_FOLDER 的父目录作为 data_dir，确保与下载路径解析一致
+        _upload_folder = current_app.config.get('UPLOAD_FOLDER', '')
+        data_dir = os.path.dirname(_upload_folder) if _upload_folder else DEFAULT_DATA_DIR
 
         for idx, file in enumerate(files):
             if not file or file.filename == "":
@@ -163,13 +165,20 @@ def download_doc(doc_id):
         f"下载 {doc['doc_name']} v{doc['version']}",
     )
     # file_path 存储为相对路径，转换为服务器上的绝对路径
+    # 优先用运行时 UPLOAD_FOLDER（由 config.json 正确注入），其父目录即 data_dir
+    # 回退到编译期算出的 DEFAULT_DATA_DIR
     file_path = doc["file_path"]
-    # 如果是相对路径，拼接 BASE_DIR
     if not os.path.isabs(file_path):
-        file_path = os.path.join(BASE_DIR, file_path)
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', '')
+        data_dir = os.path.dirname(upload_folder) if upload_folder else DEFAULT_DATA_DIR
+        file_path = os.path.join(data_dir, file_path)
+    # 规范化路径，消除 .. 穿越（避免 os.startfile 处理 .. 路径失败）
+    file_path = os.path.normpath(file_path)
 
     # pywebview 桌面壳无法处理文件下载，返回文件路径让前端通过 API 打开
     is_desktop = request.headers.get('X-Desktop-Shell') == '1'
+    import logging as _logging
+    _logging.getLogger('app').info(f"[download] doc_id={doc_id} is_desktop={is_desktop} X-Desktop-Shell={request.headers.get('X-Desktop-Shell')!r} file_path={file_path}")
     if is_desktop:
         if os.path.exists(file_path):
             return {"success": True, "filepath": file_path, "filename": doc["doc_name"]}

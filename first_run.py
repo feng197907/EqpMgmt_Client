@@ -5,7 +5,20 @@ import sys
 
 
 def _appdata_dir():
+    """获取用户 AppData/Roaming 目录。
+    Windows 下优先用 Shell32 API，避免 pywebview 进程中 APPDATA 环境变量不正确的问题。
+    """
     if os.name == 'nt':
+        try:
+            import ctypes
+            buf = ctypes.create_unicode_buffer(256)
+            # CSIDL_APPDATA = 0x001a => C:\Users\xxx\AppData\Roaming
+            ctypes.windll.shell32.SHGetFolderPathW(0, 0x001a, 0, 0, buf)
+            if buf.value:
+                return buf.value
+        except Exception:
+            pass
+        # 回退：环境变量 → expanduser
         return os.environ.get('APPDATA') or os.path.expanduser('~')
     return os.path.join(os.path.expanduser('~'), '.local', 'share')
 

@@ -240,33 +240,48 @@
     var isDesktop = typeof window.pywebview !== 'undefined' && window.pywebview.api;
 
     if (!isDesktop) {
-      // 浏览器模式：用隐藏 <a download> 触发文件下载，不跳转页面
-      try {
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = '';
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-success');
-      } catch(err) {
-        console.error('导出失败:', err);
-        btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-danger');
-      }
-      setTimeout(function() {
-        btn.disabled = false;
-        btn.innerHTML = '<i data-lucide="download"></i> 导出';
-        btn.classList.remove('btn-success', 'btn-danger');
-        btn.classList.add('btn-outline-primary');
-        if (typeof lucide !== 'undefined') {
-          lucide.createIcons({ attrs: { target: btn } });
-        }
-      }, 2000);
+      // 浏览器模式：fetch → Blob URL → <a> click，不受弹窗拦截器限制
+      fetch(url, { credentials: 'same-origin' })
+        .then(function(resp) {
+          if (!resp.ok) { throw new Error('导出失败: ' + resp.status); }
+          var disposition = resp.headers.get('Content-Disposition') || '';
+          var filenameMatch = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)/i);
+          var filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : 'export.xlsx';
+          return resp.blob().then(function(blob) {
+            return { blob: blob, filename: filename };
+          });
+        })
+        .then(function(result) {
+          var blobUrl = URL.createObjectURL(result.blob);
+          var a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = result.filename;
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 10000);
+          btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-success');
+        })
+        .catch(function(err) {
+          console.error('导出失败:', err);
+          btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
+          btn.classList.remove('btn-primary');
+          btn.classList.add('btn-danger');
+        })
+        .finally(function() {
+          setTimeout(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="download"></i> 导出';
+            btn.classList.remove('btn-success', 'btn-danger');
+            btn.classList.add('btn-outline-primary');
+            if (typeof lucide !== 'undefined') {
+              lucide.createIcons({ attrs: { target: btn } });
+            }
+          }, 2000);
+        });
       return;
     }
 
@@ -278,10 +293,12 @@
       })
       .then(function(data) {
         if (data.success) {
-          window.pywebview.api.open_file(data.filepath);
-          btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
-          btn.classList.remove('btn-primary');
-          btn.classList.add('btn-success');
+          Promise.resolve(window.pywebview.api.open_file(data.filepath)).then(function(r) {
+            if (r && r.success === false) { alert('打开文件失败：' + (r.error || '未知错误')); return; }
+            btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-success');
+          });
         } else {
           throw new Error(data.error || '导出失败');
         }
@@ -307,6 +324,9 @@
 
   // ==================== 通用文件下载方法 ====================
   function doDownload(btn, url, originalHTML) {
+    // <a> 标签没有 disabled 属性，用 data 属性防止重复触发
+    if (btn.tagName === 'A' && btn.dataset.downloading === '1') return;
+    if (btn.tagName === 'A') btn.dataset.downloading = '1';
     btn.disabled = true;
     originalHTML = originalHTML || btn.innerHTML;
     var _icon = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>';
@@ -315,7 +335,8 @@
     }
     btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>下载中...';
 
-    var isDesktop = typeof window.pywebview !== 'undefined' && window.pywebview.api;
+    var isDesktop = !!(typeof window.pywebview !== 'undefined' && window.pywebview && window.pywebview.api);
+    console.log('[DMS download] isDesktop=' + isDesktop + ' pywebview=' + (typeof window.pywebview) + ' api=' + (window.pywebview && typeof window.pywebview.api) + ' url=' + url);
 
     if (!isDesktop) {
       // 浏览器模式：用隐藏 <a download> 触发文件下载，不跳转页面
@@ -336,6 +357,7 @@
       }
       setTimeout(function() {
         btn.disabled = false;
+        btn.dataset.downloading = '';
         btn.innerHTML = originalHTML;
         btn.style.color = '';
         if (typeof lucide !== 'undefined') {
@@ -353,9 +375,11 @@
       })
       .then(function(data) {
         if (data.success) {
-          window.pywebview.api.open_file(data.filepath);
-          btn.innerHTML = _icon.replace('stroke="currentColor"', 'stroke="#198754"').replace('class="table-action-btn success"', 'class="table-action-btn success" style="color:#198754"');
-          if (btn.classList.contains('action-btn')) btn.style.color = '#198754';
+          Promise.resolve(window.pywebview.api.open_file(data.filepath)).then(function(r) {
+            if (r && r.success === false) { alert('打开文件失败：' + (r.error || '未知错误')); return; }
+            btn.innerHTML = _icon.replace('stroke="currentColor"', 'stroke="#198754"').replace('class="table-action-btn success"', 'class="table-action-btn success" style="color:#198754"');
+            if (btn.classList.contains('action-btn')) btn.style.color = '#198754';
+          });
         } else {
           throw new Error(data.error || '下载失败');
         }
@@ -368,6 +392,7 @@
       .finally(function() {
         setTimeout(function() {
           btn.disabled = false;
+          btn.dataset.downloading = '';
           btn.innerHTML = originalHTML;
           btn.style.color = '';
           if (typeof lucide !== 'undefined') {
@@ -376,6 +401,24 @@
         }, 2000);
       });
   }
+
+  // ==================== pywebview 桌面壳下载拦截 ====================
+  // 纯 <a href download> 在 pywebview 中无法触发文件保存，需拦截后走 API
+  // 注意：在每次点击时动态检测 pywebview，避免初始化时 API 尚未就绪的竞态问题
+  document.addEventListener('click', function(e) {
+    var anchor = e.target.closest('a[download]');
+    if (!anchor) return;
+
+    // 每次点击时动态判断是否处于 pywebview 桌面壳
+    var isDesktop = !!(typeof window.pywebview !== 'undefined' && window.pywebview && window.pywebview.api);
+    if (!isDesktop) return; // 浏览器模式：放行，让原生 <a download> 处理
+
+    e.preventDefault();
+    e.stopPropagation();
+    var url = anchor.href;
+    if (!url) return;
+    doDownload(anchor, url, anchor.innerHTML);
+  }, true); // 捕获阶段，确保优先于其他 click 处理
 
   window.DMS = {
     toggleSidebar: toggleSidebar,

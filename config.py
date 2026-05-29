@@ -253,7 +253,17 @@ def normalize_role(role):
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 优先使用 per-user 存储（Windows 下使用 %APPDATA%），否则回退到项目目录
 if os.name == 'nt':
-    _appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
+    # 优先用 Shell32 API 获取真实 AppData/Roaming，避免 pywebview 进程中
+    # APPDATA 环境变量不正确（如缺少 AppData 层级）的问题
+    try:
+        import ctypes as _ctypes
+        _buf = _ctypes.create_unicode_buffer(256)
+        _ctypes.windll.shell32.SHGetFolderPathW(0, 0x001a, 0, 0, _buf)
+        _appdata = _buf.value if _buf.value else None
+    except Exception:
+        _appdata = None
+    if not _appdata:
+        _appdata = os.environ.get('APPDATA') or os.path.expanduser('~')
     DEFAULT_DATA_DIR = os.path.join(_appdata, 'DMS')
 else:
     DEFAULT_DATA_DIR = os.path.join(BASE_DIR, 'data')

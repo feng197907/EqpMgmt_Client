@@ -40,7 +40,9 @@ def _wait_for_server(url, timeout=15):
 
 
 def _get_startup_log_path():
-	base = os.environ.get('APPDATA') or os.path.expanduser('~')
+	# 用 first_run 的 _appdata_dir 确保路径一致
+	from first_run import _appdata_dir
+	base = _appdata_dir()
 	log_dir = os.path.join(base, 'DMS', 'logs')
 	os.makedirs(log_dir, exist_ok=True)
 	return os.path.join(log_dir, 'startup.log')
@@ -142,9 +144,14 @@ def main():
 
 		def open_file(self, filepath):
 			try:
+				# 规范化路径，消除 .. 穿越
+				filepath = os.path.normpath(filepath)
+				if not os.path.exists(filepath):
+					return {"success": False, "error": f"文件不存在: {filepath}"}
 				os.startfile(filepath)
-			except Exception:
-				return None
+				return {"success": True}
+			except Exception as e:
+				return {"success": False, "error": str(e)}
 
 	try:
 		import webview

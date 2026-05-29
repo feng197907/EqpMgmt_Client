@@ -185,8 +185,7 @@
                 </a>
                 {% if row.status in ['active', 'archived'] %}
                 <a href="{{ url_for('documents.download_doc', doc_id=row.id) }}" 
-                   class="table-action-btn success" title="下载"
-                   onclick="window.DMS.doDownload(this,'{{ url_for('documents.download_doc', doc_id=row.id) }}');return false;">
+                   class="table-action-btn success" title="下载" download>
                   <i data-lucide="download"></i>
                 </a>
                 {% endif %}
@@ -261,33 +260,48 @@ function exportDocuments(btn) {
   var isDesktop = typeof window.pywebview !== 'undefined' && window.pywebview.api;
 
   if (!isDesktop) {
-    // 浏览器模式：用隐藏 <a download> 触发文件下载，不跳转页面
-    try {
-      var dlA = document.createElement('a');
-      dlA.href = exportUrl;
-      dlA.download = '';
-      dlA.style.display = 'none';
-      document.body.appendChild(dlA);
-      dlA.click();
-      document.body.removeChild(dlA);
-      btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
-      btn.classList.remove('btn-primary');
-      btn.classList.add('btn-success');
-    } catch(err) {
-      console.error('导出失败:', err);
-      btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
-      btn.classList.remove('btn-primary');
-      btn.classList.add('btn-danger');
-    }
-    setTimeout(function() {
-      btn.disabled = false;
-      btn.innerHTML = '<i data-lucide="download"></i> 导出';
-      btn.classList.remove('btn-success', 'btn-danger');
-      btn.classList.add('btn-outline-primary');
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons({ attrs: { target: btn } });
-      }
-    }, 2000);
+    // 浏览器模式：fetch → Blob URL → <a> click，不受弹窗拦截器限制
+    fetch(exportUrl, { credentials: 'same-origin' })
+      .then(function(resp) {
+        if (!resp.ok) { throw new Error('导出失败: ' + resp.status); }
+        var disposition = resp.headers.get('Content-Disposition') || '';
+        var filenameMatch = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\r\n]+)/i);
+        var filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : 'documents.xlsx';
+        return resp.blob().then(function(blob) {
+          return { blob: blob, filename: filename };
+        });
+      })
+      .then(function(result) {
+        var blobUrl = URL.createObjectURL(result.blob);
+        var dlA = document.createElement('a');
+        dlA.href = blobUrl;
+        dlA.download = result.filename;
+        dlA.style.display = 'none';
+        document.body.appendChild(dlA);
+        dlA.click();
+        document.body.removeChild(dlA);
+        setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 10000);
+        btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-success');
+      })
+      .catch(function(err) {
+        console.error('导出失败:', err);
+        btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-danger');
+      })
+      .finally(function() {
+        setTimeout(function() {
+          btn.disabled = false;
+          btn.innerHTML = '<i data-lucide="download"></i> 导出';
+          btn.classList.remove('btn-success', 'btn-danger');
+          btn.classList.add('btn-outline-primary');
+          if (typeof lucide !== 'undefined') {
+            lucide.createIcons({ attrs: { target: btn } });
+          }
+        }, 2000);
+      });
     return;
   }
 

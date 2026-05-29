@@ -29,6 +29,7 @@ from blueprints import (
     esign_bp,
     maintenance_bp,
     password_bp,
+    profile_bp,
     search_bp,
     settings_bp,
     spare_part_bp,
@@ -68,6 +69,7 @@ def create_app():
     app.register_blueprint(maintenance_bp)  # 维护计划相关路由
     app.register_blueprint(search_bp)  # 全局搜索
     app.register_blueprint(password_bp)  # 密码重置功能
+    app.register_blueprint(profile_bp)   # 个人设置
     app.register_blueprint(settings_bp)  # 系统设置
     app.register_blueprint(esign_bp)  # 电子签名
     app.register_blueprint(spare_part_bp)  # 备件库存管理

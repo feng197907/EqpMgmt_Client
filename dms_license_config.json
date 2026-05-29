@@ -1,10 +1,10 @@
 {
     "license":  {
                     "name":  "TestClient",
-                    "expires":  "2026-05-28T23:59:59",
-                    "build_time":  "2026-05-29T11:20:20",
-                    "days":  1,
+                    "expires":  null,
+                    "build_time":  "2026-05-29T11:33:57",
+                    "days":  0,
                     "required":  true,
-                    "mode":  "trial"
+                    "mode":  "free"
                 }
 }

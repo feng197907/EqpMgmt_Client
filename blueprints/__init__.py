@@ -9,6 +9,7 @@ from blueprints.documents import documents_bp
 from blueprints.esign import esign_bp
 from blueprints.maintenance import maintenance_bp
 from blueprints.password import password_bp
+from blueprints.profile import profile_bp
 from blueprints.search import search_bp
 from blueprints.settings import settings_bp
 from blueprints.spare_part import spare_part_bp
@@ -26,6 +27,7 @@ __all__ = [
     "maintenance_bp",
     "search_bp",
     "password_bp",
+    "profile_bp",
     "settings_bp",
     "esign_bp",
     "spare_part_bp",

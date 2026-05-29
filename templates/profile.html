@@ -1,0 +1,769 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-title">
+    <h1>个人设置</h1>
+    <p class="page-subtitle">管理您的账户信息和安全设置</p>
+  </div>
+</div>
+
+<div class="profile-layout">
+
+  <!-- 左侧：用户卡片 -->
+  <div class="profile-sidebar">
+    <div class="profile-card">
+      <div class="profile-avatar-wrap">
+        <div class="profile-avatar-lg">
+          {{ current_user.username[0]|upper }}
+        </div>
+      </div>
+      <div class="profile-meta">
+        <div class="profile-username">{{ current_user.username }}</div>
+        <div class="profile-role-badge">{{ current_user.role_label or current_user.role }}</div>
+      </div>
+      <div class="profile-info-list">
+        <div class="profile-info-item">
+          <i data-lucide="shield"></i>
+          <span class="profile-info-label">账号状态</span>
+          <span class="profile-info-value">
+            {% if user_row and user_row['status'] == 'active' %}
+            <span class="badge-status badge-status-active">正常</span>
+            {% else %}
+            <span class="badge-status badge-status-inactive">停用</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="profile-info-item">
+          <i data-lucide="user-check"></i>
+          <span class="profile-info-label">账号角色</span>
+          <span class="profile-info-value">{{ current_user.role_label or current_user.role }}</span>
+        </div>
+        {% if created_at %}
+        <div class="profile-info-item">
+          <i data-lucide="calendar"></i>
+          <span class="profile-info-label">首次活跃</span>
+          <span class="profile-info-value">
+            {{ created_at[:10] if created_at else '—' }}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- 快速导航 -->
+    <div class="profile-nav-card">
+      <div class="profile-nav-title">快速导航</div>
+      <a href="#section-password" class="profile-nav-item active" id="nav-password">
+        <i data-lucide="lock"></i>
+        <span>修改密码</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- 右侧：设置内容 -->
+  <div class="profile-content">
+
+    <!-- 基本信息 -->
+    <div class="settings-section" id="section-info">
+      <div class="settings-section-header">
+        <i data-lucide="user"></i>
+        <h2>基本信息</h2>
+      </div>
+      <div class="settings-section-body">
+        <div class="info-grid">
+          <div class="info-row">
+            <span class="info-label">用户名</span>
+            <span class="info-value">{{ current_user.username }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">角色</span>
+            <span class="info-value">{{ current_user.role_label or current_user.role }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">账号状态</span>
+            <span class="info-value">
+              {% if user_row and user_row['status'] == 'active' %}
+              <span class="badge-status badge-status-active">正常</span>
+              {% else %}
+              <span class="badge-status badge-status-inactive">停用</span>
+              {% endif %}
+            </span>
+          </div>
+          {% if created_at %}
+          <div class="info-row">
+            <span class="info-label">首次活跃</span>
+            <span class="info-value">
+              {{ created_at[:16] if created_at else '—' }}
+            </span>
+          </div>
+          {% endif %}
+        </div>
+        <p class="info-note">
+          <i data-lucide="info"></i>
+          如需修改用户名或角色，请联系系统管理员。
+        </p>
+      </div>
+    </div>
+
+    <!-- 修改密码 -->
+    <div class="settings-section" id="section-password">
+      <div class="settings-section-header">
+        <i data-lucide="lock"></i>
+        <h2>修改密码</h2>
+      </div>
+      <div class="settings-section-body">
+        <form method="POST" action="{{ url_for('profile.profile') }}" class="password-form" id="passwordForm" novalidate>
+          <input type="hidden" name="action" value="change_password">
+
+          <div class="form-group">
+            <label class="form-label" for="current_password">
+              当前密码 <span class="required">*</span>
+            </label>
+            <div class="input-with-toggle">
+              <input
+                type="password"
+                id="current_password"
+                name="current_password"
+                class="form-control"
+                placeholder="请输入当前密码"
+                autocomplete="current-password"
+                required
+              >
+              <button type="button" class="input-eye-btn" data-target="current_password" tabindex="-1" aria-label="显示/隐藏密码">
+                <i data-lucide="eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="new_password">
+              新密码 <span class="required">*</span>
+            </label>
+            <div class="input-with-toggle">
+              <input
+                type="password"
+                id="new_password"
+                name="new_password"
+                class="form-control"
+                placeholder="至少 6 个字符"
+                autocomplete="new-password"
+                required
+                minlength="6"
+              >
+              <button type="button" class="input-eye-btn" data-target="new_password" tabindex="-1" aria-label="显示/隐藏密码">
+                <i data-lucide="eye"></i>
+              </button>
+            </div>
+            <!-- 密码强度条 -->
+            <div class="password-strength" id="passwordStrength" style="display:none;">
+              <div class="password-strength-bar">
+                <div class="password-strength-fill" id="strengthFill"></div>
+              </div>
+              <span class="password-strength-label" id="strengthLabel"></span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="confirm_password">
+              确认新密码 <span class="required">*</span>
+            </label>
+            <div class="input-with-toggle">
+              <input
+                type="password"
+                id="confirm_password"
+                name="confirm_password"
+                class="form-control"
+                placeholder="再次输入新密码"
+                autocomplete="new-password"
+                required
+              >
+              <button type="button" class="input-eye-btn" data-target="confirm_password" tabindex="-1" aria-label="显示/隐藏密码">
+                <i data-lucide="eye"></i>
+              </button>
+            </div>
+            <div class="field-hint" id="confirmHint" style="display:none;"></div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+              <i data-lucide="save"></i>
+              保存新密码
+            </button>
+            <button type="reset" class="btn btn-outline-secondary" onclick="resetForm()">
+              <i data-lucide="rotate-ccw"></i>
+              重置
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 登录安全提示 -->
+    <div class="settings-section">
+      <div class="settings-section-header">
+        <i data-lucide="shield-check"></i>
+        <h2>安全建议</h2>
+      </div>
+      <div class="settings-section-body">
+        <ul class="security-tips">
+          <li>
+            <i data-lucide="check-circle"></i>
+            <span>使用包含字母、数字和特殊字符的强密码（建议 8 位以上）</span>
+          </li>
+          <li>
+            <i data-lucide="check-circle"></i>
+            <span>不要在多个平台使用相同的密码</span>
+          </li>
+          <li>
+            <i data-lucide="check-circle"></i>
+            <span>定期更换密码，建议每 3 个月更换一次</span>
+          </li>
+          <li>
+            <i data-lucide="check-circle"></i>
+            <span>使用完毕后请点击"退出登录"，避免他人误操作</span>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+/* ========== 个人设置页面样式 ========== */
+
+.profile-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .profile-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 左侧卡片 */
+.profile-card {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.profile-avatar-wrap {
+  margin-bottom: 12px;
+}
+
+.profile-avatar-lg {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.profile-meta {
+  margin-bottom: 16px;
+}
+
+.profile-username {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.profile-role-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: 100px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.profile-info-list {
+  border-top: 1px solid var(--border-color);
+  padding-top: 12px;
+  text-align: left;
+}
+
+.profile-info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-info-item:last-child {
+  border-bottom: none;
+}
+
+.profile-info-item i {
+  width: 14px;
+  height: 14px;
+  color: var(--color-gray-400);
+  flex-shrink: 0;
+}
+
+.profile-info-label {
+  flex: 1;
+  color: var(--text-muted);
+}
+
+.profile-info-value {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* 快速导航 */
+.profile-nav-card {
+  background: var(--bg-card);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.profile-nav-title {
+  padding: 12px 16px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  transition: background var(--transition-fast), color var(--transition-fast);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.profile-nav-item:last-child {
+  border-bottom: none;
+}
+
+.profile-nav-item i {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.profile-nav-item:hover,
+.profile-nav-item.active {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+/* 右侧内容区 */
+.profile-content > .settings-section {
+  margin-bottom: 20px;
+}
+
+.profile-content > .settings-section:last-child {
+  margin-bottom: 0;
+}
+
+/* 基本信息网格 */
+.info-grid {
+  padding: 4px 0;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: var(--text-sm);
+}
+
+.info-row:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  width: 120px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.info-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.info-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  background: var(--color-gray-50);
+  padding: 8px 12px;
+  border-radius: var(--border-radius-sm);
+}
+
+.info-note i {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--color-info);
+}
+
+/* 密码表单 */
+.password-form {
+  max-width: 480px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.required {
+  color: var(--color-danger);
+  margin-left: 2px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 9px 40px 9px 12px;
+  font-size: var(--text-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+  background: #fff;
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.form-control:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-control.is-invalid {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.form-control.is-valid {
+  border-color: var(--color-success);
+}
+
+/* 密码显示/隐藏 */
+.input-with-toggle {
+  position: relative;
+}
+
+.input-with-toggle .form-control {
+  padding-right: 40px;
+}
+
+.input-eye-btn {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 38px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: color var(--transition-fast);
+}
+
+.input-eye-btn:hover {
+  color: var(--text-secondary);
+}
+
+.input-eye-btn i {
+  width: 16px;
+  height: 16px;
+}
+
+/* 密码强度条 */
+.password-strength {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.password-strength-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.password-strength-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease, background 0.3s ease;
+  width: 0;
+}
+
+.password-strength-label {
+  font-size: var(--text-xs);
+  width: 40px;
+  flex-shrink: 0;
+}
+
+/* 确认密码提示 */
+.field-hint {
+  margin-top: 6px;
+  font-size: var(--text-xs);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-hint.match {
+  color: var(--color-success);
+}
+
+.field-hint.no-match {
+  color: var(--color-danger);
+}
+
+/* 表单操作区 */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* 账号状态徽章 */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.badge-status-active {
+  background: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.badge-status-inactive {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+}
+
+/* 安全建议列表 */
+.security-tips {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.security-tips li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.security-tips li:last-child {
+  border-bottom: none;
+}
+
+.security-tips li i {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: var(--color-success);
+  margin-top: 1px;
+}
+</style>
+
+<script>
+(function() {
+  // ========== 密码显示/隐藏 ==========
+  document.querySelectorAll('.input-eye-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var target = document.getElementById(btn.dataset.target);
+      if (!target) return;
+      var isPassword = target.type === 'password';
+      target.type = isPassword ? 'text' : 'password';
+      var icon = btn.querySelector('[data-lucide]');
+      if (icon) {
+        icon.setAttribute('data-lucide', isPassword ? 'eye-off' : 'eye');
+        lucide.createIcons();
+      }
+    });
+  });
+
+  // ========== 密码强度检测 ==========
+  var newPwdInput = document.getElementById('new_password');
+  var strengthBar = document.getElementById('passwordStrength');
+  var strengthFill = document.getElementById('strengthFill');
+  var strengthLabel = document.getElementById('strengthLabel');
+
+  function calcStrength(pwd) {
+    var score = 0;
+    if (pwd.length >= 6) score++;
+    if (pwd.length >= 10) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    return score;
+  }
+
+  if (newPwdInput) {
+    newPwdInput.addEventListener('input', function() {
+      var val = this.value;
+      if (!val) {
+        strengthBar.style.display = 'none';
+        return;
+      }
+      strengthBar.style.display = 'flex';
+      var score = calcStrength(val);
+      var levels = [
+        { label: '极弱', color: '#EF4444', width: '20%' },
+        { label: '弱', color: '#F59E0B', width: '40%' },
+        { label: '一般', color: '#F59E0B', width: '60%' },
+        { label: '强', color: '#10B981', width: '80%' },
+        { label: '极强', color: '#10B981', width: '100%' },
+      ];
+      var level = levels[Math.max(0, Math.min(score - 1, 4))];
+      strengthFill.style.width = level.width;
+      strengthFill.style.background = level.color;
+      strengthLabel.textContent = level.label;
+      strengthLabel.style.color = level.color;
+
+      // 联动检查确认密码
+      checkConfirm();
+    });
+  }
+
+  // ========== 确认密码实时校验 ==========
+  var confirmInput = document.getElementById('confirm_password');
+  var confirmHint = document.getElementById('confirmHint');
+
+  function checkConfirm() {
+    if (!confirmInput || !confirmInput.value) {
+      if (confirmHint) confirmHint.style.display = 'none';
+      return;
+    }
+    var match = confirmInput.value === newPwdInput.value;
+    confirmHint.style.display = 'flex';
+    if (match) {
+      confirmHint.className = 'field-hint match';
+      confirmHint.innerHTML = '<i data-lucide="check-circle" style="width:12px;height:12px;"></i> 密码一致';
+      confirmInput.classList.remove('is-invalid');
+      confirmInput.classList.add('is-valid');
+    } else {
+      confirmHint.className = 'field-hint no-match';
+      confirmHint.innerHTML = '<i data-lucide="x-circle" style="width:12px;height:12px;"></i> 两次密码不一致';
+      confirmInput.classList.remove('is-valid');
+      confirmInput.classList.add('is-invalid');
+    }
+    lucide.createIcons();
+  }
+
+  if (confirmInput) {
+    confirmInput.addEventListener('input', checkConfirm);
+  }
+
+  // ========== 提交前校验 ==========
+  var form = document.getElementById('passwordForm');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      var current = document.getElementById('current_password').value;
+      var newPwd = newPwdInput.value;
+      var confirm = confirmInput.value;
+
+      if (!current || !newPwd || !confirm) {
+        e.preventDefault();
+        alert('请填写所有必填字段。');
+        return;
+      }
+      if (newPwd.length < 6) {
+        e.preventDefault();
+        alert('新密码长度不能少于 6 个字符。');
+        return;
+      }
+      if (newPwd !== confirm) {
+        e.preventDefault();
+        confirmInput.classList.add('is-invalid');
+        confirmInput.focus();
+        return;
+      }
+    });
+  }
+
+  // ========== 重置表单 ==========
+  window.resetForm = function() {
+    if (strengthBar) strengthBar.style.display = 'none';
+    if (confirmHint) confirmHint.style.display = 'none';
+    ['current_password', 'new_password', 'confirm_password'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.classList.remove('is-valid', 'is-invalid');
+        el.value = '';
+      }
+    });
+  };
+
+  // ========== 平滑滚动导航 ==========
+  document.querySelectorAll('.profile-nav-item[href^="#"]').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.preventDefault();
+      var target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+
+  lucide.createIcons();
+})();
+</script>
+{% endblock %}

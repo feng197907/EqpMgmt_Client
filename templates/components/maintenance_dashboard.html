@@ -4,24 +4,24 @@
   <div class="card-header d-flex justify-content-between align-items-center">
     <span>📋 即将到期的维护</span>
     <div class="btn-group">
-      <button class="btn btn-sm btn-outline-secondary" onclick="filterMaintenance('all')" id="filterAll">全部</button>
-      <button class="btn btn-sm btn-outline-secondary" onclick="filterMaintenance('calibration')">校准</button>
-      <button class="btn btn-sm btn-outline-secondary" onclick="filterMaintenance('maintenance')">保养</button>
-      <button class="btn btn-sm btn-outline-secondary" onclick="filterMaintenance('inspection')">巡检</button>
+      <button class="btn btn-sm btn-outline-secondary active" onclick="filterMaintenance('all', this)">全部</button>
+      <button class="btn btn-sm btn-outline-primary" onclick="filterMaintenance('calibration', this)">校准</button>
+      <button class="btn btn-sm btn-outline-success" onclick="filterMaintenance('maintenance', this)">保养</button>
+      <button class="btn btn-sm btn-outline-warning" onclick="filterMaintenance('inspection', this)">巡检</button>
     </div>
   </div>
   <div class="card-body">
     {% if overdue %}
-    <div class="mb-3">
+    <div class="mb-3 maintenance-section">
       <h4 class="text-danger">🔴 已逾期 ({{ overdue|length }}台)</h4>
       <ul class="list-group">
         {% for item in overdue %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
+        <li class="list-group-item d-flex justify-content-between align-items-center maintenance-item" data-type="{{ item.maintenance_type }}">
           <div>
             <a href="{{ url_for('devices.device_detail', device_id=item.device_id) }}">
               {{ item.device_code }} {{ item.device_name }}
             </a>
-            <span class="badge badge-danger">{{ item.maintenance_type_label }}</span>
+            <span class="badge badge-{{ 'primary' if item.maintenance_type == 'calibration' else ('success' if item.maintenance_type == 'maintenance' else 'warning') }}">{{ item.maintenance_type_label }}</span>
             <span class="text-muted">逾期 {{ item.overdue_days }} 天</span>
           </div>
           <a href="{{ url_for('maintenance.new_record_form', device_id=item.device_id, plan_id=item.plan_id) }}"
@@ -33,16 +33,16 @@
     {% endif %}
 
     {% if due_today %}
-    <div class="mb-3">
+    <div class="mb-3 maintenance-section">
       <h4 class="text-danger">⚠️ 今日到期 ({{ due_today|length }}台)</h4>
       <ul class="list-group">
         {% for item in due_today %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
+        <li class="list-group-item d-flex justify-content-between align-items-center maintenance-item" data-type="{{ item.maintenance_type }}">
           <div>
             <a href="{{ url_for('devices.device_detail', device_id=item.device_id) }}">
               {{ item.device_code }} {{ item.device_name }}
             </a>
-            <span class="badge badge-danger">{{ item.maintenance_type_label }}</span>
+            <span class="badge badge-{{ 'primary' if item.maintenance_type == 'calibration' else ('success' if item.maintenance_type == 'maintenance' else 'warning') }}">{{ item.maintenance_type_label }}</span>
             <span class="text-muted">到期日: {{ item.due_date }}</span>
           </div>
           <a href="{{ url_for('maintenance.new_record_form', device_id=item.device_id, plan_id=item.plan_id) }}"
@@ -54,16 +54,16 @@
     {% endif %}
 
     {% if due_within_7days %}
-    <div class="mb-3">
+    <div class="mb-3 maintenance-section">
       <h4 class="text-warning">📅 7日内到期 ({{ due_within_7days|length }}台)</h4>
       <ul class="list-group">
         {% for item in due_within_7days %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
+        <li class="list-group-item d-flex justify-content-between align-items-center maintenance-item" data-type="{{ item.maintenance_type }}">
           <div>
             <a href="{{ url_for('devices.device_detail', device_id=item.device_id) }}">
               {{ item.device_code }} {{ item.device_name }}
             </a>
-            <span class="badge badge-warning">{{ item.maintenance_type_label }}</span>
+            <span class="badge badge-{{ 'primary' if item.maintenance_type == 'calibration' else ('success' if item.maintenance_type == 'maintenance' else 'warning') }}">{{ item.maintenance_type_label }}</span>
             <span class="text-muted">到期日: {{ item.due_date }}</span>
           </div>
           <a href="{{ url_for('maintenance.maintenance_plans', device_id=item.device_id) }}"
@@ -82,9 +82,30 @@
 {% endif %}
 
 <script>
-function filterMaintenance(type) {
-  // 这里可以实现按类型筛选的功能
-  // 可以通过AJAX重新加载数据或前端筛选
-  console.log('Filter by:', type);
+function filterMaintenance(type, btnEl) {
+  // 切换按钮激活态
+  if (btnEl) {
+    var btnGroup = btnEl.closest('.btn-group');
+    if (btnGroup) {
+      btnGroup.querySelectorAll('.btn').forEach(function(b) { b.classList.remove('active'); });
+    }
+    btnEl.classList.add('active');
+  }
+
+  // 筛选列表项
+  var items = document.querySelectorAll('.maintenance-item');
+  items.forEach(function(item) {
+    if (type === 'all') {
+      item.style.display = '';
+    } else {
+      item.style.display = item.getAttribute('data-type') === type ? '' : 'none';
+    }
+  });
+
+  // 隐藏没有可见项的区域标题
+  document.querySelectorAll('.maintenance-section').forEach(function(section) {
+    var visibleItems = section.querySelectorAll('.maintenance-item:not([style*="display: none"])');
+    section.style.display = visibleItems.length > 0 ? '' : 'none';
+  });
 }
 </script>

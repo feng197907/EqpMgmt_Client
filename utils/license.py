@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Tuple, cast
 from base64 import b64decode
@@ -27,40 +27,74 @@ def load_license(path: str) -> dict | None:
         return json.load(f)
 
 
+def _load_license_config() -> dict:
+    """Load dms_license_config.json with BOM-safe parsing.
+    
+    PowerShell's Out-File -Encoding utf8 on Windows adds a UTF-8 BOM,
+    which causes json.load() to fail with encoding='utf-8'.
+    Using encoding='utf-8-sig' strips the BOM if present.
+    """
+    config_paths = []
+    if getattr(sys, 'frozen', False):
+        exe_dir = Path(sys.executable).resolve().parent
+        config_paths.append(str(exe_dir / 'dms_license_config.json'))
+        meipass = getattr(sys, '_MEIPASS', None)
+        if meipass:
+            config_paths.append(str(Path(meipass) / 'dms_license_config.json'))
+    else:
+        config_paths.append(str(Path.cwd() / 'dms_license_config.json'))
+    
+    for config_path in config_paths:
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r', encoding='utf-8-sig') as f:
+                    return json.load(f)
+            except Exception:
+                pass
+
+    # ---- Development fallback: read from build_config.json ----
+    # dms_license_config.json is auto-generated at build time.  When running
+    # directly from source (e.g. ``python desktop_launcher.py``), fall back
+    # to build_config.json so license checks still work during development.
+    build_config = Path.cwd() / 'build_config.json'
+    if build_config.exists():
+        try:
+            with open(build_config, 'r', encoding='utf-8-sig') as f:
+                bc = json.load(f)
+            lic = bc.get('license')
+            if lic:
+                return {'license': lic}
+        except Exception:
+            pass
+
+    return {}
+
+
 def should_enforce_license() -> bool:
     """Check if license enforcement is enabled.
-    
+
     Priority:
     1. Environment variable DMS_LICENSE_REQUIRED
     2. Build config file (dms_license_config.json) bundled with the executable
     3. Default: False
+
+    Note: ``mode: "free"`` always returns False regardless of other settings.
     """
     # Check environment variable first
     env_value = os.environ.get('DMS_LICENSE_REQUIRED', '').strip().lower()
     if env_value in {'1', 'true', 'yes', 'on'}:
         return True
     
-    # Check bundled config file (for PyInstaller packages)
-    try:
-        config_paths = []
-        # PyInstaller sets sys.frozen = True
-        if getattr(sys, 'frozen', False):
-            exe_dir = Path(sys.executable).resolve().parent
-            config_paths.append(str(exe_dir / 'dms_license_config.json'))
-            meipass = getattr(sys, '_MEIPASS', None)
-            if meipass:
-                config_paths.append(str(Path(meipass) / 'dms_license_config.json'))
-        else:
-            config_paths.append(str(Path.cwd() / 'dms_license_config.json'))
-        
-        for config_path in config_paths:
-            if os.path.exists(config_path):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-                if config.get('license', {}).get('required', False):
-                    return True
-    except Exception:
-        pass
+    # Check bundled config file (BOM-safe parsing)
+    config = _load_license_config()
+    license_cfg = config.get('license', {})
+    
+    # free mode → never enforce
+    if license_cfg.get('mode') == 'free':
+        return False
+    
+    if license_cfg.get('required', False):
+        return True
     
     return False
 
@@ -214,3 +248,102 @@ def check_license(public_key_path: str, extra_candidates: Iterable[str] | None =
             return False, 'license missing'
         return True, 'not required'
     return verify_license(license_path, public_key_path)
+
+
+def check_trial_expiry() -> Tuple[bool, bool, str]:
+    """Check trial expiry based on dms_license_config.json.
+
+    Supported configuration fields (``license`` section):
+
+    ============  ============  ================================================
+    Field         Type          Description
+    ============  ============  ================================================
+    mode          string        ``"trial"`` or ``"free"``.  ``"free"`` skips
+                                 all checks entirely.
+    name          string        License name (informational, shown in messages).
+    days          integer       Trial duration in days, counted from
+                                 ``build_time``.
+    expires       string/null   Explicit expiry in ISO 8601.  When set,
+                                 **takes priority over** ``days``.
+    required      boolean       ``True`` → block startup on expiry.
+                                 ``False`` → warn only.
+                                 Ignored when ``mode`` is ``"free"``.
+    build_time    string/null   ISO 8601 timestamp of the build.  Required
+                                 when using ``days``; the expiry is
+                                 ``build_time + days``.
+    ============  ============  ================================================
+
+    Returns:
+        (is_expired, should_block, message)
+
+        - **is_expired**: True when the trial period has passed.
+        - **should_block**: True when the app should be blocked
+          (expired AND required).  The caller uses this to decide
+          whether to abort startup.
+        - **message**: Human-readable status in Chinese.
+    """
+    config = _load_license_config()
+    license_cfg = config.get('license', {})
+
+    mode = license_cfg.get('mode', '')
+
+    # ---- free mode: no license check at all ----
+    if mode == 'free':
+        return False, False, 'free mode'
+
+    # ---- only trial mode is handled here ----
+    if mode != 'trial':
+        return False, False, f'unknown mode: {mode}'
+
+    expires_str = license_cfg.get('expires') or None  # treat "" as None
+    days = license_cfg.get('days', 0)
+    build_time_str = license_cfg.get('build_time') or None
+    required = bool(license_cfg.get('required', False))
+    name = license_cfg.get('name', '')
+
+    # ---- Calculate expiry datetime ----
+    expiry_dt = None
+    expiry_source = ''
+
+    # Priority 1: explicit expires field
+    if expires_str:
+        try:
+            expiry_dt = datetime.fromisoformat(expires_str)
+            expiry_source = f'到期时间: {expiry_dt.strftime("%Y-%m-%d %H:%M")}'
+        except Exception:
+            return False, False, f'无效的 expires 格式: {expires_str}'
+
+    # Priority 2: build_time + days
+    elif days and days > 0:
+        if build_time_str:
+            try:
+                build_dt = datetime.fromisoformat(build_time_str)
+            except Exception:
+                return False, False, f'无效的 build_time 格式: {build_time_str}'
+            expiry_dt = build_dt + timedelta(days=days)
+            expiry_source = (
+                f'构建于 {build_dt.strftime("%Y-%m-%d %H:%M")}，'
+                f'{days} 天后到期'
+            )
+        else:
+            # No build_time recorded — treat as no expiry (lenient fallback)
+            return False, False, 'trial 模式缺少 build_time，无法计算到期时间'
+
+    # No expiry configured at all
+    if expiry_dt is None:
+        return False, False, 'trial 模式未配置到期时间'
+
+    # ---- Compare with current time ----
+    now = datetime.now()
+
+    if now > expiry_dt:
+        expired_msg = f'试用已过期（{expiry_source}，已于 {expiry_dt.strftime("%Y-%m-%d %H:%M")} 到期）'
+        if required:
+            return True, True, expired_msg
+        else:
+            # Expired but not enforced — warn only
+            return True, False, f'{expired_msg}（非强制模式，可继续使用）'
+
+    remaining = (expiry_dt - now).days
+    remaining_msg = f'试用期内（剩余 {remaining} 天，{expiry_source}）'
+    return False, False, remaining_msg

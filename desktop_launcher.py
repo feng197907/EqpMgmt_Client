@@ -62,6 +62,12 @@ def _show_license_error(message):
 	ctypes.windll.user32.MessageBoxW(0, f'License error: {message}', 'License Check Failed', 0x00000010)
 
 
+def _show_license_warning(message):
+	"""Show a non-blocking warning dialog (expired but not enforced)."""
+	import ctypes
+	ctypes.windll.user32.MessageBoxW(0, message, 'DMS 试用期提示', 0x00000040)
+
+
 def main():
 	_apply_config_env()
 
@@ -70,28 +76,58 @@ def main():
 	try:
 		import ctypes
 		import logging
-		from utils.license import verify_license, resolve_license_path, resolve_public_key_path, should_enforce_license
+		from utils.license import verify_license, resolve_license_path, resolve_public_key_path, should_enforce_license, check_trial_expiry
 
 		logger = logging.getLogger('app')
-		pubkey = resolve_public_key_path()
-		license_path = resolve_license_path()
-		_write_startup_probe(f'License file resolved to: {license_path or "(not found)"}')
-		_write_startup_probe(f'Public key resolved to: {pubkey or "(not found)"}')
-		if license_path is None:
-			if should_enforce_license():
-				ctypes.windll.user32.MessageBoxW(0, 'License check failed: license not found', 'License Check Failed', 0x00000010)
-				return
-			logger.warning('License not found; continuing because enforcement is disabled.')
+
+		# ---- Trial / free mode check (reads config from dms_license_config.json) ----
+		is_expired, should_block, trial_msg = check_trial_expiry()
+		_write_startup_probe(f'License mode check: expired={is_expired}, block={should_block}, msg={trial_msg}')
+
+		if trial_msg == 'free mode':
+			# free mode: skip all license checks entirely
+			_write_startup_probe('Free mode — no license checks')
+		elif should_block:
+			# Trial expired AND required=True → block startup
+			_show_license_error(trial_msg)
+			return
+		elif is_expired:
+			# Trial expired but required=False → warn, then continue
+			_show_license_warning(trial_msg)
 		else:
-			if pubkey is None:
-				_write_startup_probe('Public key file not found; using embedded public key fallback')
-				logger.warning('Public key not found; using embedded public key fallback.')
-			ok, msg = verify_license(license_path, pubkey or '')
-			if not ok:
-				_show_license_error(msg)
-				return
-		if license_path is None and not should_enforce_license():
-			logger.warning('License not found; continuing because enforcement is disabled.')
+			# Trial active or not expired → log remaining days
+			_write_startup_probe(f'Trial status: {trial_msg}')
+
+			# If trial mode is active, skip the license file check below
+			# (trial mode uses build_time+days, not a license.json file)
+			pass
+
+		# ---- Standard license file check (only for non-free, non-trial-expired) ----
+		# This runs when:
+		#   - trial mode is not active (mode is neither "trial" nor "free")
+		#   - or when no trial config exists at all
+		if trial_msg == 'free mode' or (not is_expired and trial_msg != 'free mode'):
+			# In trial mode with days remaining, skip the license file check
+			# The trial itself IS the license
+			is_trial_active = (trial_msg != 'free mode' and '试用' in trial_msg and '过期' not in trial_msg)
+			if not is_trial_active:
+				pubkey = resolve_public_key_path()
+				license_path = resolve_license_path()
+				_write_startup_probe(f'License file resolved to: {license_path or "(not found)"}')
+				_write_startup_probe(f'Public key resolved to: {pubkey or "(not found)"}')
+				if license_path is None:
+					if should_enforce_license():
+						ctypes.windll.user32.MessageBoxW(0, 'License check failed: license not found', 'License Check Failed', 0x00000010)
+						return
+					logger.warning('License not found; continuing because enforcement is disabled.')
+				else:
+					if pubkey is None:
+						_write_startup_probe('Public key file not found; using embedded public key fallback')
+						logger.warning('Public key not found; using embedded public key fallback.')
+					ok, msg = verify_license(license_path, pubkey or '')
+					if not ok:
+						_show_license_error(msg)
+						return
 	except Exception as exc:
 		# If license code itself fails, do not block normal local-client startup unless explicitly required.
 		if should_enforce_license():

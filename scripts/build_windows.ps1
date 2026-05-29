@@ -36,18 +36,12 @@ if (-not (Test-Path $configFile)) {
 	
 	# Default configuration
 	$config = @{
-		license = @{
-			name     = 'Default'
-			days    = 365
-			expires = $null
-			required = $false
-		}
-		build   = @{
+		build = @{
 			entry_script = 'desktop_launcher.py'
 			output_name = 'DMS_Client'
 			windowed    = $true
 		}
-		sign    = @{
+		sign  = @{
 			enabled          = $false
 			cert_thumbprint = ''
 			cert_pfx_path   = ''
@@ -57,16 +51,10 @@ if (-not (Test-Path $configFile)) {
 	}
 } else {
 	Write-Host "Loading configuration from: $configFile" -ForegroundColor Cyan
-	$config = Get-Content $configFile -Raw | ConvertFrom-Json
+	$config = Get-Content $configFile -Raw -Encoding UTF8 | ConvertFrom-Json
 }
 
 # Extract configuration
-$licenseMode = $config.license.mode
-$licenseName = $config.license.name
-$licenseDays = $config.license.days
-$licenseExpires = $config.license.expires
-$licenseRequired = $config.license.required
-
 $entryScript = $config.build.entry_script
 $outputName = $config.build.output_name
 $windowed = $config.build.windowed
@@ -83,59 +71,17 @@ $signTimestampUrl = $config.sign.timestamp_url
 # Build process
 # ============================================================
 
+# Determine the python executable (prefer venv if activated)
+$pythonExe = 'python'
+if (Test-Path (Join-Path $venvPath 'Scripts\python.exe')) {
+	$pythonExe = Join-Path $venvPath 'Scripts\python.exe'
+}
+
 # Ensure virtualenv & packages
 Write-Host "Installing dependencies..." -ForegroundColor Cyan
-python -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
-python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-python -m pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# ============================================================
-# License generation (optional)
-# ============================================================
-
-$licenseEnabled = $licenseMode -ne 'free'
-
-if ($licenseEnabled -and -not [string]::IsNullOrWhiteSpace($licenseName)) {
-	Write-Host "`nGenerating license for: $licenseName" -ForegroundColor Cyan
-	
-	# Build the command
-	$licenseCmd = "python `"$repoRoot\scripts\create_license.py`" `"$licenseName`""
-	
-	if (-not [string]::IsNullOrWhiteSpace($licenseExpires)) {
-		# Use specific expiry date
-		$licenseCmd += " `"$licenseExpires`""
-		Write-Host "  Expiry date: $licenseExpires" -ForegroundColor Yellow
-	} elseif ($licenseDays -and $licenseDays -gt 0) {
-		# Use days
-		$licenseCmd += " $licenseDays"
-		Write-Host "  Valid for: $licenseDays days" -ForegroundColor Yellow
-	} else {
-		# Default: 365 days
-		$licenseCmd += " 365"
-		Write-Host "  Valid for: 365 days (default)" -ForegroundColor Yellow
-	}
-	
-	# Execute license creation
-	Invoke-Expression $licenseCmd
-	
-	# Copy license to dist folder (will be bundled with the executable)
-	$licenseSrc = Join-Path $repoRoot "certs/license_$licenseName.json"
-	if (Test-Path $licenseSrc) {
-		Write-Host "  License file: $licenseSrc" -ForegroundColor Green
-	}
-	
-	# Set environment variable for license enforcement
-	if ($licenseRequired) {
-		$env:DMS_LICENSE_REQUIRED = '1'
-		Write-Host "  License enforcement: ENABLED" -ForegroundColor Yellow
-	} else {
-		$env:DMS_LICENSE_REQUIRED = ''
-		Write-Host "  License enforcement: OPTIONAL" -ForegroundColor Gray
-	}
-} else {
-	Write-Host "`nFree mode selected; skipping license generation" -ForegroundColor Gray
-	$env:DMS_LICENSE_REQUIRED = ''
-}
+& $pythonExe -m pip install --upgrade pip -i https://pypi.tuna.tsinghua.edu.cn/simple
+& $pythonExe -m pip install -r (Join-Path $repoRoot 'requirements.txt') -i https://pypi.tuna.tsinghua.edu.cn/simple
+& $pythonExe -m pip install pyinstaller -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Prepare data arguments (PyInstaller on Windows uses semicolon as separator)
 $add_templates = "templates;templates"
@@ -143,39 +89,49 @@ $add_static = "static;static"
 $add_uploads = "uploads;uploads"
 $add_docs = if (Test-Path (Join-Path $repoRoot 'docs')) { "docs;docs" } else { $null }
 
-# Add license file only in trial mode
-$licenseFile = if ($licenseEnabled -and -not [string]::IsNullOrWhiteSpace($licenseName)) { "certs/license_$licenseName.json" } else { $null }
+# ============================================================
+# License runtime config — auto-generated from build_config.json
+# ============================================================
+# The ``license`` section in build_config.json is the single source of truth.
+# This script extracts it, injects build_time (if null), writes
+# dms_license_config.json, and packages it into the executable.
+# dms_license_config.json is a build artifact — do NOT edit it manually.
 
-$licenseFilePath = if ($licenseFile) { Join-Path $repoRoot $licenseFile } else { $null }
-if ($licenseFilePath -and (Test-Path $licenseFilePath)) {
-	$add_license = "$licenseFile;$licenseFile"
-} else {
-	$add_license = $null
+$licenseSection = $config.license
+if (-not $licenseSection) {
+	Write-Error "build_config.json is missing the 'license' section. Please add it (see build_config.json.example)."
+	exit 1
 }
 
-# ============================================================
-# Generate license enforcement config file
-# This file is used by the runtime to check if license is required
-# ============================================================
-$licenseConfigFile = 'dms_license_config.json'
-$licenseConfigFilePath = Join-Path $repoRoot $licenseConfigFile
-$licenseConfig = @{
+# If build_time is null/empty, inject current build timestamp (local time, ISO 8601)
+$buildTime = $licenseSection.build_time
+if ([string]::IsNullOrWhiteSpace($buildTime)) {
+	$buildTime = (Get-Date).ToString('yyyy-MM-ddTHH:mm:ss')
+	Write-Host "License build_time not set — auto-injecting: $buildTime" -ForegroundColor Yellow
+}
+
+# Build the runtime license config JSON that utils/license.py expects
+$licenseRuntime = @{
 	license = @{
-		required = if ($licenseEnabled -and $licenseRequired) { $true } else { $false }
-		mode     = if ($licenseEnabled) { 'trial' } else { 'free' }
-		name     = $licenseName
-		days     = if ($licenseDays) { $licenseDays } else { 365 }
+		mode       = $licenseSection.mode
+		name       = $licenseSection.name
+		days       = $licenseSection.days
+		expires    = $licenseSection.expires
+		required   = $licenseSection.required
+		build_time = $buildTime
 	}
 }
-$licenseConfig | ConvertTo-Json -Depth 3 | Out-File -FilePath $licenseConfigFilePath -Encoding utf8
-Write-Host "License enforcement config: $licenseConfigFilePath" -ForegroundColor Green
-if ($licenseEnabled -and $licenseRequired) {
-	Write-Host "  Enforcement: ENABLED (written to config file)" -ForegroundColor Yellow
-} else {
-	Write-Host "  Enforcement: OPTIONAL (written to config file)" -ForegroundColor Gray
-}
 
-$add_license_config = "$licenseConfigFile;$licenseConfigFile"
+$licenseConfigFile = 'dms_license_config.json'
+$licenseConfigFilePath = Join-Path $repoRoot $licenseConfigFile
+
+# Write dms_license_config.json (overwrite if exists)
+# PowerShell 5.1 does not support UTF8NoBOM; use .NET to write UTF-8 without BOM
+$licenseJson = $licenseRuntime | ConvertTo-Json -Depth 5
+[System.IO.File]::WriteAllText($licenseConfigFilePath, $licenseJson, (New-Object System.Text.UTF8Encoding $false))
+Write-Host "Generated runtime license config: $licenseConfigFilePath" -ForegroundColor Green
+
+$add_license_config = "$licenseConfigFile;."
 
 # Build single-file executable
 Write-Host "`nBuilding executable..." -ForegroundColor Cyan
@@ -195,9 +151,6 @@ Get-ChildItem -Path $releaseDir -File -ErrorAction SilentlyContinue |
 		$_.Name -like 'DMS_Client_Installer.exe' -or
 		$_.Name -like 'DMS_Client_Installer_*.exe'
 	} |
-	Remove-Item -Force -ErrorAction SilentlyContinue
-
-Get-ChildItem -Path $releaseDir -Filter 'license*.json' -ErrorAction SilentlyContinue |
 	Remove-Item -Force -ErrorAction SilentlyContinue
 
 $buildArgs = @(
@@ -221,10 +174,6 @@ if ($add_docs) {
 	$buildArgs += @("--add-data", $add_docs)
 }
 
-if ($add_license) {
-	$buildArgs += @("--add-data", $add_license)
-}
-
 $buildArgs += @(
 	"--name", $outputName,
 	$entryScriptPath
@@ -232,7 +181,7 @@ $buildArgs += @(
 
 
 # Execute PyInstaller
-pyinstaller @buildArgs
+& $pythonExe -m PyInstaller @buildArgs
 if ($LASTEXITCODE -ne 0) {
 	Write-Error "PyInstaller failed with exit code $LASTEXITCODE"
 	exit $LASTEXITCODE
@@ -330,22 +279,6 @@ Write-Host "============================================================" -Foreg
 Write-Host "`nConfiguration Summary:" -ForegroundColor Cyan
 Write-Host "  Entry script: $entryScript"
 Write-Host "  Output name: $outputName"
-
-if (-not [string]::IsNullOrWhiteSpace($licenseName)) {
-	Write-Host "`n  License Configuration:" -ForegroundColor Cyan
-	Write-Host "    Name: $licenseName"
-	if (-not [string]::IsNullOrWhiteSpace($licenseExpires)) {
-		Write-Host "    Expires: $licenseExpires"
-	} else {
-		$d = if (-not $licenseDays -or $licenseDays -le 0) { 365 } else { $licenseDays }
-		Write-Host "    Valid for: $d days"
-	}
-	if ($licenseRequired) {
-		Write-Host "    Enforcement: REQUIRED" -ForegroundColor Yellow
-	} else {
-		Write-Host "    Enforcement: OPTIONAL" -ForegroundColor Gray
-	}
-}
 
 if ($signEnabled) {
 	Write-Host "`n  Signing: ENABLED" -ForegroundColor Green

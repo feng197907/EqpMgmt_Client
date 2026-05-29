@@ -1,20 +1,19 @@
 {
-  "_comment": "DMS 客户端构建配置文件 - license.mode 可选 trial / free",
-  "_comment2": "复制此文件为 build_config.json 并修改相应参数",
-  "_comment3": "trial: 按 days 或 expires 发放内嵌授权；free: 不生成许可证，长期免费使用",
-  "_comment4": "当前构建不再输出 license_TestClient.json，授权只在程序内部生效",
+  "_comment": "DMS 客户端构建配置文件 - 复制此文件为 build_config.json 并修改相应参数",
+  "_comment2": "授权配置在 license section 中维护，构建时自动生成 dms_license_config.json 并打包",
 
-  "license": {
-    "mode": "trial",
-    "name": "Default",
-    "days": 365,
-    "expires": null,
-    "required": false
-  },
   "build": {
     "entry_script": "desktop_launcher.py",
     "output_name": "DMS_Client",
     "windowed": true
+  },
+  "license": {
+    "mode": "free",
+    "name": "",
+    "days": 0,
+    "expires": null,
+    "required": false,
+    "build_time": null
   },
   "sign": {
     "enabled": false,

@@ -86,7 +86,7 @@ def upload_doc(device_id):
                 calibration_due_date = request.form.get("calibration_due_date", "").strip() or None
 
             version = get_next_version(conn, device_id, doc_type)
-            original_name = file.filename
+            original_name = file.filename or ""
             # 清理文件名中的危险字符，但保留中文等非ASCII字符
             safe_name = original_name.replace("..", ".").replace("/", "_").replace("\\", "_")
             # 存储文件名使用安全的ASCII版本（用于文件系统）
@@ -451,16 +451,19 @@ def export_documents():
 
     wb = Workbook()
     ws = wb.active
+    assert ws is not None
     ws.title = "文档列表"
 
     headers = ["设备编码", "设备名称", "文档名称", "类型", "版本", "状态", "上传人", "上传时间"]
-    ws.append(headers)
-    for cell in ws[1]:
+    ws.append(headers)  # type: ignore[arg-type]
+    row1 = ws[1]
+    assert row1 is not None
+    for cell in row1:
         _set_header_style(cell)
         _set_border(cell)
 
     for row in rows:
-        ws.append([
+        ws.append([  # type: ignore[arg-type]
             row["device_code"] or "-",
             row["device_name"] or "-",
             row["doc_name"] or "-",
@@ -471,14 +474,19 @@ def export_documents():
             row["upload_time"] or "-",
         ])
 
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+    _iter_rows = ws.iter_rows(min_row=2, max_row=ws.max_row)
+    assert _iter_rows is not None
+    for row in _iter_rows:
         for cell in row:
             _set_border(cell)
             cell.alignment = Alignment(vertical="center", wrap_text=True)
 
-    for col in ws.columns:
+    _columns = ws.columns
+    assert _columns is not None
+    for col_idx, col in enumerate(_columns):
         max_length = 0
-        column = col[0].column_letter
+        first_cell = col[0]
+        column = getattr(first_cell, 'column_letter', chr(65 + col_idx))  # fallback: A,B,C...
         for cell in col:
             try:
                 if cell.value:
@@ -486,7 +494,7 @@ def export_documents():
             except Exception:
                 pass
         adjusted_width = min(max_length + 2, 50)
-        ws.column_dimensions[column].width = adjusted_width
+        ws.column_dimensions[column].width = adjusted_width  # type: ignore[index]
 
     filename = f"documents_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 

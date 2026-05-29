@@ -1,8 +1,10 @@
-﻿{
+{
     "license":  {
-                    "days":  1,
                     "name":  "TestClient",
-                    "mode":  "trial",
-                    "required":  true
+                    "expires":  "2026-05-28T23:59:59",
+                    "build_time":  "2026-05-29T11:20:20",
+                    "days":  1,
+                    "required":  true,
+                    "mode":  "trial"
                 }
 }

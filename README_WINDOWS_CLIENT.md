@@ -1,139 +1,172 @@
-# DMS Windows 客户端 安装与使用说明
+# DMS 客户端 — 安装与使用指南
 
-本文档针对将本项目打包为 Windows 客户端后的安装、首次运行、升级、卸载与常见故障排查场景。
-
-## 1. 前提与依赖
-- Windows 10/11
-- Python 3.10+（仅在从源码构建时需要）
-- 已安装 NSIS（若需生成安装程序）
-- 推荐使用虚拟环境：`.venv`
-
-## 2. 快速安装（已有二进制）
-- 便携运行：解压 `dist/DMS_Client_Portable.zip`，双击 `DMS_Client.exe` 启动。
-- 安装程序：运行 `dist/DMS_Client_Installer.exe` 按提示安装（支持选择是否创建桌面图标与开机自启）。
-
-快速版客户端会直接弹出独立窗口（`pywebview`），不再先打开浏览器；窗口背后仍然是本地 Flask 服务。
-
-## 3. 从源码构建可执行（开发者）
-1. 创建并激活虚拟环境：
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-2. 安装依赖：
-```powershell
-pip install -r requirements.txt
-pip install pyinstaller
-```
-3. 使用项目提供的打包脚本（会生成 `dist/DMS_Client.exe`）：
-```powershell
-.\scripts\build_windows.ps1
-```
-默认构建的是桌面壳版本；如需浏览器版，可先设置：
-```powershell
-$env:DMS_ENTRY_SCRIPT = 'launcher.py'
-.\scripts\build_windows.ps1
-```
-4. 生成 NSIS 安装程序（需先安装 NSIS）：
-```powershell
-makensis installer\dms_installer.nsi
-```
-
-如果你想一口气重新打包 EXE、安装器和发布 ZIP，用这一条：
-```powershell
-.\scripts\rebuild_release.ps1
-```
-
-## 3.1 发布签名（正式 CA 证书）
-正式发布请使用受信任的代码签名证书，不要使用仓库里的测试证书。推荐两种方式：
-
-- 方式 A：证书安装在当前用户/本机证书存储中
-  ```powershell
-  $env:SIGN_CERT_THUMBPRINT = '你的证书指纹'
-  $env:SIGN_TIMESTAMP_URL = 'http://timestamp.digicert.com'
-  .\scripts\build_windows.ps1
-  ```
-
-- 方式 B：使用 PFX 文件
-  ```powershell
-  $env:SIGN_CERT_PFX_PATH = 'C:\path\to\release-code-sign.pfx'
-  $env:SIGN_CERT_PFX_PASS = 'PFX密码'
-  $env:SIGN_TIMESTAMP_URL = 'http://timestamp.digicert.com'
-  .\scripts\build_windows.ps1
-  ```
-
-发布签名脚本会自动签名以下文件：
-- `dist\DMS_Client.exe`
-- `dist\DMS_Client_Installer.exe`
-
-如果要只单独重签，可直接运行：
-```powershell
-.\scripts\sign_release.ps1 -DistDir .\dist
-```
-
-## 4. 首次运行行为
-- 程序会在用户目录下创建配置与数据目录：`%APPDATA%\DMS`。
-  - `config.json`：应用配置（DB_TYPE、DB_PATH、UPLOAD_FOLDER）。
-  - `uploads/`：上传文件目录。
-  - 默认采用 SQLite（`equipment.db`）放在 `%APPDATA%\DMS`。
-- 如果以 GUI/安装器方式运行，程序会自动写入默认 `config.json`（无交互），并打开桌面窗口。
-- 如果以命令行运行并需要自定义配置，可执行：
-```powershell
-python first_run.py
-# 或
-python launcher.py  # 先生成默认配置，再启动服务
-```
-
-## 5. 升级说明
-- 以安装器升级：用新版本安装程序覆盖安装（会替换可执行文件，保留 `%APPDATA%\DMS` 数据）。
-- 便携升级：停止正在运行的 `DMS_Client.exe`，替换二进制文件，重新启动。
-- 若 schema 有变更，升级脚本会在应用启动时尝试逐步迁移（参见 `database.py` 中的迁移逻辑）。建议升级前备份 `%APPDATA%\DMS/equipment.db` 与 `uploads/`。
-
-## 6. 卸载
-- 使用安装程序生成的 `Uninstall`（控制面板 -> 卸载程序）进行卸载，会移除安装目录与开始菜单/桌面快捷方式；默认不会删除 `%APPDATA%\DMS`，以保留用户数据。
-- 若需要完全清理（包括用户数据），可手动删除：
-```powershell
-Remove-Item -Recurse -Force "$env:APPDATA\DMS"
-Remove-Item -Recurse -Force "C:\Program Files\DMS_Client"  # 如安装到此目录
-```
-
-## 7. 常见故障与排查
-- 启动后页面打不开（连接被拒绝/超时）
-  - 确认服务是否在运行：检查进程或运行 `netstat -ano | findstr 5000`。
-  - 检查是否被防火墙或安全软件拦截（允许本地回环/端口访问）。
-  - 确认 `config.json` 中 `DB_TYPE` 与 `DB_PATH` 设置正确。
-
-- 首次运行没有生成 `config.json`
-  - GUI 模式下程序会自动生成默认配置；若未生成，检查 `%APPDATA%` 的写权限。
-  - 可手动运行：`.venv\Scripts\python.exe first_run.py` 来初始化配置。
-
-- 数据库连接/迁移错误
-  - 查看日志（应用会将日志写入 `logs/` 或在启动目录生成 `app.log`，参见 `utils/logging_config.py`）。
-  - 若从 MySQL 回退到 SQLite，请检查 `DB_TYPE` 环境变量与 `database.py` 检测逻辑。
-
-- 文件上传失败或权限错误
-  - 确保 `UPLOAD_FOLDER` 可写；推荐使用 `%APPDATA%\DMS\uploads`。
-
-- 启动时出现 `License Check Failed`
-  - 默认本地客户端不会强制要求许可证；如果你手动启用了 `DMS_LICENSE_REQUIRED=1`，请确认许可证文件已放到 `%APPDATA%\DMS\license.json`。
-  - 发布 ZIP 不会包含私钥；如果你要做正式授权，请单独分发签名过的许可证文件。
-
-## 8. 调试建议
-- 以命令行方式运行，便于查看输出与交互：
-```powershell
-python launcher.py
-# 或直接
-python -m app
-```
-- 如要调试桌面壳，可运行：
-```powershell
-python desktop_launcher.py
-```
-- 查看日志：`%APPDATA%\DMS\logs\app.log` 和 `%APPDATA%\DMS\logs\error.log`。
-- 500 错误返回体会包含 `trace_id` 和日志文件路径，便于快速定位。
-
-## 9. 联系与贡献
-- 若需要企业级打包（MSI/企业签名/代码签名证书整合），当前流程已支持正式 CA 证书；我也可以继续协助添加 WiX、自动更新或 CI 签名。
+DMS（设备管理系统）Windows 桌面客户端，开箱即用，无需安装 Python 或任何额外依赖。
 
 ---
-文件位置：`README_WINDOWS_CLIENT.md`。需要我把这份内容合并回主 `README.md` 吗？
+
+## 系统要求
+
+| 项目 | 要求 |
+|------|------|
+| 操作系统 | Windows 10 / 11（64 位） |
+| 磁盘空间 | ≥ 200 MB |
+| 网络 | 本地使用无需联网；连接远程服务器时需要 |
+
+---
+
+## 安装
+
+### 方式一：安装程序（推荐）
+
+1. 双击 `DMS_Client_Installer.exe` 启动安装向导
+2. 欢迎页 → 点击「下一步」
+3. 选择安装组件：
+   - **Main Files**（必选）— 主程序
+   - **Create Desktop Icon**（可选）— 创建桌面快捷方式
+   - **Run at Startup**（可选）— 开机自启动
+4. 选择安装路径（默认 `C:\Program Files\DMS_Client`）
+5. 点击「安装」→ 完成
+
+> 💡 如果电脑上已有旧版本，安装程序会提示您选择**卸载旧版**或**覆盖安装**。覆盖安装不会丢失用户数据。
+
+### 方式二：便携版
+
+1. 解压 `DMS_Client_Release_*.zip`
+2. 双击 `DMS_Client.exe` 即可运行，无需安装
+
+> 便携版适合 U 盘携带或不想写入注册表的场景。
+
+---
+
+## 启动
+
+双击 `DMS_Client.exe`（桌面快捷方式或安装目录中的均可）。
+
+程序启动后会：
+
+1. 自动在系统托盘区弹出独立窗口（无需手动打开浏览器）
+2. 首次运行时自动创建数据目录和默认配置（见下方）
+3. 默认打开 `http://127.0.0.1:5000`
+
+> 窗口本质上是内嵌浏览器，背后运行本地 Flask 服务，关闭窗口即关闭服务。
+
+---
+
+## 首次运行
+
+首次启动时，程序自动完成以下初始化：
+
+1. **创建数据目录** `%APPDATA%\DMS`
+2. **生成默认配置** `config.json`（SQLite 模式，零配置开箱即用）
+3. **创建数据库** `equipment.db`
+4. **创建上传目录** `uploads/`
+
+### 默认登录账号
+
+| 字段 | 值 |
+|------|-----|
+| 用户名 | `admin` |
+| 密码 | `admin123` |
+
+> ⚠️ 首次登录后请尽快修改默认密码。
+
+### 数据目录结构
+
+```
+%APPDATA%\DMS\
+├── config.json          ← 应用配置
+├── equipment.db         ← SQLite 数据库
+├── uploads/             ← 上传文件存储
+└── logs/                ← 运行日志
+    ├── app.log
+    ├── error.log
+    └── startup.log
+```
+
+---
+
+## 授权（License）系统
+
+DMS 客户端内置授权系统，支持**免费模式**、**试用模式**和**许可证文件**三种方式。
+
+
+
+## 升级
+
+### 安装程序升级
+
+直接运行新版本的 `DMS_Client_Installer.exe`，安装程序会检测旧版本并提示覆盖安装。用户数据（`%APPDATA%\DMS`）不会被删除。
+
+### 便携版升级
+
+1. 关闭正在运行的 DMS 客户端
+2. 用新版本的 `DMS_Client.exe` 替换旧文件
+3. 重新启动
+
+> ⚠️ 升级前建议备份数据库文件 `%APPDATA%\DMS\equipment.db`。如果数据库结构有变更，程序启动时会自动迁移。
+
+---
+
+## 卸载
+
+### 安装程序方式
+
+控制面板 → 程序与功能 → 找到「DMS Client」→ 卸载
+
+卸载会移除安装目录和快捷方式，**不会删除** `%APPDATA%\DMS` 中的用户数据。
+
+### 完全清理（包括用户数据）
+
+如需彻底清除所有数据：
+
+1. 先通过控制面板卸载程序
+2. 手动删除数据目录：
+
+```powershell
+Remove-Item -Recurse -Force "$env:APPDATA\DMS"
+```
+
+---
+
+## 常见问题
+
+### 启动后窗口打不开 / 连接被拒绝
+
+- 检查 `DMS_Client.exe` 进程是否在运行（任务管理器）
+- 检查端口 5000 是否被其他程序占用：`netstat -ano | findstr 5000`
+- 检查是否被杀毒软件/防火墙拦截
+
+### 首次运行没有自动创建配置
+
+- 确认 `%APPDATA%` 目录有写入权限
+- 检查日志文件 `%APPDATA%\DMS\logs\startup.log` 中的错误信息
+
+### 数据库相关错误
+
+- 查看 `%APPDATA%\DMS\logs\error.log`
+- 数据库文件位于 `%APPDATA%\DMS\equipment.db`，确认文件存在且可读写
+- 如需重置数据库，停止程序后删除 `equipment.db`，重启会自动重建（数据会丢失）
+
+### 文件上传失败
+
+- 确认 `%APPDATA%\DMS\uploads` 目录存在且有写入权限
+
+### License Check Failed 弹窗
+
+- 默认免费模式不会出现此弹窗
+- 如果出现，说明当前版本配置了授权验证：
+  - 确认许可证文件已放到正确位置（见「许可证文件放置位置」）
+  - 确认许可证未过期
+  - 联系管理员获取有效的许可证文件
+
+### 日志查看
+
+所有运行日志存放在 `%APPDATA%\DMS\logs\` 目录下：
+
+| 文件 | 内容 |
+|------|------|
+| `startup.log` | 启动过程记录（含授权检查） |
+| `app.log` | 应用运行日志 |
+| `error.log` | 错误日志 |
+
+页面出现 500 错误时，返回信息中会包含 `trace_id`，可在 `app.log` 中搜索该 ID 快速定位问题。

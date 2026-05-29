@@ -1,38 +1,59 @@
-# Package a portable ZIP containing the exe and a README
-param()
+# package_portable.ps1 — Package a portable ZIP containing the exe and a README
+# Usage: .\scripts\package_portable.ps1
 
-$dist = Join-Path -Path $PSScriptRoot -ChildPath "..\dist"
-$dist = (Resolve-Path $dist).ProviderPath
-$exe = Join-Path $dist "DMS_Client.exe"
-if (-not (Test-Path $exe)) {
-    Write-Error "Executable not found: $exe"
+$ErrorActionPreference = 'Stop'
+
+$repoRoot = Split-Path $PSScriptRoot -Parent
+Set-Location $repoRoot
+
+$releaseDir = Join-Path $repoRoot 'releases'
+if (-not (Test-Path $releaseDir)) {
+    Write-Error "Release directory not found: $releaseDir — run build_windows.ps1 first."
     exit 1
 }
 
-$zipPath = Join-Path $dist "DMS_Client_Portable.zip"
+# Find the main executable
+$exe = Join-Path $releaseDir 'DMS_Client.exe'
+if (-not (Test-Path $exe)) {
+    # Fallback: look for timestamped builds
+    $timestamped = Get-ChildItem -Path $releaseDir -Filter 'DMS_Client_*.exe' |
+        Where-Object { $_.Name -notmatch 'Installer' } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+    if ($timestamped) {
+        $exe = $timestamped.FullName
+    } else {
+        Write-Error "No DMS_Client executable found in $releaseDir"
+        exit 1
+    }
+}
+
+$zipPath = Join-Path $releaseDir 'DMS_Client_Portable.zip'
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
 $tempDir = Join-Path $env:TEMP "dms_portable_$(Get-Random)"
 New-Item -Path $tempDir -ItemType Directory | Out-Null
 
-Copy-Item $exe -Destination $tempDir
+try {
+    Copy-Item $exe -Destination $tempDir
 
-$readme = @"
+    $readme = @"
 DMS Client (Portable)
 
 说明:
 - 双击 DMS_Client.exe 启动本地客户端，首次运行会触发配置向导并在浏览器中打开。
-- 配置与数据存放在 %APPDATA%\\DMS（Windows）
+- 配置与数据存放在 %APPDATA%\DMS（Windows）
 
 要创建安装程序，请安装 NSIS 并运行:
-    makensis installer\dms_installer.nsi
+    .\scripts\build_installer.ps1
 
 "@
-$readmePath = Join-Path $tempDir "README.txt"
-Set-Content -Path $readmePath -Value $readme -Encoding UTF8
+    $readmePath = Join-Path $tempDir 'README.txt'
+    [System.IO.File]::WriteAllText($readmePath, $readme, (New-Object System.Text.UTF8Encoding $false))
 
-Compress-Archive -Path (Join-Path $tempDir '*') -DestinationPath $zipPath -Force
+    Compress-Archive -Path (Join-Path $tempDir '*') -DestinationPath $zipPath -Force
 
-Remove-Item $tempDir -Recurse -Force
-
-Write-Host "Created portable package: $zipPath"
+    Write-Host "Created portable package: $zipPath" -ForegroundColor Green
+} finally {
+    if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
+}

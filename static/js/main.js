@@ -427,4 +427,7 @@
     doDownload: doDownload
   };
 
+  // ==================== 初始化 Lucide 图标 ====================
+  lucide.createIcons();
+
 })();

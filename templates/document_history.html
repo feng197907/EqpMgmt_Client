@@ -160,7 +160,7 @@
           <p class="stat-label">首次上传</p>
           <p class="stat-value" style="font-size: 16px;">
             {% if history_rows %}
-              {{ history_rows[-1].upload_time.strftime('%Y-%m-%d') if history_rows[-1].upload_time else '-' }}
+              {{ history_rows[-1].upload_time[:10] if history_rows[-1].upload_time else '-' }}
             {% else %}
               -
             {% endif %}

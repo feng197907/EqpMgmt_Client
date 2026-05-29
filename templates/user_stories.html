@@ -223,7 +223,7 @@
                     </div>
                     <div class="recent-info">
                         <div class="recent-title">{{ row.doc_name }}</div>
-                        <div class="recent-meta">{{ row.device_code }} · v{{ row.version }} · {{ row.upload_time.strftime('%Y-%m-%d') if row.upload_time else '' }}</div>
+                        <div class="recent-meta">{{ row.device_code }} · v{{ row.version }} · {{ row.upload_time[:10] if row.upload_time else '' }}</div>
                     </div>
                     <div class="recent-action">
                         <span class="status-badge {{ row.status }}">
@@ -257,7 +257,7 @@
                     </div>
                     <div class="recent-info">
                         <div class="recent-title">{{ row.doc_name }} v{{ row.version }}</div>
-                        <div class="recent-meta">{{ row.borrower }} · {{ row.borrow_date.strftime('%Y-%m-%d') if row.borrow_date else '' }}</div>
+                        <div class="recent-meta">{{ row.borrower }} · {{ row.borrow_date[:10] if row.borrow_date else '' }}</div>
                     </div>
                     <div class="recent-action">
                         <span class="status-badge {{ row.status }}">
@@ -282,12 +282,5 @@
     </div>
 </div>
 
-<script>
-// 页面加载完成后初始化 Lucide 图标
-document.addEventListener('DOMContentLoaded', function() {
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
-});
-</script>
+<script src="{{ url_for('static', filename='js/pages/user-stories.js') }}"></script>
 {% endblock %}

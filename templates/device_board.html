@@ -207,16 +207,5 @@
 </div>
 {% endif %}
 
-<script>
-  // 重新初始化 Lucide 图标
-  lucide.createIcons();
-
-  // 点击统计卡片筛选
-  function filterByStatus(status) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('status', status);
-    url.searchParams.delete('page');
-    window.location.href = url.toString();
-  }
-</script>
+<script src="{{ url_for('static', filename='js/pages/device-board.js') }}"></script>
 {% endblock %}

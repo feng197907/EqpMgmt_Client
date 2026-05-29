@@ -1,0 +1,18 @@
+  .stat-mini-cards { display: flex; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+  .stat-mini-card { flex: 1; min-width: 140px; background: #fff; border-radius: 8px;
+    padding: 1rem 1.25rem; border: 1px solid var(--border-color, #e5e7eb);
+    display: flex; align-items: center; gap: 0.75rem; }
+  .stat-mini-card .icon-circle { width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .stat-mini-card .icon-circle.danger { background: #fef2f2; color: #dc2626; }
+  .stat-mini-card .icon-circle.warning { background: #fffbeb; color: #d97706; }
+  .stat-mini-card .icon-circle.info { background: #eff6ff; color: #2563eb; }
+  .stat-mini-card .icon-circle.success { background: #f0fdf4; color: #16a34a; }
+  .stat-mini-card .stat-number { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+  .stat-mini-card .stat-label { font-size: 0.75rem; color: #6b7280; }
+  .stock-row-out { background: #fef2f2 !important; }
+  .stock-row-low { background: #fffbeb !important; }
+  .stock-row-over { background: #eff6ff !important; }
+  .stock-row-inactive { opacity: 0.5; }
+  .form-row-inline { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+  .form-row-inline .form-group { margin-bottom: 0; }

@@ -1,0 +1,6 @@
+  .stat-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card { background: #fff; border-radius: 8px; padding: 1.25rem; border: 1px solid var(--border-color, #e5e7eb); }
+  .stat-card .value { font-size: 1.75rem; font-weight: 700; line-height: 1.2; }
+  .stat-card .label { font-size: 0.8rem; color: #6b7280; margin-top: 0.25rem; }
+  .chart-card { background: #fff; border-radius: 8px; padding: 1rem; border: 1px solid var(--border-color, #e5e7eb); margin-bottom: 1rem; }
+  .chart-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 0.75rem 0; }

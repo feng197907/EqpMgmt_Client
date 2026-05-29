@@ -1,0 +1,64 @@
+  .row-borrowed {
+    background: rgba(245, 158, 11, 0.05);
+  }
+  .row-borrowed:hover {
+    background: rgba(245, 158, 11, 0.08) !important;
+  }
+
+  .user-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .user-avatar-mini {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--color-primary);
+    border-radius: 50%;
+  }
+
+  .inline-form {
+    display: inline-flex;
+  }
+
+  .doc-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    font-size: 11px;
+    font-weight: 500;
+    border-radius: 4px;
+    background: var(--color-gray-100);
+    color: var(--text-secondary);
+  }
+
+  .doc-type-badge.doc-type-manual,
+  .doc-type-badge.doc-type-说明书 {
+    background: #EDE9FE;
+    color: #5B21B6;
+  }
+
+  .doc-type-badge.doc-type-calibration,
+  .doc-type-badge.doc-type-校准报告 {
+    background: var(--color-info-light);
+    color: #1E40AF;
+  }
+
+  .doc-type-badge.doc-type-maintenance,
+  .doc-type-badge.doc-type-维护记录 {
+    background: var(--color-warning-light);
+    color: #92400E;
+  }
+
+  .doc-type-badge.doc-type-certificate,
+  .doc-type-badge.doc-type-证书 {
+    background: var(--color-success-light);
+    color: #065F46;
+  }

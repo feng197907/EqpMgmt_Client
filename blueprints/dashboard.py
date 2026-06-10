@@ -288,6 +288,88 @@ def reminders():
             "ORDER BY d.upload_time DESC"
         )
     calibration_rows = cur.fetchall()
+
+    # 维护提醒查询
+    from utils.maintenance import build_due_maintenance_reminders
+    from datetime import date as date_type
+    maintenance_data = build_due_maintenance_reminders(conn, days=7)
+    today_date = date_type.today()
+
+    # 收集所有维护提醒并标注状态
+    all_maintenance_items = []
+    for item in maintenance_data["overdue"]:
+        item["status"] = "overdue"
+        item["status_label"] = "已逾期"
+        item["severity"] = "danger"
+        all_maintenance_items.append(item)
+    for item in maintenance_data["due_today"]:
+        item["status"] = "due_today"
+        item["status_label"] = "今日到期"
+        item["severity"] = "danger"
+        all_maintenance_items.append(item)
+    for item in maintenance_data["due_within_7days"]:
+        item["status"] = "due_within_7days"
+        item["status_label"] = "7日内到期"
+        item["severity"] = "warning"
+        all_maintenance_items.append(item)
+
+    # 拆分为校准类和非校准类：校准类归入上方校准提醒列表
+    calibration_from_plan = []
+    maintenance_reminders = []
+    for item in all_maintenance_items:
+        if item.get("maintenance_type") == "calibration":
+            # 转为校准提醒格式
+            due_date = item.get("due_date")
+            if isinstance(due_date, str):
+                due_date = due_date[:10]  # "YYYY-MM-DD"
+            elif hasattr(due_date, "strftime"):
+                due_date = due_date.strftime("%Y-%m-%d")
+
+            from datetime import datetime as dt
+            try:
+                parsed_due = dt.strptime(due_date, "%Y-%m-%d").date()
+            except (ValueError, TypeError):
+                parsed_due = today_date
+            days_left = (parsed_due - today_date).days
+
+            calibration_from_plan.append({
+                "device_id": item["device_id"],
+                "device_code": item["device_code"],
+                "device_name": item["device_name"],
+                "doc_id": None,  # 来自维护计划，没有文档
+                "doc_name": "维护计划-校准",
+                "version": "\u2014",
+                "uploaded_by": None,
+                "upload_time": None,
+                "due_date": due_date,
+                "days_left": days_left,
+                "severity": item["severity"],
+                "label": item["status_label"],
+                "has_explicit_due": True,
+                "source": "plan",
+                "plan_id": item["plan_id"],
+            })
+        else:
+            maintenance_reminders.append(item)
+
+    # 按设备筛选（对维护提醒同样生效）
+    if filter_device:
+        fd = filter_device.lower()
+        maintenance_reminders = [
+            r for r in maintenance_reminders
+            if fd in r["device_code"].lower() or fd in r["device_name"].lower()
+        ]
+        calibration_from_plan = [
+            r for r in calibration_from_plan
+            if fd in r["device_code"].lower() or fd in r["device_name"].lower()
+        ]
+
+    # 维护提醒严重度统计
+    maintenance_severity_counts = {
+        "danger": sum(1 for r in maintenance_reminders if r["severity"] == "danger"),
+        "warning": sum(1 for r in maintenance_reminders if r["severity"] == "warning"),
+    }
+
     cur.execute("SELECT COUNT(*) AS total FROM approval_requests WHERE status = 'pending'")
     pending_approvals = cur.fetchone()["total"]
     # 检查借阅功能是否开启
@@ -300,7 +382,9 @@ def reminders():
         borrowed_total = 0
     conn.close()
 
-    all_reminders = build_calibration_reminders(calibration_rows)
+    # 校准提醒 = 文档来源 + 维护计划中的校准类记录
+    doc_reminders = build_calibration_reminders(calibration_rows)
+    all_reminders = doc_reminders + calibration_from_plan
 
     # 状态筛选
     if filter_severity and filter_severity != "all":
@@ -308,7 +392,7 @@ def reminders():
     else:
         calibration_reminders = all_reminders
 
-    # 统计各状态数量（用于筛选 tab 上的计数）
+    # 统计各状态数量（用于筛选 tab 上的计数，包含校准计划来源）
     severity_counts = {
         "danger": sum(1 for r in all_reminders if r["severity"] == "danger"),
         "warning": sum(1 for r in all_reminders if r["severity"] == "warning"),
@@ -319,11 +403,13 @@ def reminders():
     return render_template(
         "reminders.html",
         calibration_reminders=calibration_reminders,
+        maintenance_reminders=maintenance_reminders,
         pending_approvals=pending_approvals,
         borrowed_total=borrowed_total,
         filter_severity=filter_severity or "all",
         filter_device=filter_device,
         severity_counts=severity_counts,
+        maintenance_severity_counts=maintenance_severity_counts,
     )
 
 

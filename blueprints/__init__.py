@@ -7,6 +7,7 @@ from blueprints.device_changes import device_changes_bp
 from blueprints.devices import devices_bp
 from blueprints.documents import documents_bp
 from blueprints.esign import esign_bp
+from blueprints.log_bp import log_bp
 from blueprints.maintenance import maintenance_bp
 from blueprints.password import password_bp
 from blueprints.profile import profile_bp
@@ -31,4 +32,5 @@ __all__ = [
     "settings_bp",
     "esign_bp",
     "spare_part_bp",
+    "log_bp",
 ]

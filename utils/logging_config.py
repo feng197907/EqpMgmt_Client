@@ -34,6 +34,7 @@ def setup_logging(app: Flask):
     # 日志文件路径
     app_log_file = os.path.join(log_dir, 'app.log')
     error_log_file = os.path.join(log_dir, 'error.log')
+    js_error_log_file = os.path.join(log_dir, 'js_error.log')
 
     # 日志格式（含精确时间）
     formatter = logging.Formatter(
@@ -76,14 +77,28 @@ def setup_logging(app: Flask):
     error_file_handler.setLevel(logging.ERROR)
     error_logger.addHandler(error_file_handler)
 
-    # 3. 配置 Flask app logger
+    # 3. 前端 JS 错误日志（独立文件）
+    js_error_logger = logging.getLogger('js_error')
+    js_error_logger.handlers.clear()
+    js_error_logger.setLevel(logging.ERROR)
+
+    js_error_file_handler = RotatingFileHandler(
+        js_error_log_file,
+        maxBytes=5*1024*1024,
+        backupCount=5
+    )
+    js_error_file_handler.setFormatter(formatter)
+    js_error_file_handler.setLevel(logging.ERROR)
+    js_error_logger.addHandler(js_error_file_handler)
+
+    # 4. 配置 Flask app logger
     app.logger.handlers.clear()
     app.logger.handlers.append(app_file_handler)
     app.logger.handlers.append(console_handler)
     app.logger.setLevel(logging.INFO)
     app.logger.propagate = False
 
-    # 4. 禁用 Werkzeug 默认日志
+    # 5. 禁用 Werkzeug 默认日志
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
 
@@ -133,6 +148,7 @@ def setup_logging(app: Flask):
     app.config['LOG_DIR'] = log_dir
     app.config['APP_LOG_FILE'] = app_log_file
     app.config['ERROR_LOG_FILE'] = error_log_file
+    app.config['JS_ERROR_LOG_FILE'] = js_error_log_file
 
     return app
 

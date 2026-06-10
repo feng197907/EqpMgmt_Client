@@ -3,7 +3,7 @@
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
   <div>
     <h3 class="mb-1">提醒中心</h3>
-    <div class="text-muted">校准文档到期提醒{% if borrowing_enabled %} · 待审批与借阅状态概览{% endif %}</div>
+    <div class="text-muted">校准与维护到期提醒{% if borrowing_enabled %} · 待审批与借阅状态概览{% endif %}</div>
   </div>
   <div class="btn-group">
     <a class="btn btn-outline-primary" href="{{ url_for('dashboard.user_stories') }}">用户故事中心</a>
@@ -35,7 +35,7 @@
     <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="text-muted small">已逾期</div>
-        <div class="fs-3 fw-bold text-danger">{{ severity_counts.danger }}</div>
+        <div class="fs-3 fw-bold text-danger">{{ severity_counts.danger + maintenance_severity_counts.danger }}</div>
       </div>
     </div>
   </div>
@@ -43,13 +43,13 @@
     <div class="card shadow-sm h-100">
       <div class="card-body">
         <div class="text-muted small">即将到期 / 需关注</div>
-        <div class="fs-3 fw-bold">{{ severity_counts.warning + severity_counts.info }}</div>
+        <div class="fs-3 fw-bold">{{ severity_counts.warning + severity_counts.info + maintenance_severity_counts.warning }}</div>
       </div>
     </div>
   </div>
 </div>
 
-{# 校准提醒表格 #}
+{# ===== 校准提醒表格 ===== #}
 <div class="card shadow-sm">
   <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <div class="d-flex align-items-center gap-1">
@@ -118,7 +118,12 @@
           <td>{{ row.device_name }}</td>
           <td>
             <div class="d-flex align-items-center gap-1">
+              {% if row.source == 'plan' %}
+              <span class="text-muted"><em>{{ row.doc_name }}</em></span>
+              <span class="badge badge-outline-secondary" style="font-size:10px;" title="来自维护计划">计划</span>
+              {% else %}
               <span>{{ row.doc_name }}</span>
+              {% endif %}
               {% if row.has_explicit_due %}
               <span class="badge badge-info" style="font-size:10px;">精确</span>
               {% endif %}
@@ -153,7 +158,12 @@
             {% endif %}
           </td>
           <td>
+            {% if row.source == 'plan' and row.plan_id %}
+            <a class="btn btn-sm btn-success" href="/device/{{ row.device_id }}/maintenance/plan/{{ row.plan_id }}/record">完成校准</a>
+            {% elif row.doc_id %}
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('documents.document_history', doc_id=row.doc_id) }}">版本历史</a>
+            <a class="btn btn-sm btn-primary" href="{{ url_for('documents.upload_doc', device_id=row.device_id) }}">上传校准</a>
+            {% endif %}
             <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('devices.device_detail', device_id=row.device_id) }}">设备详情</a>
           </td>
         </tr>
@@ -172,4 +182,63 @@
     </table>
   </div>
 </div>
+
+{# ===== 维护提醒表格 ===== #}
+{% if maintenance_reminders %}
+<div class="card shadow-sm mt-4">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div class="d-flex align-items-center gap-1">
+      <span>🔧 维护提醒</span>
+      <span class="badge badge-secondary">{{ maintenance_reminders|length }}</span>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>设备编码</th>
+          <th>设备名称</th>
+          <th>维护类型</th>
+          <th>到期日期</th>
+          <th>状态</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in maintenance_reminders %}
+        <tr>
+          <td><span class="font-monospace">{{ r.device_code }}</span></td>
+          <td>{{ r.device_name }}</td>
+          <td>
+            <span class="badge bg-primary">{{ r.maintenance_type_label }}</span>
+          </td>
+          <td>
+            {% if r.severity == 'danger' %}
+              <span class="text-danger fw-bold">{{ r.due_date }}</span>
+            {% elif r.severity == 'warning' %}
+              <span class="text-warning fw-bold">{{ r.due_date }}</span>
+            {% else %}
+              {{ r.due_date }}
+            {% endif %}
+          </td>
+          <td>
+            {% if r.severity == 'danger' %}
+              <span class="badge badge-danger">{{ r.status_label }}</span>
+            {% else %}
+              <span class="badge badge-warning">{{ r.status_label }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <a class="btn btn-sm btn-outline-primary" href="/device/{{ r.device_id }}/maintenance/plan/{{ r.plan_id }}/record">去维护</a>
+            <a class="btn btn-sm btn-outline-secondary" href="/device/{{ r.device_id }}">设备详情</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

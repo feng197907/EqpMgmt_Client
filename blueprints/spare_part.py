@@ -1,10 +1,8 @@
 # 备件库存管理 Blueprint
 from datetime import datetime
-from io import BytesIO
 import os
-import tempfile
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -19,6 +17,7 @@ from models.spare_part import (
     SparePartInbound,
 )
 from utils.audit import log_action
+from utils.excel_export import auto_width, excel_response, style_border_cell, style_header_cell
 from utils.decorators import admin_required, permission_required
 
 spare_part_bp = Blueprint("spare_part", __name__, url_prefix="/spare-parts")
@@ -27,55 +26,6 @@ spare_part_bp = Blueprint("spare_part", __name__, url_prefix="/spare-parts")
 # ============================================================
 # Excel 导出辅助函数（与其他 Blueprint 保持一致风格）
 # ============================================================
-
-
-def _excel_response(wb, filename):
-    """将 Workbook 转为 Flask send_file 响应"""
-    buf = BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-    return send_file(
-        buf,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name=filename,
-    )
-
-
-def _save_excel_to_temp(wb, filename):
-    """将 Workbook 保存到临时目录，返回文件路径"""
-    temp_dir = os.path.join(tempfile.gettempdir(), 'DMS_Exports')
-    os.makedirs(temp_dir, exist_ok=True)
-    filepath = os.path.join(temp_dir, filename)
-    wb.save(filepath)
-    return filepath
-
-
-def _header_style(cell):
-    """蓝色加粗表头"""
-    cell.font = Font(bold=True, color="FFFFFF")
-    cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    cell.alignment = Alignment(horizontal="center", vertical="center")
-
-
-def _border(cell):
-    """细边框"""
-    thin = Side(style="thin", color="000000")
-    cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-
-def _auto_width(ws):
-    """自动调整列宽"""
-    for col in ws.columns:
-        max_len = 0
-        col_letter = col[0].column_letter
-        for cell in col:
-            try:
-                if cell.value:
-                    max_len = max(max_len, len(str(cell.value)))
-            except Exception:
-                pass
-        ws.column_dimensions[col_letter].width = min(max_len + 2, 50)
 
 
 @spare_part_bp.route("/")
@@ -169,8 +119,8 @@ def spare_part_export():
                "供应商", "供应商联系人", "供应商电话", "备注", "创建时间"]
     ws.append(headers)
     for cell in ws[1]:
-        _header_style(cell)
-        _border(cell)
+        style_header_cell(cell)
+        style_border_cell(cell)
 
     for i, row in enumerate(rows, 1):
         ws.append([
@@ -194,17 +144,13 @@ def spare_part_export():
 
     for data_row in ws.iter_rows(min_row=2, max_row=ws.max_row):
         for cell in data_row:
-            _border(cell)
+            style_border_cell(cell)
             cell.alignment = Alignment(vertical="center", wrap_text=True)
 
-    _auto_width(ws)
+    auto_width(ws)
 
     filename = f"备件列表_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
-    if is_desktop:
-        filepath = _save_excel_to_temp(wb, filename)
-        return {"success": True, "filepath": filepath, "filename": filename}
-    return _excel_response(wb, filename)
+    return excel_response(wb, filename)
 
 
 @spare_part_bp.route("/stats")
@@ -406,8 +352,8 @@ def inbound_export():
                "入库日期", "操作人", "录入时间", "备注"]
     ws.append(headers)
     for cell in ws[1]:
-        _header_style(cell)
-        _border(cell)
+        style_header_cell(cell)
+        style_border_cell(cell)
 
     for i, row in enumerate(rows, 1):
         ws.append([
@@ -428,17 +374,13 @@ def inbound_export():
 
     for data_row in ws.iter_rows(min_row=2, max_row=ws.max_row):
         for cell in data_row:
-            _border(cell)
+            style_border_cell(cell)
             cell.alignment = Alignment(vertical="center", wrap_text=True)
 
-    _auto_width(ws)
+    auto_width(ws)
 
     filename = f"备件入库记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
-    if is_desktop:
-        filepath = _save_excel_to_temp(wb, filename)
-        return {"success": True, "filepath": filepath, "filename": filename}
-    return _excel_response(wb, filename)
+    return excel_response(wb, filename)
 
 
 @spare_part_bp.route("/consumptions/export")
@@ -492,8 +434,8 @@ def consumption_export():
                "消耗人", "消耗时间", "备注"]
     ws.append(headers)
     for cell in ws[1]:
-        _header_style(cell)
-        _border(cell)
+        style_header_cell(cell)
+        style_border_cell(cell)
 
     for i, row in enumerate(rows, 1):
         ws.append([
@@ -515,17 +457,13 @@ def consumption_export():
 
     for data_row in ws.iter_rows(min_row=2, max_row=ws.max_row):
         for cell in data_row:
-            _border(cell)
+            style_border_cell(cell)
             cell.alignment = Alignment(vertical="center", wrap_text=True)
 
-    _auto_width(ws)
+    auto_width(ws)
 
     filename = f"备件消耗记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
-    if is_desktop:
-        filepath = _save_excel_to_temp(wb, filename)
-        return {"success": True, "filepath": filepath, "filename": filename}
-    return _excel_response(wb, filename)
+    return excel_response(wb, filename)
 
 
 @spare_part_bp.route("/consumptions")

@@ -1,10 +1,8 @@
 # 认证 Blueprint
 from datetime import datetime
-from io import BytesIO
 import os
-import tempfile
 
-from flask import Blueprint, flash, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -13,6 +11,7 @@ from werkzeug.security import check_password_hash
 from config import DEVICE_STATUS_LABELS
 from database import get_db
 from utils.audit import log_action
+from utils.excel_export import excel_response, style_border_cell, style_header_cell
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -81,41 +80,6 @@ def index():
     )
 
 
-def _create_excel_response(wb, filename):
-    """将 Workbook 转为 Flask send_file 响应"""
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return send_file(
-        output,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name=filename,
-    )
-
-
-def _save_excel_to_temp(wb, filename):
-    """将 Workbook 保存到临时目录，返回文件路径"""
-    temp_dir = os.path.join(tempfile.gettempdir(), 'DMS_Exports')
-    os.makedirs(temp_dir, exist_ok=True)
-    filepath = os.path.join(temp_dir, filename)
-    wb.save(filepath)
-    return filepath
-
-
-def _set_header_style(cell):
-    """设置表头样式"""
-    cell.font = Font(bold=True, color="FFFFFF")
-    cell.fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-    cell.alignment = Alignment(horizontal="center", vertical="center")
-
-
-def _set_border(cell):
-    """设置单元格边框"""
-    thin = Side(style="thin", color="000000")
-    cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
-
-
 @auth_bp.route("/devices/export")
 @login_required
 def export_devices():
@@ -147,8 +111,8 @@ def export_devices():
     headers = ["设备编码", "设备名称", "型号", "位置", "状态"]
     ws.append(headers)
     for cell in ws[1]:
-        _set_header_style(cell)
-        _set_border(cell)
+        style_header_cell(cell)
+        style_border_cell(cell)
 
     for device in devices:
         ws.append([
@@ -161,7 +125,7 @@ def export_devices():
 
     for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
         for cell in row:
-            _set_border(cell)
+            style_border_cell(cell)
             cell.alignment = Alignment(vertical="center", wrap_text=True)
 
     for col in ws.columns:
@@ -177,8 +141,4 @@ def export_devices():
         ws.column_dimensions[column].width = adjusted_width
 
     filename = f"devices_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    is_desktop = request.headers.get('X-Desktop-Shell') == '1'
-    if is_desktop:
-        filepath = _save_excel_to_temp(wb, filename)
-        return {"success": True, "filepath": filepath, "filename": filename}
-    return _create_excel_response(wb, filename)
+    return excel_response(wb, filename)

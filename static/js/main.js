@@ -231,16 +231,51 @@
   }
 
   // ==================== 导出公共方法 ====================
+  // 所有页面的导出按钮统一走这里：
+  //   浏览器   → fetch → Blob → <a download>（不受弹窗拦截器限制）
+  //   桌面壳   → 带 X-Desktop-Shell 请求头，后端落盘后返回 JSON，再调 pywebview 打开
+  // 调用方只需传按钮和导出 URL；按钮样式因页面而异（btn-export / btn-outline-primary），
+  // 所以用「原始快照 + 还原」而不是写死 class 名，避免恢复后样式变形。
   function doExport(btn, url) {
+    var originalClass = btn.className;
+    var originalHtml = btn.innerHTML;
+
+    function setState(stateClass, html) {
+      btn.innerHTML = html;
+      btn.classList.remove('btn-primary', 'btn-success', 'btn-danger');
+      if (stateClass) {
+        btn.classList.add(stateClass);
+      }
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons({ attrs: { target: btn } });
+      }
+    }
+
+    function restore() {
+      setTimeout(function() {
+        btn.disabled = false;
+        btn.className = originalClass;
+        btn.innerHTML = originalHtml;
+        if (typeof lucide !== 'undefined') {
+          lucide.createIcons({ attrs: { target: btn } });
+        }
+      }, 2000);
+    }
+
+    function fail(err) {
+      console.error('导出失败:', err);
+      setState('btn-danger', '<i data-lucide="alert-circle"></i> 导出失败');
+      restore();
+    }
+
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>导出中...';
-    btn.classList.remove('btn-outline-primary');
+    btn.classList.remove('btn-outline-primary', 'btn-export');
     btn.classList.add('btn-primary');
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>导出中...';
 
     var isDesktop = typeof window.pywebview !== 'undefined' && window.pywebview.api;
 
     if (!isDesktop) {
-      // 浏览器模式：fetch → Blob URL → <a> click，不受弹窗拦截器限制
       fetch(url, { credentials: 'same-origin' })
         .then(function(resp) {
           if (!resp.ok) { throw new Error('导出失败: ' + resp.status); }
@@ -261,65 +296,32 @@
           a.click();
           document.body.removeChild(a);
           setTimeout(function() { URL.revokeObjectURL(blobUrl); }, 10000);
-          btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
-          btn.classList.remove('btn-primary');
-          btn.classList.add('btn-success');
+          setState('btn-success', '<i data-lucide="check"></i> 导出成功');
+          restore();
         })
-        .catch(function(err) {
-          console.error('导出失败:', err);
-          btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
-          btn.classList.remove('btn-primary');
-          btn.classList.add('btn-danger');
-        })
-        .finally(function() {
-          setTimeout(function() {
-            btn.disabled = false;
-            btn.innerHTML = '<i data-lucide="download"></i> 导出';
-            btn.classList.remove('btn-success', 'btn-danger');
-            btn.classList.add('btn-outline-primary');
-            if (typeof lucide !== 'undefined') {
-              lucide.createIcons({ attrs: { target: btn } });
-            }
-          }, 2000);
-        });
+        .catch(fail);
       return;
     }
 
-    // pywebview 桌面壳：通过 JSON 中转获取本地文件路径再用 API 打开
+    // pywebview 桌面壳：后端把文件落盘并返回路径，这里调原生 API 打开
     fetch(url, { headers: { 'X-Desktop-Shell': '1' }, credentials: 'same-origin' })
       .then(function(resp) {
         if (!resp.ok) { throw new Error('导出失败: ' + resp.status); }
         return resp.json();
       })
       .then(function(data) {
-        if (data.success) {
-          Promise.resolve(window.pywebview.api.open_file(data.filepath)).then(function(r) {
-            if (r && r.success === false) { alert('打开文件失败：' + (r.error || '未知错误')); return; }
-            btn.innerHTML = '<i data-lucide="check"></i> 导出成功';
-            btn.classList.remove('btn-primary');
-            btn.classList.add('btn-success');
-          });
-        } else {
-          throw new Error(data.error || '导出失败');
+        if (!data || !data.success) {
+          throw new Error((data && data.error) || '导出失败');
         }
-      })
-      .catch(function(err) {
-        console.error('导出失败:', err);
-        btn.innerHTML = '<i data-lucide="alert-circle"></i> 导出失败';
-        btn.classList.remove('btn-primary');
-        btn.classList.add('btn-danger');
-      })
-      .finally(function() {
-        setTimeout(function() {
-          btn.disabled = false;
-          btn.innerHTML = '<i data-lucide="download"></i> 导出';
-          btn.classList.remove('btn-success', 'btn-danger');
-          btn.classList.add('btn-outline-primary');
-          if (typeof lucide !== 'undefined') {
-            lucide.createIcons({ attrs: { target: btn } });
+        return Promise.resolve(window.pywebview.api.open_file(data.filepath)).then(function(r) {
+          if (r && r.success === false) {
+            throw new Error('打开文件失败：' + (r.error || '未知错误'));
           }
-        }, 2000);
-      });
+          setState('btn-success', '<i data-lucide="check"></i> 导出成功');
+          restore();
+        });
+      })
+      .catch(fail);
   }
 
   // ==================== 通用文件下载方法 ====================

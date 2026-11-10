@@ -3,11 +3,10 @@ import html
 import re
 import sys
 from datetime import datetime
-from io import BytesIO
 
 # 看板与提醒 Blueprint
 from pathlib import Path
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -17,6 +16,7 @@ from config import DEVICE_STATUS_LABELS, DOC_STATUS_LABELS, ROLE_LABELS
 from database import get_db, get_system_setting
 from utils.audit import log_action
 from utils.decorators import admin_required
+from utils.excel_export import excel_response
 from utils.helpers import build_calibration_reminders, get_document_rows
 from utils.maintenance import build_due_maintenance_reminders
 
@@ -819,15 +819,7 @@ def export_audit_log():
 
     prefix = "audit_log_filtered" if has_filters else "audit_log_all"
     filename = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return send_file(
-        output,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        as_attachment=True,
-        download_name=filename,
-    )
+    return excel_response(wb, filename)
 
 
 @dashboard_bp.route("/add_device", methods=["GET", "POST"])

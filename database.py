@@ -318,8 +318,86 @@ def init_db():
     else:
         _init_sqlite_tables(cur, conn)
 
+    # 建表之后补业务索引：DDL 里只有主键和少数 UNIQUE，
+    # 列表页/看板/提醒中心的过滤与排序列此前全部裸奔。
+    _ensure_indexes(cur)
+
     conn.commit()
     conn.close()
+
+
+# ============================================================
+# 业务索引
+#
+# 依据实际查询语句确定，不是照着外键随便建：
+#   - audit_logs：页面 ORDER BY log_time DESC LIMIT 500 + 按操作人/类型筛选
+#   - documents ：设备详情按 device_id 查、看板统计待审数、列表按上传时间倒序
+#   - devices   ：看板 WHERE is_deleted=0 GROUP BY status
+#   - maintenance_plan：提醒中心 WHERE is_active/is_closed + ORDER BY next_due_date
+# 覆盖各表规模差异：审计日志和文档会持续增长，其余表量小但查询频繁。
+# ============================================================
+_BUSINESS_INDEXES = [
+    # (索引名, 表名, 列定义)
+    ("ix_audit_logs_log_time", "audit_logs", "log_time"),
+    ("ix_audit_logs_user_time", "audit_logs", "user, log_time"),
+    ("ix_audit_logs_type_time", "audit_logs", "target_type, log_time"),
+    ("ix_documents_device", "documents", "device_id, is_deleted"),
+    ("ix_documents_deleted_status", "documents", "is_deleted, status"),
+    ("ix_documents_deleted_upload", "documents", "is_deleted, upload_time"),
+    ("ix_devices_deleted_status", "devices", "is_deleted, status"),
+    ("ix_maintenance_plan_due", "maintenance_plan", "is_active, is_closed, next_due_date"),
+    ("ix_maintenance_record_device", "maintenance_record", "device_id"),
+    ("ix_approval_requests_status", "approval_requests", "status"),
+    ("ix_borrow_records_status", "borrow_records", "status"),
+    ("ix_spare_inbounds_part", "spare_part_inbounds", "spare_part_id"),
+    ("ix_spare_consumptions_part", "spare_part_consumptions", "spare_part_id"),
+]
+
+
+def _index_exists(cur, table, name):
+    """索引是否已存在。MySQL 查 information_schema，SQLite 查 sqlite_master。"""
+    if DB_TYPE == 'mysql':
+        cur.execute(
+            "SELECT COUNT(*) AS cnt FROM information_schema.statistics "
+            "WHERE table_schema = DATABASE() AND table_name = %s AND index_name = %s",
+            (table, name),
+        )
+    else:
+        cur.execute(
+            "SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type = 'index' AND name = %s",
+            (name,),
+        )
+    row = cur.fetchone()
+    if row is None:
+        return False
+    return bool(row["cnt"] if isinstance(row, dict) or hasattr(row, "keys") else row[0])
+
+
+def _ensure_indexes(cur):
+    """幂等地补建业务索引。
+
+    老库升级时表都已存在，直接 CREATE INDEX 即可；新建库在建表后执行，
+    效果相同。任何一条失败（例如列不存在）只打日志，不阻断启动 ——
+    索引是性能优化，不应该让整个应用起不来。
+    """
+    created = 0
+    skipped = 0
+    for name, table, columns in _BUSINESS_INDEXES:
+        try:
+            if _index_exists(cur, table, name):
+                skipped += 1
+                continue
+            if DB_TYPE == 'mysql':
+                # MySQL 不支持 CREATE INDEX IF NOT EXISTS，靠上面的存在性检查
+                cur.execute(f"CREATE INDEX `{name}` ON `{table}` ({columns})")
+            else:
+                cur.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})")
+            created += 1
+        except Exception as exc:
+            print(f"[DB] 索引 {name} 跳过：{exc}")
+
+    if created or skipped:
+        print(f"[DB] 业务索引：新建 {created} 个，已存在 {skipped} 个")
 
 
 def _migrate_mysql_columns(cur):

@@ -88,6 +88,8 @@ Copy-Item build_config.json.example build_config.json
 
 注意：**`certs\` 不在打包资源里**，公钥和许可证文件是 exe 的同级文件而非内置资源，详见「坑 3」。
 
+> 实现细节（别改回去）：PyInstaller 把 INFO 日志写到 stderr，而脚本开头设了 `Stop` 级错误偏好，在 Windows PowerShell 5.1 下会被包装成 `NativeCommandError` 直接终止构建。所以调用 PyInstaller 前后会把错误偏好临时降为 `Continue`，用 `$LASTEXITCODE` 判定成败。
+
 ### build_installer.ps1
 
 先设 `DMS_SKIP_NSIS=1` 跑一遍 `build_windows.ps1`（拿到最新 EXE，且不重复生成安装包），再用 `makensis` 生成 `DMS_Client_Installer.exe`。`makensis` 查找顺序：PATH → `%ProgramFiles(x86)%\NSIS`，都没有就报错退出。

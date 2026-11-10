@@ -181,10 +181,18 @@ $buildArgs += @(
 
 
 # Execute PyInstaller
+# PyInstaller writes its INFO log to stderr. Under PowerShell 5.1 with
+# $ErrorActionPreference='Stop' that stderr output is wrapped in a
+# NativeCommandError record and aborts the build, so relax the preference
+# for this call and rely on $LASTEXITCODE instead.
+$prevErrorAction = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
 & $pythonExe -m PyInstaller @buildArgs
-if ($LASTEXITCODE -ne 0) {
-	Write-Error "PyInstaller failed with exit code $LASTEXITCODE"
-	exit $LASTEXITCODE
+$pyInstallerExit = $LASTEXITCODE
+$ErrorActionPreference = $prevErrorAction
+if ($pyInstallerExit -ne 0) {
+	Write-Error "PyInstaller failed with exit code $pyInstallerExit"
+	exit $pyInstallerExit
 }
 
 $builtExePath = Join-Path $releaseDir "$outputName.exe"

@@ -20,7 +20,7 @@
   <link href="{{ url_for('static', filename='css/layout.css') }}?v=4" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/components.css') }}?v=2" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/pages.css') }}?v=2" rel="stylesheet">
-  <link href="{{ url_for('static', filename='css/pages-enhanced.css') }}?v=2" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/pages-enhanced.css') }}?v=3" rel="stylesheet">
   {% block head %}{% endblock %}
 </head>
 <body class="{% if desktop_shell %}desktop-shell{% endif %}" data-user-is-admin="{{ 'true' if current_user.is_authenticated and current_user.is_admin else 'false' }}">

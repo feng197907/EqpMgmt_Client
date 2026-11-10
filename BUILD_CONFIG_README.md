@@ -185,24 +185,23 @@
 
 ### 步骤 2：运行构建脚本
 
-在项目根目录的 PowerShell 中运行：
+在项目根目录的 PowerShell 中运行（统一入口，用 `-Target` 选做到哪一步）：
 
 ```powershell
-# 仅构建主程序 .exe
-.\scripts\build_windows.ps1
-
-# 构建主程序 + NSIS 安装包（需已安装 NSIS）
-.\scripts\build_installer.ps1
+.\scripts\build.ps1 -Target exe          # 只构建主程序 .exe
+.\scripts\build.ps1 -Target installer    # 主程序 + NSIS 安装包（需已安装 NSIS）
+.\scripts\build.ps1                      # 完整发布：EXE + 安装包 + 发布 zip（默认）
 ```
 
-> `build_installer.ps1` 会先调用 `build_windows.ps1` 完成主程序构建，再生成安装包，**无需分两步运行**。
+> 一条命令按需串联各步骤，不再需要分步执行多个脚本。完整参数见 [scripts/README.md](scripts/README.md)。
 
 ### 步骤 3：查看构建输出
 
 ```
 releases\
-  DMS_Client.exe           ← 主程序
-  DMS_Client_Installer.exe ← 安装包（有 NSIS 时）
+  DMS_Client.exe                  ← 主程序
+  DMS_Client_Installer.exe        ← 安装包（有 NSIS 且目标包含 installer 时）
+  DMS_Client_Release_<时间戳>.zip  ← 发布包（-Target release / all）
 ```
 
 ---
@@ -249,15 +248,10 @@ Copy-Item build_config.json.example build_config.json
 
 | 脚本 | 说明 |
 |------|------|
-| `scripts\build_windows.ps1` | 主构建脚本，生成单文件 `.exe`，可选调用 NSIS |
-| `scripts\build_installer.ps1` | 安装包构建脚本，先触发主构建，再生成 NSIS 安装包 |
-| `scripts\sign_release.ps1` | 代码签名脚本，由 `build_windows.ps1` 在 `sign.enabled=true` 时自动调用 |
-| `scripts\create_keypair.py` | 生成 RSA 密钥对（`license_private.pem` / `license_public.pem`） |
-| `scripts\create_license.py` | 用私钥签名生成 `license_<name>.json` 授权文件（标准 license 文件模式） |
-| `scripts\verify_license.py` | 验证指定授权文件的签名是否有效 |
-| `scripts\make_release.ps1` | 一键打包发布（构建 + 安装包 + 签名） |
-| `scripts\rebuild_release.ps1` | 强制重新构建（清理 build 目录后重新运行） |
-| `scripts\package_portable.ps1` | 打包便携版（免安装压缩包） |
+| `scripts\build.ps1` | 唯一构建入口。`-Target exe\|installer\|release\|portable\|all` 控制做到哪一步；内部完成 PyInstaller 打包、NSIS 安装包、代码签名（`sign.enabled=true` 时）、发布/便携版 zip |
+| `scripts\license.py` | 许可证工具。`keypair` 生成密钥对、`issue` 签发 `license_<name>.json`、`verify` 校验签名 |
+
+详细参数与内部行为见 [scripts/README.md](scripts/README.md)。
 
 ---
 

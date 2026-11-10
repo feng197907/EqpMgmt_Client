@@ -224,7 +224,7 @@ python launcher.py
 
 只有要做**免安装 EXE** 或 **NSIS 安装包**时才需要这一节；日常使用源码运行即可。
 
-### 前置条件（缺一项就会失败）
+### 前置条件
 
 **1. `build_config.json` 必须存在且含 `license` 段**
 
@@ -232,67 +232,77 @@ python launcher.py
 copy build_config.json.example build_config.json
 ```
 
-> 脚本在文件缺失时会打印「Using default configuration...」，但那份默认配置**没有 `license` 段**，紧接着就 `Write-Error` 退出——所谓兜底是假的，必须先复制。
+> 脚本会据此生成 `dms_license_config.json` 并打进 EXE。缺文件或缺少 `license` 段会直接报错终止——不会静默用默认值凑合。
 
-**2. 仓库根目录要有 `uploads\` 目录**
-
-```powershell
-mkdir uploads
-```
-
-> 该目录被 `.gitignore` 排除，克隆后不存在，而 `--add-data "uploads;uploads"` 要求它存在，否则 PyInstaller 直接中止。
-
-**3. 要出安装包，需先装 NSIS**
+**2. 要出安装包，需先装 NSIS**
 
 ```powershell
 winget install --id NSIS.NSIS -e
 ```
 
-装完在 `C:\Program Files (x86)\NSIS\makensis.exe`，脚本会自动找到。不装也能出 EXE，只是跳过安装包。
+装完在 `C:\Program Files (x86)\NSIS\makensis.exe`，脚本自动查找。
 
-> **PyInstaller 不用手动装**，脚本每次都会 `pip install pyinstaller`。
+**其余都不用准备**：PyInstaller 由脚本自动 `pip install`；`uploads\`、`releases\` 目录不存在会自动创建（早期版本缺 `uploads\` 会直接打包失败）。
 
-### 一条命令走完全流程
+### 命令一览
 
-```powershell
-.\scripts\rebuild_release.ps1
-```
+只有**一个**入口 `scripts\build.ps1`，用 `-Target` 选择做到哪一步：
 
-依次执行：打包 EXE → 构建 NSIS 安装包 → 生成发布 zip，产物全部落在 `releases\`。
-
-> 这个脚本会**打包两次 EXE**（第 2 步的 `build_installer.ps1` 内部又完整跑了一遍 `build_windows.ps1`），耗时约为只打包的两倍，属已知冗余。
-
-### 分步执行
-
-```powershell
-.\scripts\build_windows.ps1        # 1. PyInstaller → releases\DMS_Client.exe（装了 NSIS 时顺带出安装包）
-.\scripts\build_installer.ps1      # 2. 只做 NSIS 安装包 → releases\DMS_Client_Installer.exe
-.\scripts\make_release.ps1         # 3. 发布 zip（EXE + 安装包 + 客户端说明 + 公钥）
-.\scripts\package_portable.ps1     # 4. 便携版 zip（仅 EXE + README.txt）
-```
-
-| 需求 | 该跑哪条 |
+| 命令 | 产物 |
 |---|---|
-| 只要一个能双击的 EXE | `build_windows.ps1` |
-| 要安装包 | `build_windows.ps1`（装了 NSIS 就够）或 `build_installer.ps1` |
-| 要发给客户的一个包 | `make_release.ps1` |
-| 要免安装绿色包 | `package_portable.ps1` |
-| 全都重新出一遍 | `rebuild_release.ps1` |
+| `.\scripts\build.ps1` | EXE + 安装包 + 发布 zip（默认 `-Target release`） |
+| `.\scripts\build.ps1 -Target exe` | 只要 `releases\DMS_Client.exe` |
+| `.\scripts\build.ps1 -Target installer` | EXE + `releases\DMS_Client_Installer.exe` |
+| `.\scripts\build.ps1 -Target portable` | EXE + `releases\DMS_Client_Portable.zip` |
+| `.\scripts\build.ps1 -Target all` | 以上全部（含发布 zip 与便携版 zip） |
 
-**跳过安装包**（没装 NSIS 或只想快速验证 EXE）：
+常用组合：
 
 ```powershell
-$env:DMS_SKIP_NSIS = "1"
-.\scripts\build_windows.ps1
+.\scripts\build.ps1 -Target release -SkipDeps          # 依赖已装好，跳过 pip，快十几秒
+.\scripts\build.ps1 -Target release -SkipSign          # 暂时不签名
+.\scripts\build.ps1 -Target installer -SkipDeps        # 只想验证安装包
 ```
+
+### 参数说明
+
+| 参数 | 作用 |
+|---|---|
+| `-Target` | `exe` / `installer` / `release`（默认） / `portable` / `all` |
+| `-SkipDeps` | 跳过 pip 安装，依赖已就绪时用 |
+| `-SkipSign` | 即使 `build_config.json` 里 `sign.enabled=true` 也不签名 |
+| `-CreateTestCert` + `-TestCertPassword` | 先生成自签测试证书 `certs\code_sign.pfx`，用于验证签名链路（仅测试，正式发布会触发 SmartScreen 警告） |
 
 **PowerShell 执行策略拦截脚本**：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
 ```
 
+### 脚本一览
+
+`scripts\` 下只有两个文件，职责分别是：
+
+| 文件 | 作用 |
+|---|---|
+| `build.ps1` | **唯一的构建入口**。按顺序执行：读配置 → 生成运行期许可配置 → PyInstaller 打包 EXE →（可选）NSIS 安装包 →（可选）代码签名 →（可选）发布 zip / 便携版 zip → 打印产物与 SHA256。取代了原先的 `build_windows.ps1`、`build_installer.ps1`、`make_release.ps1`、`package_portable.ps1`、`rebuild_release.ps1`、`sign_release.ps1` 六个脚本 |
+| `license.py` | **许可证工具**，三个子命令：`keypair` 生成 RSA 密钥对、`issue` 签发许可证、`verify` 校验许可证。校验逻辑复用 `utils/license.py`，保证签发端与客户端判定标准一致 |
+
+许可证相关用法：
+
+```powershell
+python scripts/license.py keypair                              # 生成 certs\license_private.pem + license_public.pem
+python scripts/license.py issue 某某制药 365                    # 签发 365 天
+python scripts/license.py issue 某某制药 --expires 2026-12-31   # 指定到期日
+python scripts/license.py verify                               # 校验 certs 下最新一份
+python scripts/license.py verify certs\license_某某制药.json     # 校验指定文件
+```
+
+> 私钥口令优先级：`--password` > 环境变量 `DMS_LICENSE_KEY_PASS` > 内置默认值。**生产环境请用环境变量**，内置默认值只用于本地调试。
+
 ### 产物一览
+
+一次 `-Target release` 只会产生**一个**发布 zip：脚本在打包前会删除 `releases\` 下历史的 `DMS_Client_Release_*.zip`，不会越积越多。
 
 | 路径 | 内容 | 体积参考 |
 |---|---|---|
@@ -301,6 +311,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
 | `releases\DMS_Client_Release_<时间戳>.zip` | 发布包（EXE + 安装包 + 说明 + 公钥） | ≈ 37 MB |
 | `releases\DMS_Client_Portable.zip` | 便携版（EXE + README.txt） | ≈ 19 MB |
 | `build\`、`*.spec` | PyInstaller 中间产物，可随时删 | — |
+
+构建结束时会直接打印各产物的 SHA256，发版时贴进 Release 说明即可。
 
 ### 打包后怎么验证
 
@@ -329,14 +341,15 @@ Remove-Item -Force *.spec -ErrorAction SilentlyContinue
 
 | 现象 | 原因与处理 |
 |---|---|
-| 打印 `Using default configuration...` 后立刻退出 | 缺 `build_config.json`，或该文件没有 `license` 段 → 按前置条件 1 处理 |
-| PyInstaller 报 add-data 找不到 `uploads` | 仓库根目录没有 `uploads\` → `mkdir uploads` |
-| 停在 `Building executable...` 之后中断 | PowerShell 5.1 把 PyInstaller 的 stderr 日志当异常；当前脚本已修复，若仍出现请更新脚本 |
-| `makensis not found` | 未装 NSIS 或不在 PATH → `winget install --id NSIS.NSIS -e` |
+| `缺少 build_config.json` | 未复制配置样例 → `copy build_config.json.example build_config.json` |
+| `build_config.json 缺少 license 段` | 配置里删掉了 `license` 段，脚本无法生成运行期许可配置 → 对照 `.example` 补齐 |
+| `未找到 makensis`（`-Target installer`） | 未装 NSIS → `winget install --id NSIS.NSIS -e`；用其他 `-Target` 时只是跳过安装包，不报错 |
+| `PyInstaller 打包失败（exit 1）` | 看上面的 INFO 日志：常见是磁盘空间不足、杀毒锁定 `releases\DMS_Client.exe` |
+| 构建日志里出现红色 `NativeCommandError` | 已修复：脚本会把 stderr 合并成普通文本输出。若仍出现，说明用的是旧版脚本 |
 | 装完提示 `License Check Failed` | 授权模式下需把 `license_*.json` 与 `certs\license_public.pem` 放到 EXE 同级目录 |
 | 客户机双击无反应 | 杀毒拦截 / 缺 WebView2 → 查事件查看器，装 WebView2 Runtime |
 
-各脚本的参数、内部行为与全部已知问题 → [scripts/README.md](scripts/README.md)；许可与代码签名配置 → [BUILD_CONFIG_README.md](BUILD_CONFIG_README.md)；客户端安装与排障 → [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md)。
+脚本内部行为、许可与签名配置、已知限制 → [scripts/README.md](scripts/README.md)｜[BUILD_CONFIG_README.md](BUILD_CONFIG_README.md)｜[README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md)。
 
 ---
 
@@ -477,17 +490,9 @@ EqpMgmt_Client/
 │   │   └── pages/             #   按页面拆分（documents.js、audit-log.js…）
 │   └── vendor/                #   Bootstrap、Lucide（本地化，无 CDN）
 │
-├── scripts/                   # 打包与许可脚本（详见 scripts/README.md）
-│   ├── build_windows.ps1      #   PyInstaller 打包（装了 NSIS 时顺带出安装包）
-│   ├── build_installer.ps1    #   NSIS 安装程序
-│   ├── package_portable.ps1   #   便携版打包
-│   ├── make_release.ps1       #   发布 zip
-│   ├── rebuild_release.ps1    #   全流程：EXE → 安装包 → 发布 zip
-│   ├── sign_release.ps1       #   代码签名
-│   ├── create_test_pfx.ps1    #   生成自签测试证书
-│   ├── create_keypair.py      #   生成 RSA 密钥对
-│   ├── create_license.py      #   生成许可证文件
-│   └── verify_license.py      #   校验许可证
+├── scripts/                   # 构建与许可工具（详见 scripts/README.md）
+│   ├── build.ps1              #   唯一构建入口：-Target exe|installer|release|portable|all
+│   └── license.py             #   许可证工具：keypair / issue / verify
 │
 ├── installer/dms_installer.nsi  # NSIS 安装脚本
 ├── docs/使用手册.md              # 面向最终用户的操作手册

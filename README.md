@@ -17,6 +17,8 @@
 - [功能模块](#功能模块)
 - [技术架构](#技术架构)
 - [快速开始](#快速开始)
+- [启动方式](#启动方式)
+- [打包 Windows 客户端](#打包-windows-客户端)
 - [配置说明](#配置说明)
 - [数据备份与版本升级](#数据备份与版本升级)
 - [容量与性能实测](#容量与性能实测)
@@ -116,68 +118,225 @@
 
 ## 快速开始
 
-### 环境要求
+从零到能登录，依次执行以下命令（Windows PowerShell）：
 
-- Python **3.10+**（开发与验证环境为 3.12）
-- pip
-- Windows 桌面客户端另需 WebView2 运行时（Win10/11 通常已自带）
-
-### 方式一：源码运行 Web 服务
-
-```bash
+```powershell
 git clone https://github.com/feng197907/EqpMgmt_Client.git
 cd EqpMgmt_Client
-
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1        # Windows PowerShell
-# source .venv/bin/activate         # Linux / macOS
-
-pip install -r requirements.txt
-python launcher.py                  # 首次运行自动生成配置和数据库，并打开浏览器
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+python launcher.py
 ```
 
-访问 `http://127.0.0.1:5000`，初始管理员账号 **`admin / admin123`**（首次登录后请立即修改）。
+访问 `http://127.0.0.1:5000`，系统会预置两个账号（首次登录后请立即修改）：
 
-`launcher.py` 与 `app.py` 的区别：
+| 账号 | 口令 | 角色 |
+|---|---|---|
+| `admin` | `admin123` | 管理员 |
+| `user` | `user123` | 设备工程师 |
 
-| 入口 | 监听地址 | 调试 | 用途 |
-|------|---------|------|------|
-| `launcher.py` | `127.0.0.1:5000`（可由 `CLIENT_HOST` / `CLIENT_PORT` 覆盖） | 关闭 | 本机日常使用，启动后自动开浏览器 |
-| `python app.py` | `0.0.0.0:$PORT`（默认 5000） | **开启** | 仅用于开发调试，**不要用于生产** |
-| `desktop_launcher.py` | `127.0.0.1:5000` | 关闭 | 桌面客户端入口（需 pywebview） |
+`launcher.py` 首次运行会自动完成初始化，无需手工建库：
 
-### 方式二：Windows 桌面客户端
+| 自动生成 | 位置 |
+|---|---|
+| 配置 | `%APPDATA%\DMS\config.json` |
+| 数据库 | `%APPDATA%\DMS\equipment.db`（含 19 张表 + 13 个索引 + 默认管理员） |
+| 上传目录 | `%APPDATA%\DMS\uploads\` |
 
-**使用安装包（推荐）**
+### 环境要求
 
-1. 从 [Releases](https://github.com/feng197907/EqpMgmt_Client/releases) 下载 `DMS_Client_Installer.exe`
-2. 运行安装程序，按向导完成（许可证在安装时可一并配置）
-3. 启动后打开独立窗口，不再依赖浏览器
+| 项 | 要求 | 说明 |
+|---|---|---|
+| Python | **3.10+**（验证环境 3.12） | `python --version` 确认 |
+| pip | 随 Python 附带 | 装依赖 |
+| PowerShell | 5.1+ | **仅打包需要**，Windows 自带 |
+| NSIS | 3.x | **仅做安装包需要** |
+| WebView2 | Win10/11 通常已自带 | 仅桌面客户端需要 |
 
-**从源码构建**
+> **激活虚拟环境报「禁止运行脚本」**：先执行 `Set-ExecutionPolicy -Scope Process Bypass`（只对当前窗口生效）。
+> **Git Bash 用户**：激活脚本是 `.venv/Scripts/activate`（没有 `.ps1` 后缀）。
 
-一条命令走完全流程（EXE → 安装包 → 发布 zip，产物在 `releases\`）：
+---
+
+## 启动方式
+
+三个入口都在仓库根目录，区别只在于「监听谁、开不开调试、有没有窗口」：
+
+| 入口 | 监听地址 | 调试 | 打开浏览器 | 用途 |
+|------|---------|------|-----------|------|
+| `python launcher.py` | `127.0.0.1:5000` | 关 | 自动打开 | **日常使用（推荐）** |
+| `python app.py` | `0.0.0.0:5000` | **开** | 手动 | 开发调试，**不要用于生产** |
+| `python desktop_launcher.py` | `127.0.0.1:5000` | 关 | 独立窗口 | 桌面客户端，不打包也能直跑 |
+
+### 1. 日常使用
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+python launcher.py
+```
+
+启动后自动打开浏览器，关闭按 `Ctrl+C`。
+
+### 2. 开发调试
+
+```powershell
+python app.py
+```
+
+监听 `0.0.0.0`（局域网可访问），异常写入 `%APPDATA%\DMS\logs\`。改代码不自动重载（`use_reloader=False`），改完需手动重启。
+
+### 3. 桌面客户端（源码直跑）
+
+```powershell
+python desktop_launcher.py
+```
+
+与打包后的 EXE 行为一致：无边框独立窗口、静态资源禁缓存、导出文件落盘后自动唤起。未安装 `pywebview` 时会降级为浏览器打开。
+
+### 4. 修改端口
+
+```powershell
+# launcher.py / desktop_launcher.py
+$env:CLIENT_PORT = 8080
+python launcher.py
+
+# app.py 用的是另一个变量名
+$env:PORT = 8080
+python app.py
+```
+
+Linux / macOS 用 `CLIENT_PORT=8080 python launcher.py`。
+
+### 5. 局域网内给其他机器访问
+
+```powershell
+$env:CLIENT_HOST = "0.0.0.0"
+$env:CLIENT_PORT = "5000"
+python launcher.py
+```
+
+需要放行 Windows 防火墙对应端口。**注意**：本项目无 CSRF 防护、默认 `SECRET_KEY` 为 `dev-secret-key`，仅适合可信内网，不要直接暴露到公网。生产部署见[生产部署](#生产部署)。
+
+---
+
+## 打包 Windows 客户端
+
+只有要做**免安装 EXE** 或 **NSIS 安装包**时才需要这一节；日常使用源码运行即可。
+
+### 前置条件（缺一项就会失败）
+
+**1. `build_config.json` 必须存在且含 `license` 段**
+
+```powershell
+copy build_config.json.example build_config.json
+```
+
+> 脚本在文件缺失时会打印「Using default configuration...」，但那份默认配置**没有 `license` 段**，紧接着就 `Write-Error` 退出——所谓兜底是假的，必须先复制。
+
+**2. 仓库根目录要有 `uploads\` 目录**
+
+```powershell
+mkdir uploads
+```
+
+> 该目录被 `.gitignore` 排除，克隆后不存在，而 `--add-data "uploads;uploads"` 要求它存在，否则 PyInstaller 直接中止。
+
+**3. 要出安装包，需先装 NSIS**
+
+```powershell
+winget install --id NSIS.NSIS -e
+```
+
+装完在 `C:\Program Files (x86)\NSIS\makensis.exe`，脚本会自动找到。不装也能出 EXE，只是跳过安装包。
+
+> **PyInstaller 不用手动装**，脚本每次都会 `pip install pyinstaller`。
+
+### 一条命令走完全流程
 
 ```powershell
 .\scripts\rebuild_release.ps1
 ```
 
-也可以按需分步执行：
+依次执行：打包 EXE → 构建 NSIS 安装包 → 生成发布 zip，产物全部落在 `releases\`。
+
+> 这个脚本会**打包两次 EXE**（第 2 步的 `build_installer.ps1` 内部又完整跑了一遍 `build_windows.ps1`），耗时约为只打包的两倍，属已知冗余。
+
+### 分步执行
 
 ```powershell
-.\scripts\build_windows.ps1        # 1. PyInstaller 打包单文件 EXE → releases\DMS_Client.exe
-.\scripts\build_installer.ps1      # 2. NSIS 安装程序（内部会自动触发步骤 1）→ releases\DMS_Client_Installer.exe
-.\scripts\make_release.ps1         # 3. 打包成发布 zip
-.\scripts\package_portable.ps1     # 4. 便携版（免安装 zip）
+.\scripts\build_windows.ps1        # 1. PyInstaller → releases\DMS_Client.exe（装了 NSIS 时顺带出安装包）
+.\scripts\build_installer.ps1      # 2. 只做 NSIS 安装包 → releases\DMS_Client_Installer.exe
+.\scripts\make_release.ps1         # 3. 发布 zip（EXE + 安装包 + 客户端说明 + 公钥）
+.\scripts\package_portable.ps1     # 4. 便携版 zip（仅 EXE + README.txt）
 ```
 
-构建前必须准备（缺一个脚本就会失败）：`build_config.json`（复制自 `build_config.json.example`）和仓库根目录的 `uploads\` 目录（`.gitignore` 忽略，克隆后没有）。PyInstaller 由脚本自动安装，NSIS（`makensis`）需自行安装，否则只能出 EXE、出不了安装包。
+| 需求 | 该跑哪条 |
+|---|---|
+| 只要一个能双击的 EXE | `build_windows.ps1` |
+| 要安装包 | `build_windows.ps1`（装了 NSIS 就够）或 `build_installer.ps1` |
+| 要发给客户的一个包 | `make_release.ps1` |
+| 要免安装绿色包 | `package_portable.ps1` |
+| 全都重新出一遍 | `rebuild_release.ps1` |
 
-> `build_windows.ps1` 在检测到 NSIS 时会**顺带把安装包一起做出来**；`build_installer.ps1` 内部会重跑一次打包，因此分步执行时不必再单独跑第一步。
+**跳过安装包**（没装 NSIS 或只想快速验证 EXE）：
 
-详见 [scripts/README.md](scripts/README.md)（各脚本参数、产物、已知问题）
+```powershell
+$env:DMS_SKIP_NSIS = "1"
+.\scripts\build_windows.ps1
+```
 
-其他文档 → [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md) ｜ [BUILD_CONFIG_README.md](BUILD_CONFIG_README.md)
+**PowerShell 执行策略拦截脚本**：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
+```
+
+### 产物一览
+
+| 路径 | 内容 | 体积参考 |
+|---|---|---|
+| `releases\DMS_Client.exe` | 免安装单文件 | ≈ 19 MB |
+| `releases\DMS_Client_Installer.exe` | NSIS 安装包 | ≈ 19 MB |
+| `releases\DMS_Client_Release_<时间戳>.zip` | 发布包（EXE + 安装包 + 说明 + 公钥） | ≈ 37 MB |
+| `releases\DMS_Client_Portable.zip` | 便携版（EXE + README.txt） | ≈ 19 MB |
+| `build\`、`*.spec` | PyInstaller 中间产物，可随时删 | — |
+
+### 打包后怎么验证
+
+```powershell
+# 1. 文件是否生成
+Get-ChildItem releases
+
+# 2. 内嵌资源是否完整（模板、静态资源、许可配置必须在包里）
+.\.venv\Scripts\pyi-archive_viewer.exe -r -l releases\DMS_Client.exe |
+    Select-String "templates|static|dms_license"
+
+# 3. 实际启动，看启动探针日志
+Get-Content "$env:APPDATA\DMS\logs\startup.log" -Tail 20
+```
+
+> 第 3 步会读写 `%APPDATA%\DMS` 的正式数据。若本机已有在用数据，**先按[备份](#数据备份与版本升级)一节整目录复制一份再测**。
+
+### 清理构建残留
+
+```powershell
+Remove-Item -Recurse -Force build, dist, releases -ErrorAction SilentlyContinue
+Remove-Item -Force *.spec -ErrorAction SilentlyContinue
+```
+
+### 打包常见报错
+
+| 现象 | 原因与处理 |
+|---|---|
+| 打印 `Using default configuration...` 后立刻退出 | 缺 `build_config.json`，或该文件没有 `license` 段 → 按前置条件 1 处理 |
+| PyInstaller 报 add-data 找不到 `uploads` | 仓库根目录没有 `uploads\` → `mkdir uploads` |
+| 停在 `Building executable...` 之后中断 | PowerShell 5.1 把 PyInstaller 的 stderr 日志当异常；当前脚本已修复，若仍出现请更新脚本 |
+| `makensis not found` | 未装 NSIS 或不在 PATH → `winget install --id NSIS.NSIS -e` |
+| 装完提示 `License Check Failed` | 授权模式下需把 `license_*.json` 与 `certs\license_public.pem` 放到 EXE 同级目录 |
+| 客户机双击无反应 | 杀毒拦截 / 缺 WebView2 → 查事件查看器，装 WebView2 Runtime |
+
+各脚本的参数、内部行为与全部已知问题 → [scripts/README.md](scripts/README.md)；许可与代码签名配置 → [BUILD_CONFIG_README.md](BUILD_CONFIG_README.md)；客户端安装与排障 → [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md)。
 
 ---
 

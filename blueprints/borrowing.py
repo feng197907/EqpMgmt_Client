@@ -86,7 +86,6 @@ def return_doc(borrow_id):
         conn.close()
         flash("该记录已归还。", "info")
         return redirect(url_for("borrowing.borrow_list"))
-    # CURRENT_DATE 在 MySQL 和 SQLite 中均兼容
     cur.execute("UPDATE borrow_records SET status = 'returned', actual_return_date = CURRENT_DATE WHERE id = %s", (borrow_id,))
     conn.commit()
     log_action(current_user.username, "return_document", "borrow", borrow_id, "归还文档")

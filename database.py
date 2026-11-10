@@ -11,55 +11,16 @@ except ImportError:
     pass
 
 # ============================================================
-# 数据库类型判断（优先级：环境变量 > MySQL可用性）
+# 数据库类型：本项目统一使用 SQLite
+#
+# 产品定位为单机客户端（Windows 桌面壳 / 本机浏览器访问），单写者足够；
+# 历史上支持过的 MySQL 多用户部署已移除，需要多用户 Web 时走新架构。
+# 保留 DB_TYPE 常量（恒为 'sqlite'），供历史代码中的方言判断引用。
 # ============================================================
-_DB_TYPE = os.environ.get('DB_TYPE', '').lower().strip()
+DB_TYPE = 'sqlite'
 
-_MYSQL_AVAILABLE = False
-_pymysql = None
-
-# 明确指定 SQLite 时，跳过 MySQL 探测，减少容器启动延迟
-if _DB_TYPE != 'sqlite':
-    try:
-        import pymysql as _pymysql
-        _pymysql.install_as_MySQLdb()
-        from MySQLdb import Connection as _MySQLdbConn
-        # 尝试建立连接验证是否可用
-        _test_conn = _pymysql.connect(
-            host=os.environ.get('MYSQL_HOST', 'localhost'),
-            port=int(os.environ.get('MYSQL_PORT', 3306)),
-            user=os.environ.get('MYSQL_USER', 'root'),
-            password=os.environ.get('MYSQL_PASSWORD', ''),
-            database=os.environ.get('MYSQL_DATABASE', 'dms_db'),
-            charset='utf8mb4',
-            connect_timeout=3,
-        )
-        _test_conn.close()
-        _MYSQL_AVAILABLE = True
-    except Exception:
-        _MYSQL_AVAILABLE = False
-        _pymysql = None
-
-# 最终 DB_TYPE 决策
-if _DB_TYPE == 'mysql' and not _MYSQL_AVAILABLE:
-    print("[WARN] DB_TYPE=mysql but MySQL unavailable, falling back to SQLite")
-    DB_TYPE = 'sqlite'
-elif _DB_TYPE == 'sqlite':
-    DB_TYPE = 'sqlite'
-elif _DB_TYPE == 'mysql' and _MYSQL_AVAILABLE:
-    DB_TYPE = 'mysql'
-else:
-    # 默认：优先 MySQL，降级 SQLite
-    DB_TYPE = 'mysql' if _MYSQL_AVAILABLE else 'sqlite'
-
-MYSQL_AVAILABLE = (DB_TYPE == 'mysql')
-
-# 兼容旧代码中的导入（蓝图文件可能引用）
-if _pymysql:
-    pymysql = _pymysql
-else:
-    import sqlite3
-    from werkzeug.security import generate_password_hash
+import sqlite3
+from werkzeug.security import generate_password_hash
 
 # ============================================================
 # 数据库配置
@@ -83,32 +44,17 @@ try:
 except Exception:
     pass
 
-# MySQL 配置
-MYSQL_CONFIG = {
-    'host': os.environ.get('MYSQL_HOST', 'localhost'),
-    'port': int(os.environ.get('MYSQL_PORT', 3306)),
-    'user': os.environ.get('MYSQL_USER', 'root'),
-    'password': os.environ.get('MYSQL_PASSWORD', ''),
-    'database': os.environ.get('MYSQL_DATABASE', 'dms_db'),
-    'charset': 'utf8mb4',
-}
-
 # ============================================================
 # 兼容层：统一两种数据库的占位符和连接/游标行为
 # ============================================================
 
 def _convert_placeholder(sql):
-    """统一占位符：
-    - MySQL: %s
-    - SQLite: ?
-    调用方使用 %s 风格，本函数自动转换。
+    """把业务代码里习惯写的 %s 转成 SQLite 的 ? 占位符。
+
+    全项目有近 400 处 %s，逐个改成 ? 收益为零、风险不小，
+    统一在这一层转换即可。
     """
-    if DB_TYPE == 'mysql':
-        # MySQL 源码用 %s，不转换
-        return sql
-    else:
-        # SQLite 用 ?，把 %s 替换回 ?
-        return sql.replace('%s', '?')
+    return sql.replace('%s', '?')
 
 
 def _normalize_sql_for_sqlite(sql):
@@ -235,28 +181,18 @@ class CompatibleConnection:
 # ============================================================
 
 def get_db():
-    """获取数据库连接。
-    - MySQL 模式：pymysql + DictCursor，封装为 CompatibleConnection
-    - SQLite 模式：sqlite3 + dict Row，封装为 CompatibleConnection
-    """
-    if DB_TYPE == 'mysql' and MYSQL_AVAILABLE:
-        conn = _pymysql.connect(
-            host=MYSQL_CONFIG['host'],
-            port=MYSQL_CONFIG['port'],
-            user=MYSQL_CONFIG['user'],
-            password=MYSQL_CONFIG['password'],
-            database=MYSQL_CONFIG['database'],
-            charset='utf8mb4',
-            cursorclass=_pymysql.cursors.DictCursor,
-        )
-        return CompatibleConnection(conn, is_sqlite=False)
-    else:
-        import sqlite3
-        conn = sqlite3.connect(DB_PATH, timeout=10)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA busy_timeout = 5000")
-        return CompatibleConnection(conn, is_sqlite=True)
+    """获取 SQLite 连接（封装为 CompatibleConnection，游标行为对上层统一）。"""
+    conn = sqlite3.connect(DB_PATH, timeout=10, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    # 外键约束 SQLite 默认关闭，必须每个连接显式打开
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    # WAL：读写互不阻塞。桌面壳以 threaded=True 启动，看板一次并发 4-5 个请求，
+    # 默认 DELETE 日志模式下写事务会阻塞全部读，表现是「点一下卡几秒」。
+    # journal_mode 是持久化设置，写进数据库头后由后续连接继承，这里重复设置无副作用。
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    return CompatibleConnection(conn, is_sqlite=True)
 
 
 def get_db_cursor():
@@ -301,7 +237,7 @@ def sql(ph='%s'):
 
     但更推荐：直接用 %s，内部自动转换。
     """
-    return '%s' if DB_TYPE == 'mysql' else '?'
+    return '?'
 
 
 # ============================================================
@@ -313,10 +249,7 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
 
-    if DB_TYPE == 'mysql':
-        _init_mysql_tables(cur, conn)
-    else:
-        _init_sqlite_tables(cur, conn)
+    _init_sqlite_tables(cur, conn)
 
     # 建表之后补业务索引：DDL 里只有主键和少数 UNIQUE，
     # 列表页/看板/提醒中心的过滤与排序列此前全部裸奔。
@@ -355,18 +288,11 @@ _BUSINESS_INDEXES = [
 
 
 def _index_exists(cur, table, name):
-    """索引是否已存在。MySQL 查 information_schema，SQLite 查 sqlite_master。"""
-    if DB_TYPE == 'mysql':
-        cur.execute(
-            "SELECT COUNT(*) AS cnt FROM information_schema.statistics "
-            "WHERE table_schema = DATABASE() AND table_name = %s AND index_name = %s",
-            (table, name),
-        )
-    else:
-        cur.execute(
-            "SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type = 'index' AND name = %s",
-            (name,),
-        )
+    """索引是否已存在（查 sqlite_master）。"""
+    cur.execute(
+        "SELECT COUNT(*) AS cnt FROM sqlite_master WHERE type = 'index' AND name = %s",
+        (name,),
+    )
     row = cur.fetchone()
     if row is None:
         return False
@@ -387,358 +313,13 @@ def _ensure_indexes(cur):
             if _index_exists(cur, table, name):
                 skipped += 1
                 continue
-            if DB_TYPE == 'mysql':
-                # MySQL 不支持 CREATE INDEX IF NOT EXISTS，靠上面的存在性检查
-                cur.execute(f"CREATE INDEX `{name}` ON `{table}` ({columns})")
-            else:
-                cur.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})")
+            cur.execute(f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({columns})")
             created += 1
         except Exception as exc:
             print(f"[DB] 索引 {name} 跳过：{exc}")
 
     if created or skipped:
         print(f"[DB] 业务索引：新建 {created} 个，已存在 {skipped} 个")
-
-
-def _migrate_mysql_columns(cur):
-    """MySQL 增量升级：添加历史遗留列（安全，幂等）"""
-    print("[DB] Running MySQL column migrations...")
-    migrations = [
-        ("documents", "calibration_due_date",
-         "ALTER TABLE documents ADD COLUMN calibration_due_date DATE DEFAULT NULL"),
-        # repair_record 表（增量创建）
-        ("repair_record", "_table",
-         "CREATE TABLE IF NOT EXISTS repair_record (id INT AUTO_INCREMENT PRIMARY KEY, device_id INT NOT NULL, content VARCHAR(2000) NOT NULL, result VARCHAR(50) NOT NULL, performed_by VARCHAR(255) NOT NULL, performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, parts_used VARCHAR(1000), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
-        # maintenance_plan 新增列（增量）
-        ("maintenance_plan", "is_closed",
-         "ALTER TABLE maintenance_plan ADD COLUMN is_closed TINYINT NOT NULL DEFAULT 0"),
-        ("maintenance_plan", "closed_at",
-         "ALTER TABLE maintenance_plan ADD COLUMN closed_at TIMESTAMP NULL DEFAULT NULL"),
-        ("maintenance_plan", "closed_by",
-         "ALTER TABLE maintenance_plan ADD COLUMN closed_by VARCHAR(255) NULL DEFAULT NULL"),
-        ("maintenance_plan", "close_reason",
-         "ALTER TABLE maintenance_plan ADD COLUMN close_reason TEXT NULL DEFAULT NULL"),
-        # spare_parts 系列表（增量创建）
-        ("spare_parts", "_table",
-         "CREATE TABLE IF NOT EXISTS spare_parts (id INT AUTO_INCREMENT PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE, name VARCHAR(200) NOT NULL, category VARCHAR(50) NOT NULL DEFAULT 'other', specification VARCHAR(200), unit VARCHAR(20) NOT NULL DEFAULT '个', brand VARCHAR(100), safety_stock_min INT NOT NULL DEFAULT 0, safety_stock_max INT NOT NULL DEFAULT 9999, current_stock INT NOT NULL DEFAULT 0, weighted_avg_price DECIMAL(10,2) DEFAULT 0, supplier_name VARCHAR(200), supplier_contact VARCHAR(100), supplier_phone VARCHAR(50), supplier_doc_path VARCHAR(500), remark TEXT, is_active TINYINT NOT NULL DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
-        ("spare_part_inbounds", "_table",
-         "CREATE TABLE IF NOT EXISTS spare_part_inbounds (id INT AUTO_INCREMENT PRIMARY KEY, spare_part_id INT NOT NULL, quantity INT NOT NULL, unit_price DECIMAL(10,2) NOT NULL DEFAULT 0, batch_no VARCHAR(50), inbound_date DATE NOT NULL, doc_path VARCHAR(500), remark TEXT, created_by VARCHAR(255) NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
-        ("spare_part_consumptions", "_table",
-         "CREATE TABLE IF NOT EXISTS spare_part_consumptions (id INT AUTO_INCREMENT PRIMARY KEY, spare_part_id INT NOT NULL, maintenance_record_id INT, quantity INT NOT NULL, unit_price DECIMAL(10,2) NOT NULL DEFAULT 0, batch_no VARCHAR(50), consumed_by VARCHAR(255) NOT NULL, consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, remark TEXT, FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
-        ("spare_part_alerts", "_table",
-         "CREATE TABLE IF NOT EXISTS spare_part_alerts (id INT AUTO_INCREMENT PRIMARY KEY, spare_part_id INT NOT NULL, alert_type VARCHAR(50) NOT NULL, current_stock INT NOT NULL, threshold INT NOT NULL, is_resolved TINYINT NOT NULL DEFAULT 0, resolved_at TIMESTAMP NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"),
-    ]
-    for table, col, ddl in migrations:
-        try:
-            if col == "_table":
-                cur.execute(ddl)
-                print(f"[DB] Created table {table} (if not exists)")
-            else:
-                cur.execute(
-                    "SELECT COUNT(*) as cnt FROM information_schema.COLUMNS "
-                    "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
-                    (table, col)
-                )
-                row = cur.fetchone()
-                exists = row["cnt"] if isinstance(row, dict) else row[0]
-                if not exists:
-                    cur.execute(ddl)
-                    print(f"[DB] Added column {table}.{col}")
-                else:
-                    print(f"[DB] Column {table}.{col} already exists, skipping")
-        except Exception as e:
-            import traceback
-            print(f"[DB] Migration error for {table}.{col}: {e}")
-            traceback.print_exc()
-            raise
-
-
-def _init_mysql_tables(cur, conn):
-    """初始化 MySQL 表结构"""
-    tables = [
-        ("users", """
-            CREATE TABLE IF NOT EXISTS users (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                username VARCHAR(255) UNIQUE NOT NULL,
-                password VARCHAR(255) NOT NULL,
-                role VARCHAR(50) NOT NULL,
-                status VARCHAR(50) NOT NULL DEFAULT 'active',
-                permissions VARCHAR(500) DEFAULT '[]'
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("devices", """
-            CREATE TABLE IF NOT EXISTS devices (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                device_code VARCHAR(255) UNIQUE NOT NULL,
-                device_name VARCHAR(255) NOT NULL,
-                model VARCHAR(255),
-                location VARCHAR(255),
-                status VARCHAR(50) NOT NULL DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_deleted TINYINT DEFAULT 0
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("documents", """
-            CREATE TABLE IF NOT EXISTS documents (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                device_id INT NOT NULL,
-                doc_type VARCHAR(50) NOT NULL,
-                doc_name VARCHAR(255) NOT NULL,
-                version VARCHAR(50) NOT NULL,
-                file_path VARCHAR(500) NOT NULL,
-                uploaded_by VARCHAR(255) NOT NULL,
-                upload_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                remarks VARCHAR(1000),
-                status VARCHAR(50) NOT NULL DEFAULT 'draft',
-                download_count INT DEFAULT 0,
-                is_deleted TINYINT DEFAULT 0,
-                calibration_due_date DATE DEFAULT NULL,
-                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("borrow_records", """
-            CREATE TABLE IF NOT EXISTS borrow_records (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                doc_id INT NOT NULL,
-                borrower VARCHAR(255) NOT NULL,
-                department VARCHAR(100),
-                borrow_date DATE,
-                expected_return_date DATE,
-                actual_return_date DATE,
-                status VARCHAR(20) NOT NULL DEFAULT 'borrowed',
-                remarks TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("audit_logs", """
-            CREATE TABLE IF NOT EXISTS audit_logs (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user VARCHAR(255) NOT NULL,
-                action VARCHAR(50) NOT NULL,
-                target_type VARCHAR(50) NOT NULL,
-                target_id INT,
-                details VARCHAR(2000),
-                before_value VARCHAR(1000),
-                after_value VARCHAR(1000),
-                reason VARCHAR(1000),
-                ip_address VARCHAR(50),
-                log_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("approval_requests", """
-            CREATE TABLE IF NOT EXISTS approval_requests (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                doc_id INT NOT NULL,
-                status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                created_by VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                current_step INT NOT NULL DEFAULT 1,
-                FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("approval_steps", """
-            CREATE TABLE IF NOT EXISTS approval_steps (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                request_id INT NOT NULL,
-                step_order INT NOT NULL,
-                approver_role VARCHAR(50) NOT NULL,
-                status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                decided_by VARCHAR(255),
-                decided_at TIMESTAMP NULL,
-                comment VARCHAR(1000),
-                signature_id INT,
-                FOREIGN KEY (request_id) REFERENCES approval_requests(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("signatures", """
-            CREATE TABLE IF NOT EXISTS signatures (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user VARCHAR(255) NOT NULL,
-                meaning VARCHAR(1000) NOT NULL,
-                doc_id INT NOT NULL,
-                doc_version VARCHAR(50) NOT NULL,
-                doc_hash VARCHAR(255) NOT NULL,
-                ip_address VARCHAR(50),
-                user_agent VARCHAR(500),
-                signed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("system_settings", """
-            CREATE TABLE IF NOT EXISTS system_settings (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                setting_key VARCHAR(255) UNIQUE NOT NULL,
-                setting_value TEXT NOT NULL,
-                description VARCHAR(500),
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                updated_by VARCHAR(255)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("password_reset_requests", """
-            CREATE TABLE IF NOT EXISTS password_reset_requests (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                user_id INT NOT NULL,
-                username VARCHAR(255) NOT NULL,
-                status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                processed_at TIMESTAMP NULL,
-                processed_by VARCHAR(255),
-                ip_address VARCHAR(50)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("maintenance_plan", """
-            CREATE TABLE IF NOT EXISTS maintenance_plan (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                device_id INT NOT NULL,
-                maintenance_type VARCHAR(50) NOT NULL,
-                interval_days INT NOT NULL,
-                next_due_date VARCHAR(50) NOT NULL,
-                is_active TINYINT NOT NULL DEFAULT 1,
-                is_closed TINYINT NOT NULL DEFAULT 0,
-                closed_at TIMESTAMP NULL DEFAULT NULL,
-                closed_by VARCHAR(255) NULL DEFAULT NULL,
-                close_reason TEXT NULL DEFAULT NULL,
-                created_by VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("maintenance_record", """
-            CREATE TABLE IF NOT EXISTS maintenance_record (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                plan_id INT NOT NULL,
-                device_id INT NOT NULL,
-                maintenance_type VARCHAR(50) NOT NULL,
-                content VARCHAR(2000) NOT NULL,
-                result VARCHAR(50) NOT NULL,
-                performed_by VARCHAR(255) NOT NULL,
-                performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                next_due_date VARCHAR(50) NOT NULL,
-                parts_used VARCHAR(1000),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (plan_id) REFERENCES maintenance_plan(id) ON DELETE CASCADE,
-                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("repair_record", """
-            CREATE TABLE IF NOT EXISTS repair_record (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                device_id INT NOT NULL,
-                content VARCHAR(2000) NOT NULL,
-                result VARCHAR(50) NOT NULL,
-                performed_by VARCHAR(255) NOT NULL,
-                performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                parts_used VARCHAR(1000),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("device_status_requests", """
-            CREATE TABLE IF NOT EXISTS device_status_requests (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                device_id INT NOT NULL,
-                new_status VARCHAR(50) NOT NULL,
-                reason VARCHAR(1000),
-                status VARCHAR(50) NOT NULL DEFAULT 'pending',
-                requested_by VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                decided_by VARCHAR(255),
-                decided_at TIMESTAMP NULL,
-                comment TEXT,
-                FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("electronic_signatures", """
-            CREATE TABLE IF NOT EXISTS electronic_signatures (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                record_type VARCHAR(50) NOT NULL COMMENT '业务类型: maintenance_plan/document/device_change/maintenance_record',
-                record_id INT NOT NULL COMMENT '关联业务记录ID',
-                signed_by VARCHAR(255) NOT NULL COMMENT '签名人用户名',
-                signed_by_display VARCHAR(100) NOT NULL COMMENT '签名人显示名',
-                sign_meaning VARCHAR(50) NOT NULL COMMENT '签名含义: approved/reviewed/executed/released',
-                sign_meaning_label VARCHAR(50) NOT NULL COMMENT '签名含义中文: 批准/审核/执行/放行',
-                signed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '签名时间(服务器时间)',
-                ip_address VARCHAR(50) COMMENT '签名IP',
-                remark TEXT COMMENT '备注',
-                is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '软删除标记(审计要求不可物理删除)'
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("spare_parts", """
-            CREATE TABLE IF NOT EXISTS spare_parts (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                code VARCHAR(50) NOT NULL UNIQUE,
-                name VARCHAR(200) NOT NULL,
-                category VARCHAR(50) NOT NULL DEFAULT 'other',
-                specification VARCHAR(200),
-                unit VARCHAR(20) NOT NULL DEFAULT '个',
-                brand VARCHAR(100),
-                safety_stock_min INT NOT NULL DEFAULT 0,
-                safety_stock_max INT NOT NULL DEFAULT 9999,
-                current_stock INT NOT NULL DEFAULT 0,
-                weighted_avg_price DECIMAL(10,2) DEFAULT 0,
-                supplier_name VARCHAR(200),
-                supplier_contact VARCHAR(100),
-                supplier_phone VARCHAR(50),
-                supplier_doc_path VARCHAR(500),
-                remark TEXT,
-                is_active TINYINT NOT NULL DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("spare_part_inbounds", """
-            CREATE TABLE IF NOT EXISTS spare_part_inbounds (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                spare_part_id INT NOT NULL,
-                quantity INT NOT NULL,
-                unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
-                batch_no VARCHAR(50),
-                inbound_date DATE NOT NULL,
-                doc_path VARCHAR(500),
-                remark TEXT,
-                created_by VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("spare_part_consumptions", """
-            CREATE TABLE IF NOT EXISTS spare_part_consumptions (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                spare_part_id INT NOT NULL,
-                maintenance_record_id INT,
-                quantity INT NOT NULL,
-                unit_price DECIMAL(10,2) NOT NULL DEFAULT 0,
-                batch_no VARCHAR(50),
-                consumed_by VARCHAR(255) NOT NULL,
-                consumed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                remark TEXT,
-                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-        ("spare_part_alerts", """
-            CREATE TABLE IF NOT EXISTS spare_part_alerts (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                spare_part_id INT NOT NULL,
-                alert_type VARCHAR(50) NOT NULL,
-                current_stock INT NOT NULL,
-                threshold INT NOT NULL,
-                is_resolved TINYINT NOT NULL DEFAULT 0,
-                resolved_at TIMESTAMP NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (spare_part_id) REFERENCES spare_parts(id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        """),
-    ]
-
-    for _name, _ddl in tables:
-        cur.execute(_ddl)
-
-    _ensure_default_settings(cur, conn, db_type='mysql')
-    _ensure_default_user(cur, "admin", "admin123", "admin", db_type='mysql')
-    _ensure_default_user(cur, "user", "user123", "equipment_engineer", db_type='mysql')
-    _migrate_mysql_columns(cur)
 
 
 def _init_sqlite_tables(cur, conn):
@@ -1026,9 +607,9 @@ def _init_sqlite_tables(cur, conn):
     # SQLite 增量升级：新增列
     _migrate_sqlite_columns(cur)
 
-    _ensure_default_settings(cur, conn, db_type='sqlite')
-    _ensure_default_user(cur, "admin", "admin123", "admin", db_type='sqlite')
-    _ensure_default_user(cur, "user", "user123", "equipment_engineer", db_type='sqlite')
+    _ensure_default_settings(cur, conn)
+    _ensure_default_user(cur, "admin", "admin123", "admin")
+    _ensure_default_user(cur, "user", "user123", "equipment_engineer")
 
 
 def _migrate_sqlite_columns(cur):
@@ -1094,60 +675,37 @@ def ensure_column(cur, table_name, column_name, ddl_sql):
         cur.execute(ddl_sql)
 
 
-def _ensure_default_user(cur, username, password, role, db_type='mysql'):
-    """默认用户不存在时才插入（同时兼容 MySQL/SQLite）。"""
-    from werkzeug.security import generate_password_hash
-    if db_type == 'mysql':
-        cur.execute("SELECT id FROM users WHERE username = %s", (username,))
-    else:
-        cur.execute("SELECT id FROM users WHERE username = ?", (username,))
-
+def _ensure_default_user(cur, username, password, role):
+    """默认用户不存在时才插入。"""
+    cur.execute("SELECT id FROM users WHERE username = ?", (username,))
     if cur.fetchone() is None:
         hashed = generate_password_hash(password, method='pbkdf2:sha256')
-        if db_type == 'mysql':
-            cur.execute(
-                "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
-                (username, hashed, role),
-            )
-        else:
-            cur.execute(
-                "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                (username, hashed, role),
-            )
+        cur.execute(
+            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            (username, hashed, role),
+        )
 
 
-def _ensure_default_settings(cur, conn, db_type='mysql'):
-    """初始化默认系统设置（同时兼容 MySQL/SQLite）。"""
+def _ensure_default_settings(cur, conn):
+    """初始化默认系统设置。"""
     default_settings = [
         ("approval_enabled", "true",  "是否启用审批流程（设备变更、文档上传等）"),
         ("auto_approve_document", "false", "文档上传后是否自动生效"),
         ("borrowing_enabled", "true", "是否启用借阅功能（借阅、归还文档等）"),
     ]
-    import time
 
     for key, value, description in default_settings:
-        if db_type == 'mysql':
-            # MySQL：用 INSERT IGNORE 防重
-            cur.execute(
-                "INSERT IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (%s, %s, %s)",
-                (key, value, description),
-            )
-        else:
-            # SQLite：用 INSERT OR IGNORE 防重（无 MySQL 的 INSERT IGNORE 语法）
-            cur.execute(
-                "INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)",
-                (key, value, description),
-            )
+        cur.execute(
+            "INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description) VALUES (?, ?, ?)",
+            (key, value, description),
+        )
 
 
 def get_system_setting(key, default=None):
     """获取系统设置值"""
     conn = get_db()
     cur = conn.cursor()
-    if DB_TYPE == 'mysql':
-        cur.execute("SELECT setting_value FROM system_settings WHERE setting_key = %s", (key,))
-    else:
-        cur.execute("SELECT setting_value FROM system_settings WHERE setting_key = ?", (key,))
+    cur.execute("SELECT setting_value FROM system_settings WHERE setting_key = ?", (key,))
     row = cur.fetchone()
     conn.close()
     if row:
@@ -1169,15 +727,9 @@ def update_system_setting(key, value, updated_by=None):
     """更新系统设置"""
     conn = get_db()
     cur = conn.cursor()
-    if DB_TYPE == 'mysql':
-        cur.execute(
-            "UPDATE system_settings SET setting_value = %s, updated_by = %s, updated_at = NOW() WHERE setting_key = %s",
-            (value, updated_by, key),
-        )
-    else:
-        cur.execute(
-            "UPDATE system_settings SET setting_value = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?",
-            (value, updated_by, key),
-        )
+    cur.execute(
+        "UPDATE system_settings SET setting_value = ?, updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE setting_key = ?",
+        (value, updated_by, key),
+    )
     conn.commit()
     conn.close()

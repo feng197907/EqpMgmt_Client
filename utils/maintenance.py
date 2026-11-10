@@ -32,7 +32,7 @@ def calc_urgency(due_date):
     """
     if not due_date:
         return "info"
-    # 兼容 MySQL 返回的 date/datetime 对象，以及字符串格式
+    # 兼容 date/datetime 对象与字符串两种形态
     if isinstance(due_date, datetime):
         due = due_date.date()
     elif isinstance(due_date, date):

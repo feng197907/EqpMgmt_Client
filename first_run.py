@@ -1,6 +1,5 @@
 import os
 import json
-import getpass
 import sys
 
 
@@ -69,19 +68,8 @@ def run_wizard(interactive=True):
 
     # Interactive mode
     print('首次运行配置向导')
-    db_type = input('选择数据库类型 [sqlite/mysql] (默认 sqlite): ').strip().lower() or 'sqlite'
-    conf = {'DB_TYPE': db_type}
-    if db_type == 'sqlite':
-        db_path = os.path.join(os.path.dirname(cfg_path), 'equipment.db')
-        conf['DB_PATH'] = db_path
-    else:
-        print('请输入 MySQL 连接信息：')
-        host = input('Host (默认 localhost): ').strip() or 'localhost'
-        port = input('Port (默认 3306): ').strip() or '3306'
-        user = input('User (默认 root): ').strip() or 'root'
-        password = getpass.getpass('Password: ')
-        database = input('Database (默认 dms_db): ').strip() or 'dms_db'
-        conf.update({'MYSQL_HOST': host, 'MYSQL_PORT': int(port), 'MYSQL_USER': user, 'MYSQL_PASSWORD': password, 'MYSQL_DATABASE': database})
+    conf = {'DB_TYPE': 'sqlite'}
+    conf['DB_PATH'] = os.path.join(os.path.dirname(cfg_path), 'equipment.db')
 
     uploads = os.path.join(os.path.dirname(cfg_path), 'uploads')
     os.makedirs(uploads, exist_ok=True)
@@ -99,9 +87,16 @@ def load_config():
         return None
     try:
         with open(cfg_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            cfg = json.load(f)
     except Exception:
         return None
+
+    # 历史配置里可能残留 DB_TYPE=mysql。本版本已移除 MySQL 支持，
+    # 这里明确告警，避免用户把「换成了空库」误认为数据丢失。
+    if str(cfg.get('DB_TYPE', '')).lower() == 'mysql':
+        print('[WARN] config.json 指定了 MySQL，当前版本仅支持 SQLite，已忽略该配置。')
+        print('       原 MySQL 库中的历史数据不会自动出现，需先导出再迁移。')
+    return cfg
 
 
 if __name__ == '__main__':

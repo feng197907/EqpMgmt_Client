@@ -6,7 +6,7 @@ from database import get_db
 
 
 def _normalize_date(value):
-    """将日期值标准化为 date 对象，兼容 MySQL 返回的 datetime/date 对象和字符串"""
+    """将日期值标准化为 date 对象，兼容 datetime/date 对象与字符串两种返回形态"""
     if value is None:
         return None
     if isinstance(value, datetime):

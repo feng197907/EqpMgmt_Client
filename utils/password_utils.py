@@ -89,7 +89,7 @@ def reset_user_password(user_id, new_password, operator, source, request_id=None
 
         conn.commit()
     except Exception:
-        # MySQL 下不能只依赖连接关闭时的隐式回滚，异常路径显式回滚
+        # 异常路径显式回滚，不依赖连接关闭时的隐式回滚
         conn.rollback()
         raise
     finally:

@@ -46,9 +46,7 @@ def profile():
             conn = get_db()
             cur = conn.cursor()
             cur.execute(
-                "UPDATE users SET password = %s WHERE id = %s"
-                if _is_mysql()
-                else "UPDATE users SET password = ? WHERE id = ?",
+                "UPDATE users SET password = ? WHERE id = ?",
                 (new_hash, current_user.id),
             )
             conn.commit()
@@ -69,9 +67,7 @@ def profile():
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "SELECT id, username, role, status FROM users WHERE id = %s"
-        if _is_mysql()
-        else "SELECT id, username, role, status FROM users WHERE id = ?",
+        "SELECT id, username, role, status FROM users WHERE id = ?",
         (current_user.id,),
     )
     user_row = cur.fetchone()
@@ -80,9 +76,7 @@ def profile():
     created_at = None
     if user_row:
         cur.execute(
-            "SELECT log_time FROM audit_logs WHERE user = %s ORDER BY log_time ASC LIMIT 1"
-            if _is_mysql()
-            else "SELECT log_time FROM audit_logs WHERE user = ? ORDER BY log_time ASC LIMIT 1",
+            "SELECT log_time FROM audit_logs WHERE user = ? ORDER BY log_time ASC LIMIT 1",
             (user_row["username"],),
         )
         log_row = cur.fetchone()
@@ -99,11 +93,3 @@ def profile():
         created_at=created_at,
     )
 
-
-def _is_mysql():
-    """判断当前数据库类型是否为 MySQL"""
-    try:
-        from database import DB_TYPE
-        return DB_TYPE == "mysql"
-    except ImportError:
-        return False

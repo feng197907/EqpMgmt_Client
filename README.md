@@ -40,9 +40,9 @@
 | 项 | 说明 |
 |----|------|
 | 框架 | Flask 2.3+ |
-| 数据库 | SQLite（默认）/ MySQL（可选，自动降级） |
+| 数据库 | SQLite 3（单库，随客户端存放在本地） |
 | 认证 | Flask-Login |
-| 数据访问 | 原生 SQL（sqlite3 / PyMySQL），自动兼容双库 |
+| 数据访问 | 原生 SQL（sqlite3），业务层统一写 `%s`、由兼容层自动转 `?` |
 | 加密 | cryptography（许可证 RSA 签名验证） |
 
 ### 前端
@@ -151,13 +151,7 @@ python app.py
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `SECRET_KEY` | Flask session 加密密钥 | `dev-secret-key` |
-| `DB_TYPE` | 数据库类型 `sqlite` / `mysql` | 自动检测（优先 MySQL） |
-| `DB_PATH` | SQLite 数据库路径（`DB_TYPE=sqlite`） | `%APPDATA%\DMS\equipment.db` |
-| `MYSQL_HOST` | MySQL 主机 | `localhost` |
-| `MYSQL_PORT` | MySQL 端口 | `3306` |
-| `MYSQL_USER` | MySQL 用户 | `root` |
-| `MYSQL_PASSWORD` | MySQL 密码 | 空 |
-| `MYSQL_DATABASE` | MySQL 库名 | `dms_db` |
+| `DB_PATH` | SQLite 数据库路径 | `%APPDATA%\DMS\equipment.db` |
 | `UPLOAD_FOLDER` | 上传文件目录 | `%APPDATA%\DMS\uploads` |
 | `PORT` | 应用端口 | `5000` |
 
@@ -360,7 +354,8 @@ server {
 | 数据库迁移失败 | 备份数据库 → 检查 `database.py` 迁移逻辑 → 查看错误日志 |
 | 文件上传失败 | `UPLOAD_FOLDER` 目录权限、文件大小限制（50MB） |
 | Windows 客户端无法启动 | 杀毒软件拦截 → 以管理员运行 → 事件查看器 |
-| MySQL 连接失败 | 检查 `.env` 中 MySQL 配置 → 系统自动降级为 SQLite |
+| 启动后数据是空的 | 检查 `%APPDATA%\DMS\config.json` 是否残留 `"DB_TYPE": "mysql"`（本版本已移除 MySQL 支持，会忽略并提示） |
+| 备份数据库 | WAL 模式下勿直接复制 `equipment.db`，需连同 `-wal`/`-shm` 一起复制，或先 `PRAGMA wal_checkpoint(TRUNCATE)` |
 
 更多排查 → [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md)
 

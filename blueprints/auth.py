@@ -12,6 +12,7 @@ from config import DEVICE_STATUS_LABELS
 from database import get_db
 from utils.audit import log_action
 from utils.excel_export import excel_response, style_border_cell, style_header_cell
+from utils.pagination import build_pagination, parse_page
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -55,28 +56,43 @@ def logout():
 @auth_bp.route("/devices")
 @login_required
 def index():
-    """设备列表首页"""
+    """设备列表首页（分页）"""
     query = request.args.get("q", "").strip()
     show_inactive = request.args.get("show_inactive", "").lower() in {"1", "true", "on", "yes"}
+    page = parse_page(request.args.get("page"))
+    per_page = 20
+
     conn = get_db()
     cur = conn.cursor()
     status_filter = "" if (show_inactive and current_user.is_admin) else "AND status = 'active'"
+
+    where = "WHERE 1=1 " + status_filter
+    params = []
     if query:
-        cur.execute(
-            f"""
-            SELECT * FROM devices
-            WHERE (device_code LIKE %s OR device_name LIKE %s OR model LIKE %s)
-            {status_filter}
-            ORDER BY created_at DESC
-            """,
-            (f"%{query}%", f"%{query}%", f"%{query}%"),
-        )
-    else:
-        cur.execute(f"SELECT * FROM devices WHERE 1=1 {status_filter} ORDER BY created_at DESC")
+        where += " AND (device_code LIKE %s OR device_name LIKE %s OR model LIKE %s)"
+        params = [f"%{query}%"] * 3
+
+    # 总数与当前页分开查：先 COUNT 才能算出页数，列表只取当前页
+    cur.execute(f"SELECT COUNT(*) AS cnt FROM devices {where}", params)
+    row = cur.fetchone()
+    total = row["cnt"] if row else 0
+
+    cur.execute(
+        f"SELECT * FROM devices {where} ORDER BY created_at DESC, id DESC LIMIT %s OFFSET %s",
+        params + [per_page, (page - 1) * per_page],
+    )
     devices = cur.fetchall()
     conn.close()
+
+    pagination = build_pagination(
+        "auth.index", page, per_page, total,
+        q=query or None,
+        show_inactive=1 if show_inactive else None,
+    )
+
     return render_template(
         "index.html", devices=devices, query=query, show_inactive=show_inactive,
+        pagination=pagination,
     )
 
 

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_pagination.html' import pagination_bar %}
 {% block content %}
 <div class="page-container">
 
@@ -56,7 +57,7 @@
         <i data-lucide="list"></i>
         设备列表
         {% if devices %}
-        <span class="badge bg-secondary ms-2">{{ devices|length }}</span>
+        <span class="badge bg-secondary ms-2">{{ pagination.total if pagination else devices|length }}</span>
         {% endif %}
       </h5>
       <button class="btn btn-sm btn-outline-primary" onclick="window.DMS.doExport(this,'{{ url_for('auth.export_devices') }}?q={{ query|urlencode }}&show_inactive={{ 1 if show_inactive else '' }}')">
@@ -157,6 +158,7 @@
         </table>
       </div>
     </div>
+    {{ pagination_bar(pagination) }}
   </div>
 </div>
 

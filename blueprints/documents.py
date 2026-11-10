@@ -16,6 +16,7 @@ from config import (
 from database import get_db, get_system_setting
 from utils.audit import log_action
 from utils.excel_export import excel_response, style_border_cell, style_header_cell
+from utils.pagination import build_pagination, parse_page
 from utils.db_utils import commit_with_retry, execute_with_retry, get_next_version
 from utils.decorators import admin_required
 from utils.file_utils import (
@@ -274,7 +275,11 @@ def submit_document(doc_id):
 @documents_bp.route("/documents")
 @login_required
 def document_search():
-    """文档检索"""
+    """文档检索（分页）
+
+    此前是全量查询 + 整表渲染，5 万份文档会生成 65 MB HTML，
+    浏览器构建上万个 DOM 节点直接卡死。改为按页取数。
+    """
     query = request.args.get("q", "").strip()
     device_query = request.args.get("device", "").strip()
     uploader = request.args.get("uploader", "").strip()
@@ -282,38 +287,62 @@ def document_search():
     status = request.args.get("status", "").strip()
     start_date = request.args.get("start_date", "").strip()
     end_date = request.args.get("end_date", "").strip()
-    sql = (
-        "SELECT d.*, dev.device_code, dev.device_name "
+    page = parse_page(request.args.get("page"))
+    per_page = 20
+
+    # 筛选条件只写一次，COUNT 和取数共用，避免两处条件写岔导致
+    # 「总数说 30 条、翻到第 2 页却空了」这种不一致
+    from_where = (
         "FROM documents d JOIN devices dev ON dev.id = d.device_id WHERE d.is_deleted = 0"
     )
     params = []
     if query:
-        sql += " AND d.doc_name LIKE %s"
+        from_where += " AND d.doc_name LIKE %s"
         params.append(f"%{query}%")
     if device_query:
-        sql += " AND (dev.device_code LIKE %s OR dev.device_name LIKE %s)"
+        from_where += " AND (dev.device_code LIKE %s OR dev.device_name LIKE %s)"
         params.extend([f"%{device_query}%", f"%{device_query}%"])
     if uploader:
-        sql += " AND d.uploaded_by LIKE %s"
+        from_where += " AND d.uploaded_by LIKE %s"
         params.append(f"%{uploader}%")
     if doc_type:
-        sql += " AND d.doc_type = %s"
+        from_where += " AND d.doc_type = %s"
         params.append(doc_type)
     if status:
-        sql += " AND d.status = %s"
+        from_where += " AND d.status = %s"
         params.append(status)
     if start_date:
-        sql += " AND DATE(d.upload_time) >= DATE(%s)"
+        from_where += " AND DATE(d.upload_time) >= DATE(%s)"
         params.append(start_date)
     if end_date:
-        sql += " AND DATE(d.upload_time) <= DATE(%s)"
+        from_where += " AND DATE(d.upload_time) <= DATE(%s)"
         params.append(end_date)
-    sql += " ORDER BY d.upload_time DESC"
+
     conn = get_db()
     cur = conn.cursor()
-    cur.execute(sql, params)
+    cur.execute(f"SELECT COUNT(*) AS cnt {from_where}", params)
+    row = cur.fetchone()
+    total = row["cnt"] if row else 0
+
+    cur.execute(
+        f"SELECT d.*, dev.device_code, dev.device_name {from_where} "
+        "ORDER BY d.upload_time DESC, d.id DESC LIMIT %s OFFSET %s",
+        params + [per_page, (page - 1) * per_page],
+    )
     rows = cur.fetchall()
     conn.close()
+
+    pagination = build_pagination(
+        "documents.document_search", page, per_page, total,
+        q=query or None,
+        device=device_query or None,
+        uploader=uploader or None,
+        doc_type=doc_type or None,
+        status=status or None,
+        start_date=start_date or None,
+        end_date=end_date or None,
+    )
+
     return render_template(
         "documents.html",
         rows=rows,
@@ -327,6 +356,7 @@ def document_search():
         doc_types=DOC_TYPES,
         doc_status_labels=DOC_STATUS_LABELS,
         doc_type_labels=DOC_TYPE_LABELS,
+        pagination=pagination,
     )
 
 

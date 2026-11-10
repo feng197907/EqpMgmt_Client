@@ -1,0 +1,55 @@
+{# 通用分页控件。
+   由 utils.pagination.build_pagination 生成数据，模板只做展示：
+   翻页链接、页码窗口都已在后端算好，这里不拼 URL。
+
+   用法：
+     {% from '_pagination.html' import pagination_bar %}
+     {{ pagination_bar(pagination) }}
+#}
+
+{% macro pagination_bar(pagination) %}
+{% if pagination and pagination.pages > 1 %}
+<div class="pagination-wrapper">
+  <span class="pagination-info">
+    共 {{ pagination.total }} 条，第 {{ pagination.page }} / {{ pagination.pages }} 页
+    {% if pagination.total %}(当前 {{ pagination.start_index }}-{{ pagination.end_index }}){% endif %}
+  </span>
+
+  <nav class="pagination" aria-label="分页导航">
+    {% if pagination.prev %}
+    <a class="pagination-item" href="{{ pagination.prev }}" rel="prev">上一页</a>
+    {% else %}
+    <span class="pagination-item" style="opacity:.45;cursor:not-allowed;">上一页</span>
+    {% endif %}
+
+    {% if pagination.window_start > 1 %}
+    <a class="pagination-item" href="{{ pagination.first }}" title="第 1 页">1</a>
+    {% if pagination.window_start > 2 %}
+    <span class="pagination-item" style="border:none;background:none;cursor:default;">…</span>
+    {% endif %}
+    {% endif %}
+
+    {% for p in pagination.window %}
+    {% if p == pagination.page %}
+    <span class="pagination-item active" aria-current="page">{{ p }}</span>
+    {% else %}
+    <a class="pagination-item" href="{{ pagination.links[p] }}">{{ p }}</a>
+    {% endif %}
+    {% endfor %}
+
+    {% if pagination.window_end < pagination.pages %}
+    {% if pagination.window_end < pagination.pages - 1 %}
+    <span class="pagination-item" style="border:none;background:none;cursor:default;">…</span>
+    {% endif %}
+    <a class="pagination-item" href="{{ pagination.last }}" title="第 {{ pagination.pages }} 页">{{ pagination.pages }}</a>
+    {% endif %}
+
+    {% if pagination.next %}
+    <a class="pagination-item" href="{{ pagination.next }}" rel="next">下一页</a>
+    {% else %}
+    <span class="pagination-item" style="opacity:.45;cursor:not-allowed;">下一页</span>
+    {% endif %}
+  </nav>
+</div>
+{% endif %}
+{% endmacro %}

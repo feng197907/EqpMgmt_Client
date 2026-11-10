@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% from '_pagination.html' import pagination_bar %}
 {% block content %}
 {# 文档检索页 - 增强版 #}
 <div class="page-container">
@@ -125,7 +126,9 @@
       <h3 class="data-table-title">
         <i data-lucide="list"></i>
         文档列表
-        {% if rows %}
+        {% if pagination and pagination.total %}
+        <span class="data-table-count">{{ pagination.total }}</span>
+        {% elif rows %}
         <span class="data-table-count">{{ rows|length }}</span>
         {% endif %}
       </h3>
@@ -222,6 +225,7 @@
         </tbody>
       </table>
     </div>
+    {{ pagination_bar(pagination) }}
   </div>
 </div>
 

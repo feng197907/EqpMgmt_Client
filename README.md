@@ -171,10 +171,13 @@ python launcher.py                  # 首次运行自动生成配置和数据库
 .\scripts\package_portable.ps1     # 4. 便携版（免安装 zip）
 ```
 
-构建前需准备 `build_config.json`（参照 `build_config.json.example`）与 RSA 密钥对（`scripts/create_keypair.py`）。
-打包与安装程序需要 PyInstaller、NSIS（`makensis`）已安装。
+构建前必须准备（缺一个脚本就会失败）：`build_config.json`（复制自 `build_config.json.example`）和仓库根目录的 `uploads\` 目录（`.gitignore` 忽略，克隆后没有）。PyInstaller 由脚本自动安装，NSIS（`makensis`）需自行安装，否则只能出 EXE、出不了安装包。
 
-详细说明 → [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md) ｜ [BUILD_CONFIG_README.md](BUILD_CONFIG_README.md)
+> `build_windows.ps1` 在检测到 NSIS 时会**顺带把安装包一起做出来**；`build_installer.ps1` 内部会重跑一次打包，因此分步执行时不必再单独跑第一步。
+
+详见 [scripts/README.md](scripts/README.md)（各脚本参数、产物、已知问题）
+
+其他文档 → [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md) ｜ [BUILD_CONFIG_README.md](BUILD_CONFIG_README.md)
 
 ---
 
@@ -315,13 +318,14 @@ EqpMgmt_Client/
 │   │   └── pages/             #   按页面拆分（documents.js、audit-log.js…）
 │   └── vendor/                #   Bootstrap、Lucide（本地化，无 CDN）
 │
-├── scripts/                   # 构建与许可工具（全流程入口：rebuild_release.ps1）
-│   ├── build_windows.ps1      #   PyInstaller 打包
+├── scripts/                   # 打包与许可脚本（详见 scripts/README.md）
+│   ├── build_windows.ps1      #   PyInstaller 打包（装了 NSIS 时顺带出安装包）
 │   ├── build_installer.ps1    #   NSIS 安装程序
 │   ├── package_portable.ps1   #   便携版打包
-│   ├── make_release.ps1       #   发布打包
-│   ├── rebuild_release.ps1    #   重新构建
+│   ├── make_release.ps1       #   发布 zip
+│   ├── rebuild_release.ps1    #   全流程：EXE → 安装包 → 发布 zip
 │   ├── sign_release.ps1       #   代码签名
+│   ├── create_test_pfx.ps1    #   生成自签测试证书
 │   ├── create_keypair.py      #   生成 RSA 密钥对
 │   ├── create_license.py      #   生成许可证文件
 │   └── verify_license.py      #   校验许可证
@@ -469,6 +473,7 @@ server {
 |------|------|
 | [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md) | 桌面客户端安装、许可、排障 |
 | [BUILD_CONFIG_README.md](BUILD_CONFIG_README.md) | 构建配置（许可证、签名、版本信息）字段说明 |
+| [scripts/README.md](scripts/README.md) | 打包与发布：前置条件、脚本行为、产物、已知问题 |
 | [docs/使用手册.md](docs/使用手册.md) | 面向最终用户的功能操作手册 |
 
 ---

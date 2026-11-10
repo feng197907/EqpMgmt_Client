@@ -1,303 +1,178 @@
-# 自动化部署指南
+# 打包与发布脚本说明
 
-本文档介绍如何配置 GitHub Webhook 实现代码自动部署。
+本目录的脚本负责把源码变成可交付的 Windows 客户端，链路是：
 
-## 脚本说明（目录说明）
+```
+desktop_launcher.py ──PyInstaller──> releases\DMS_Client.exe
+                                      └──NSIS──> releases\DMS_Client_Installer.exe
+                                                    └──zip──> releases\DMS_Client_Release_<时间戳>.zip
+```
 
-- `webhook_server.py`：
-	- 一个基于 Flask 的 Webhook 接收服务，监听 `/webhook` 路径（默认端口 `5001`），在收到 `push` 事件时执行拉取并部署流程。
-	- 关键配置：`GIT_DIR`（项目路径）、`WEBHOOK_SECRET`（可用于签名校验，但仓库中可能已禁用校验）、`DEPLOY_LOG`（日志文件）。
-	- 功能：记录拉取前/后的 git 信息、执行 `git fetch` / `git pull`，在必要时重启或 reload 应用（尝试发送 SIGHUP 给 gunicorn，或以 daemon 方式启动）。
-
-- `webhook-deploy.sh`：
-	- 一个用于传统 CGI/HTTP 接收的 Bash 自动部署脚本，适合将 Webhook 请求交给 shell 脚本处理的场景。
-	- 关键配置：`GIT_DIR`、`WEBHOOK_SECRET`（若为空则跳过签名校验）、`LOG_FILE`。
-	- 功能：验证签名（如果配置了 `WEBHOOK_SECRET`）、处理 `push` 事件、执行 `git pull` 并根据运行方式（systemd / gunicorn / 直接 Python）重启服务。
-
-安全与使用建议：
-
-- 若部署在公网服务器，建议启用 `WEBHOOK_SECRET` 并在 GitHub Webhook 配置中填写相同的 Secret，以防止被他人触发部署。
-- 将 `GIT_DIR` 修改为实际项目路径（示例默认 `/data/EquipmentManagement`）。
-- 若使用 `systemd` 管理服务，优先使用 `systemctl restart <service>` 方式重启；若使用 `gunicorn`，脚本会尝试发送 SIGHUP 进行平滑重载。
-
-下面为详细部署说明：
-
-## 目录
-
-- [方案一：Webhook 自动部署](#方案一webhook-自动部署)
-- [方案二：systemd 服务管理（推荐）](#方案二systemd-服务管理推荐)
+本文只讲**怎么跑、跑出什么、会踩什么坑**。
+配置字段含义见 [../BUILD_CONFIG_README.md](../BUILD_CONFIG_README.md)，最终用户的安装与使用见 [../README_WINDOWS_CLIENT.md](../README_WINDOWS_CLIENT.md)。
 
 ---
 
-## 方案一：Webhook 自动部署
+## 一、前置条件
 
-当代码 push 到 GitHub main 分支后，服务器自动拉取最新代码并重启服务。
+| 项 | 要求 | 不满足会怎样 |
+|---|---|---|
+| 系统 | Windows 10/11 x64 | 脚本是 PowerShell + Windows API，Linux/macOS 跑不了 |
+| Python | 3.10+，推荐仓库根目录存在 `.venv` | 无 `.venv` 时回退系统 Python，依赖可能不全 |
+| 网络 | 能访问 `pypi.tuna.tsinghua.edu.cn` | 脚本每次构建都会强制 `pip install`，离线构建直接失败 |
+| `build_config.json` | **必须存在**（从 `build_config.json.example` 复制） | 脚本报错退出，见「坑 1」 |
+| `uploads\` 目录 | **必须存在** | `--add-data "uploads;uploads"` 找不到源目录，PyInstaller 中止，见「坑 4」 |
+| NSIS（`makensis`） | 做安装包时必须 | 只出 EXE 可不装；`build_installer.ps1` 与 `rebuild_release.ps1` 会失败 |
+| signtool | 可选，来自 Windows SDK | 仅签名需要，缺失时签名步骤静默跳过 |
 
-### 1. 配置 webhook_server.py
+`.venv` 和 `uploads\` 都在 `.gitignore` 里，**新克隆的仓库两者都没有**，第一次打包前先补上：
 
-编辑 `scripts/webhook_server.py`，修改以下配置：
-
-```python
-# 服务器项目路径
-GIT_DIR = "/data/EquipmentManagement"
-
-# 设置一个安全的密钥（随便写，之后 GitHub 要填同样的）
-WEBHOOK_SECRET = "your-secret-key-here"
-
-# 部署命令
-DEPLOY_COMMAND = "cd /data/EquipmentManagement && git pull origin main"
-
-# 重启命令
-RESTART_COMMAND = "systemctl restart dms"
-```
-
-### 2. 上传到服务器
-
-```bash
-# 本地执行，上传到服务器
-scp -r scripts/ root@你的服务器IP:/data/EquipmentManagement/
-```
-
-### 3. 服务器安装依赖并启动
-
-```bash
-# SSH 登录服务器
-ssh root@你的服务器IP
-
-# 安装依赖
-pip3 install flask
-
-# 启动 webhook 服务（监听 5001 端口）
-cd /data/EquipmentManagement
-nohup python3 scripts/webhook_server.py > webhook.log 2>&1 &
-
-# 验证服务启动
-curl http://localhost:5001/health
-# 返回 {"status": "ok"} 表示成功
-```
-
-### 4. 开放端口
-
-在腾讯云控制台 → 安全组 → 添加入站规则：
-
-| 协议 | 端口 | 来源 |
-|------|------|------|
-| TCP | 5001 | 0.0.0.0/0 |
-
-### 5. GitHub 配置 Webhook
-
-1. 打开 GitHub 仓库 → **Settings** → **Webhooks** → **Add webhook**
-
-2. 填写配置：
-
-| 字段 | 值 |
-|------|-----|
-| Payload URL | `http://你的服务器IP:5001/webhook` |
-| Content type | `application/json` |
-| Secret | `your-secret-key-here`（与 webhook_server.py 一致） |
-| Events | ✅ Just the `push` events |
-
-3. 点击 **Add webhook**
-
-### 6. 测试部署
-
-```bash
-# 本地修改代码后 push
-git add .
-git commit -m "测试自动部署"
-git push origin main
-
-# 服务器会自动执行：
-# 1. git pull 拉取最新代码
-# 2. systemctl restart dms 重启服务
-```
-
-### 7. 查看日志
-
-```bash
-# 服务器上查看 webhook 日志
-tail -f /data/EquipmentManagement/webhook.log
-
-# 查看部署日志
-cat /var/log/webhook-deploy.log
+```powershell
+python -m venv .venv
+New-Item -ItemType Directory -Force uploads
+Copy-Item build_config.json.example build_config.json
 ```
 
 ---
 
-## 方案二：systemd 服务管理（推荐）
+## 二、产物一览
 
-使用 systemd 管理 Flask 应用，更简单可靠。
+| 产物 | 生成脚本 | 说明 |
+|---|---|---|
+| `releases\DMS_Client.exe` | `build_windows.ps1` | 单文件客户端，双击即用 |
+| `releases\DMS_Client_Installer.exe` | `build_windows.ps1`（装了 NSIS 时自动生成）、`build_installer.ps1` | NSIS 安装程序 |
+| `releases\DMS_Client_Release_<yyyyMMdd_HHmmss>.zip` | `make_release.ps1` | 对外发布包 |
+| `releases\DMS_Client_Portable.zip` | `package_portable.ps1` | 便携版（EXE + 说明文件） |
+| `dms_license_config.json`（仓库根目录） | `build_windows.ps1` | **构建产物**，每次构建按 `build_config.json` 重新生成，不要手改 |
 
-### 1. 创建服务文件
+`releases\`、`build\`、`*.spec`、`build_config.json`、`dms_license_config.json`、`certs\` 均已被 `.gitignore` 排除，不进版本库。
 
-在服务器上执行：
+---
 
-```bash
-cat > /etc/systemd/system/dms.service << 'EOF'
-[Unit]
-Description=DMS Equipment Management System
-After=network.target
+## 三、两条使用路径
 
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/data/EquipmentManagement
-ExecStart=/usr/bin/gunicorn --bind 0.0.0.0:5000 --workers 2 app:app
-Restart=always
-RestartSec=5
+### 3.1 一条命令走完全流程
 
-[Install]
-WantedBy=multi-user.target
-EOF
+```powershell
+.\scripts\rebuild_release.ps1
 ```
 
-### 2. 启用并启动服务
+依次执行 `build_windows.ps1` → `build_installer.ps1` → `make_release.ps1`，任一步非零退出即中断。
 
-```bash
-systemctl daemon-reload
-systemctl enable dms
-systemctl start dms
-``` 
-### 3. 服务管理命令   
+> ⚠️ 当前实现会**打包两次 EXE**（`build_installer.ps1` 内部又调了一次 `build_windows.ps1`），耗时约为单次的两倍。详见「坑 2」。
 
-```bash
-# 启动服务
-systemctl start dms
+### 3.2 分步执行（推荐，便于定位失败点）
 
-# 停止服务
-systemctl stop dms
-
-# 重启服务
-systemctl restart dms
-
-# 查看状态
-systemctl status dms
-
-# 查看日志
-journalctl -u dms -f
+```powershell
+.\scripts\build_windows.ps1      # 1. 出 EXE（装了 NSIS 的话连安装包一起出）
+.\scripts\build_installer.ps1    # 2. 只补安装包（内部会重跑一次打包）
+.\scripts\make_release.ps1       # 3. 组发布 zip
+.\scripts\package_portable.ps1   # 4. 便携版 zip（可选）
 ```
 
-### 4. 部署更新
+只要 EXE、不要安装包的话，跳过第 2 步即可 —— `build_windows.ps1` 检测不到 `makensis` 时只打印一行提示，不算失败。
 
-每次 push 后，手动在服务器执行：
+---
 
-```bash
-cd /data/EquipmentManagement
-git pull origin main
-systemctl restart dms
+## 四、各脚本做了什么
+
+### build_windows.ps1
+
+1. 激活 `.venv`（不存在则用系统 Python）
+2. **无条件**跑三条 pip 命令：升级 pip、装 `requirements.txt`、装 `pyinstaller`（均走清华源）
+3. 读 `build_config.json` 的 `license` 段；`build_time` 为空则注入当前本地时间（`yyyy-MM-ddTHH:mm:ss`），写出 **UTF-8 无 BOM** 的 `dms_license_config.json`
+4. 建 `releases\`，删掉里面旧的 `DMS_Client.exe` / `DMS_Client_*.exe` / `DMS_Client_Installer*.exe`（zip 不动）
+5. 调用 PyInstaller：`--onefile --noconfirm --distpath releases`，`windowed=true` 时加 `--windowed`（无控制台窗口）；打包进 exe 的资源为 `templates\`、`static\`、`uploads\`、`dms_license_config.json`，存在 `docs\` 时一并带上
+6. 检测到 `makensis` 就接着做安装包，传 `/DAPP_EXE`、`/DAPP_EXE_PATH`、`/DAPP_INSTALL_EXE`、`/DOUTFILE`、`/DAPP_NAME`；调用方设了环境变量 `DMS_SKIP_NSIS=1` 则跳过
+7. `sign.enabled=true` 时写入 `SIGN_CERT_*` 环境变量并调用 `sign_release.ps1`
+
+注意：**`certs\` 不在打包资源里**，公钥和许可证文件是 exe 的同级文件而非内置资源，详见「坑 3」。
+
+### build_installer.ps1
+
+先设 `DMS_SKIP_NSIS=1` 跑一遍 `build_windows.ps1`（拿到最新 EXE，且不重复生成安装包），再用 `makensis` 生成 `DMS_Client_Installer.exe`。`makensis` 查找顺序：PATH → `%ProgramFiles(x86)%\NSIS`，都没有就报错退出。
+
+安装脚本 `installer\dms_installer.nsi` 的实际行为：
+
+- 安装目录 `$PROGRAMFILES64\DMS_Client`
+- 创建 `%APPDATA%\DMS` 与 `%APPDATA%\DMS\uploads`
+- 可选组件：桌面图标、开机自启（写 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`）
+- 卸载时删快捷方式、程序目录、自启注册表项；`%APPDATA%\DMS` 用 `RMDir`（只删空目录），所以**用户数据不会被误删**
+- 界面语言只有 English
+
+### make_release.ps1
+
+把 `DMS_Client.exe`、`DMS_Client_Installer.exe`（有就带）、`README_WINDOWS_CLIENT.md`、`certs\license_public.pem`（有就带）打进 `DMS_Client_Release_<时间戳>.zip`，临时暂存目录用完即删。
+
+### package_portable.ps1
+
+把 `DMS_Client.exe` 和一份 `README.txt` 说明打成 `DMS_Client_Portable.zip`，适合「要发给别人但不想让他装东西」的场景。
+
+### sign_release.ps1
+
+对 `DMS_Client.exe` 和 `DMS_Client_Installer.exe` 做 SHA256 签名并 `signtool verify`。凭据三选一，优先级 PFX → 指纹 → 证书主题名：
+
+| `build_config.json` → `sign` | 运行时环境变量 |
+|---|---|
+| `cert_pfx_path` + `cert_pfx_password` | `SIGN_CERT_PFX_PATH` + `SIGN_CERT_PFX_PASS` |
+| `cert_thumbprint` | `SIGN_CERT_THUMBPRINT` |
+| —（只支持环境变量） | `SIGN_CERT_SUBJECT` |
+
+找不到 `signtool.exe` 时直接 `exit 0`（静默跳过），不会让构建失败。`signtool` 只在三个固定位置找：Windows Kits `10.0.18362.0` 的 x64 / x86 目录、App Certification Kit 目录。
+
+### create_test_pfx.ps1
+
+生成自签测试证书 `certs\code_sign.pfx`，用来验证签名链路是否通。自签证书在正式发布时会触发 SmartScreen 警告，只能用于测试。
+
+```powershell
+$env:SIGN_PFX_PASS = '你的测试口令'
+.\scripts\create_test_pfx.ps1
 ```
 
 ---
 
-## 方案三：systemd + Webhook（最完整）
+## 五、许可证相关
 
-结合 systemd 服务管理和 Webhook 自动化：
+客户端运行时读 `dms_license_config.json` 的 `license` 段决定是否强制校验（`mode=free` 永不强制），授权文件用 RSA-PSS + SHA256 签名。
 
-### 1. 修改 webhook_server.py
+```powershell
+# 1. 生成密钥对（certs 目录要先存在；私钥口令在脚本内硬编码为 p@ssw0rd）
+New-Item -ItemType Directory -Force certs
+py -3 scripts/create_keypair.py      # → certs\license_private.pem / certs\license_public.pem
 
-```python
-GIT_DIR = "/data/EquipmentManagement"
-WEBHOOK_SECRET = "your-secret-key"
-RESTART_COMMAND = "systemctl restart dms"
+# 2. 签发授权
+py -3 scripts/create_license.py 客户名称 365               # 365 天
+py -3 scripts/create_license.py 客户名称 2026-12-31         # 指定日期
+py -3 scripts/create_license.py 客户名称 2026-12-31T23:59:59  # 指定精确时间
+
+# 3. 校验
+py -3 scripts/verify_license.py
 ```
 
-### 2. 配置服务
-
-按方案二的步骤配置 systemd 服务。
-
-### 3. 启动 webhook 服务
-
-```bash
-nohup python3 /data/EquipmentManagement/scripts/webhook_server.py > webhook.log 2>&1 &
-```
-
-### 4. 验证
-
-```bash
-# 测试 webhook
-curl -X POST http://localhost:5001/webhook
-
-# 查看服务状态
-systemctl status dms
-```
-## 查看服务状态
-```bash
-systemctl status dms
-systemctl status dms-webhook
-```
-## 停止/启动/重启服务
-```bash
-systemctl stop dms
-systemctl start dms
-systemctl restart dms
-```
-## 查看日志
-```bash
-journalctl -u dms -f
-journalctl -u dms-webhook -f
-```
-## 查看部署日志
-```bash
-tail -f /var/log/webhook-deploy.log
-```
----
-
-## 常见问题
-
-### Q1: webhook 服务启动失败
-
-检查依赖是否安装：
-```bash
-pip3 install flask
-```
-
-检查端口是否被占用：
-```bash
-netstat -tlnp | grep 5001
-```
-
-### Q2: git pull 失败
-
-检查服务器上的 git 配置：
-```bash
-cd /data/EquipmentManagement
-git remote -v
-git config --list
-```
-
-如果需要认证，建议使用 SSH 方式：
-```bash
-git remote set-url origin git@github.com:用户名/仓库名.git
-```
-
-### Q3: 服务重启后无法访问
-
-检查端口是否开放：
-```bash
-# 腾讯云安全组添加 5000 端口
-netstat -tlnp | grep 5000
-```
-
-检查防火墙：
-```bash
-systemctl status firewalld
-firewall-cmd --list-ports
-```
-
-### Q4: 如何回滚到旧版本
-
-```bash
-cd /data/EquipmentManagement
-git log --oneline     # 查看提交历史
-git reset --hard <commit-id>   # 回滚到指定版本
-systemctl restart dms
-```
+- `create_license.py` 输出 `certs\license_<客户名称>.json`
+- `verify_license.py` 里的文件名是**写死的** `certs/license_TestUser.json` 加 `certs/license_public.pem`，验别的许可证需要改源码
+- `certs\license_private.pem` 是签发私钥，**绝不能进发布包**（整个 `certs\` 已被 `.gitignore` 排除）
 
 ---
 
-## 安全建议
+## 六、已知问题（均为当前代码的真实行为）
 
-1. **设置 WEBHOOK_SECRET**：防止他人恶意触发部署
-2. **限制 IP 访问**：在云服务器安全组中限制 5001 端口来源 IP
-3. **定期更新依赖**：`pip3 install --upgrade flask gunicorn`
-4. **查看审计日志**：定期检查 webhook.log 和 git 操作日志
+| # | 问题 | 影响 | 规避方式 |
+|---|---|---|---|
+| 1 | 没有 `build_config.json` 时，脚本虽然先打印「Using default configuration...」，但默认配置里**没有 `license` 段**，紧接着 `Write-Error` 并 `exit 1` | 报错看起来像配置错误，实际是「没配置文件就直接不干活」 | 必须先复制 `build_config.json.example` |
+| 2 | `rebuild_release.ps1` 第 2 步调 `build_installer.ps1`，后者内部又完整跑一次 `build_windows.ps1`（含 PyInstaller） | 全流程打包两遍，耗时约两倍 | 用「3.2 分步执行」 |
+| 3 | PyInstaller 只打包 `templates/static/uploads/docs/dms_license_config.json`，**不含 `certs\`**；而 `utils/license.py` 在 frozen 模式下找许可证 JSON 只查 `_MEIPASS`，不查 exe 同级目录 | 授权模式下把 `license_xxx.json` 放在 exe 旁边**不会被读取**；公钥另有 exe 同级 `certs\license_public.pem` 兜底，于是出现「公钥找得到、许可证找不到」 | 发布授权版前先实测；或把 `certs` 加进 `--add-data`，并给 `license_search_paths()` 补上 exe 同级路径 |
+| 4 | `--add-data "uploads;uploads"` 依赖仓库根目录存在 `uploads\` | 目录不存在时 PyInstaller 报 `Unable to find` 并中止 | 打包前 `New-Item -ItemType Directory -Force uploads` |
+| 5 | `sign_release.ps1` 里文件名硬编码 `DMS_Client.exe` / `DMS_Client_Installer.exe`，`signtool` 也只在 18362 版 SDK 目录下找 | 改了 `output_name` 或装了新版 SDK 后，签名会找不到文件或静默跳过 | 保持 `output_name = DMS_Client`；改了就同步改 `sign_release.ps1` |
+| 6 | `installer\dms_installer.nsi` 注释声称支持开始菜单，实际只创建桌面图标 | 开始菜单没有快捷方式（卸载时仍会尝试删除，无副作用） | 需要就让用户勾桌面图标，或自行在 nsi 里补 `CreateShortCut "$SMPROGRAMS\..."` |
+
+---
+
+## 七、清理构建残留
+
+```powershell
+Remove-Item -Recurse -Force build, releases -ErrorAction SilentlyContinue
+Remove-Item -Force *.spec -ErrorAction SilentlyContinue
+```
+
+`build\` 是 PyInstaller 的中间目录，`*.spec` 是它生成的规格文件，两者都不进版本库。清掉后重跑 `build_windows.ps1` 即可，不影响 `%APPDATA%\DMS` 里的正式数据。

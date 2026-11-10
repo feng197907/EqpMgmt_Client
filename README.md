@@ -156,13 +156,23 @@ python launcher.py                  # 首次运行自动生成配置和数据库
 
 **从源码构建**
 
+一条命令走完全流程（EXE → 安装包 → 发布 zip，产物在 `releases\`）：
+
 ```powershell
-.\scripts\build_windows.ps1        # 1. PyInstaller 打包单文件 EXE
-.\scripts\build_installer.ps1      # 2. NSIS 安装程序（内部会自动触发步骤 1）
-.\scripts\package_portable.ps1     # 3. 便携版（免安装 zip）
+.\scripts\rebuild_release.ps1
+```
+
+也可以按需分步执行：
+
+```powershell
+.\scripts\build_windows.ps1        # 1. PyInstaller 打包单文件 EXE → releases\DMS_Client.exe
+.\scripts\build_installer.ps1      # 2. NSIS 安装程序（内部会自动触发步骤 1）→ releases\DMS_Client_Installer.exe
+.\scripts\make_release.ps1         # 3. 打包成发布 zip
+.\scripts\package_portable.ps1     # 4. 便携版（免安装 zip）
 ```
 
 构建前需准备 `build_config.json`（参照 `build_config.json.example`）与 RSA 密钥对（`scripts/create_keypair.py`）。
+打包与安装程序需要 PyInstaller、NSIS（`makensis`）已安装。
 
 详细说明 → [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md) ｜ [BUILD_CONFIG_README.md](BUILD_CONFIG_README.md)
 
@@ -305,7 +315,7 @@ EqpMgmt_Client/
 │   │   └── pages/             #   按页面拆分（documents.js、audit-log.js…）
 │   └── vendor/                #   Bootstrap、Lucide（本地化，无 CDN）
 │
-├── scripts/                   # 构建与许可工具（详见 scripts/README.md）
+├── scripts/                   # 构建与许可工具（全流程入口：rebuild_release.ps1）
 │   ├── build_windows.ps1      #   PyInstaller 打包
 │   ├── build_installer.ps1    #   NSIS 安装程序
 │   ├── package_portable.ps1   #   便携版打包
@@ -459,7 +469,6 @@ server {
 |------|------|
 | [README_WINDOWS_CLIENT.md](README_WINDOWS_CLIENT.md) | 桌面客户端安装、许可、排障 |
 | [BUILD_CONFIG_README.md](BUILD_CONFIG_README.md) | 构建配置（许可证、签名、版本信息）字段说明 |
-| [scripts/README.md](scripts/README.md) | 构建与许可证脚本用法 |
 | [docs/使用手册.md](docs/使用手册.md) | 面向最终用户的功能操作手册 |
 
 ---

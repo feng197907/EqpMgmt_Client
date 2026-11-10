@@ -4,14 +4,13 @@ import tempfile
 from datetime import datetime
 from io import BytesIO
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, send_file, send_from_directory, url_for
+from flask import Blueprint, flash, redirect, render_template, request, send_file, send_from_directory, url_for
 from flask_login import current_user, login_required
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from werkzeug.utils import secure_filename
 
 from config import (
-    DEFAULT_DATA_DIR,
     DOC_STATUS_LABELS,
     DOC_TYPE_LABELS,
     DOC_TYPES,
@@ -20,7 +19,13 @@ from database import get_db, get_system_setting
 from utils.audit import log_action
 from utils.db_utils import commit_with_retry, execute_with_retry, get_next_version
 from utils.decorators import admin_required
-from utils.file_utils import allowed_file, compute_doc_hash, ensure_upload_dir
+from utils.file_utils import (
+    allowed_file,
+    compute_doc_hash,
+    ensure_upload_dir,
+    get_data_dir,
+    resolve_doc_path,
+)
 
 documents_bp = Blueprint("documents", __name__)
 
@@ -63,9 +68,8 @@ def upload_doc(device_id):
         success_count = 0
         error_msgs = []
         device_dir = ensure_upload_dir(device_id)
-        # 用运行时 UPLOAD_FOLDER 的父目录作为 data_dir，确保与下载路径解析一致
-        _upload_folder = current_app.config.get('UPLOAD_FOLDER', '')
-        data_dir = os.path.dirname(_upload_folder) if _upload_folder else DEFAULT_DATA_DIR
+        # 与下载/审批共用同一套数据目录解析，避免相对路径基准不一致
+        data_dir = get_data_dir()
 
         for idx, file in enumerate(files):
             if not file or file.filename == "":
@@ -143,8 +147,6 @@ def upload_doc(device_id):
 @login_required
 def download_doc(doc_id):
     """下载文档"""
-    from config import BASE_DIR
-
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT * FROM documents WHERE id = %s AND is_deleted = 0", (doc_id,))
@@ -164,16 +166,8 @@ def download_doc(doc_id):
         current_user.username, "download_document", "document", doc_id,
         f"下载 {doc['doc_name']} v{doc['version']}",
     )
-    # file_path 存储为相对路径，转换为服务器上的绝对路径
-    # 优先用运行时 UPLOAD_FOLDER（由 config.json 正确注入），其父目录即 data_dir
-    # 回退到编译期算出的 DEFAULT_DATA_DIR
-    file_path = doc["file_path"]
-    if not os.path.isabs(file_path):
-        upload_folder = current_app.config.get('UPLOAD_FOLDER', '')
-        data_dir = os.path.dirname(upload_folder) if upload_folder else DEFAULT_DATA_DIR
-        file_path = os.path.join(data_dir, file_path)
-    # 规范化路径，消除 .. 穿越（避免 os.startfile 处理 .. 路径失败）
-    file_path = os.path.normpath(file_path)
+    # file_path 存储为相对路径，统一由 resolve_doc_path 解析（与审批/签名同一套逻辑）
+    file_path = resolve_doc_path(doc["file_path"])
 
     # pywebview 桌面壳无法处理文件下载，返回文件路径让前端通过 API 打开
     is_desktop = request.headers.get('X-Desktop-Shell') == '1'
@@ -187,6 +181,9 @@ def download_doc(doc_id):
 
     directory = os.path.dirname(file_path)
     filename = os.path.basename(file_path)
+    if not os.path.exists(file_path):
+        flash("文件不存在，可能已被移动或删除。", "warning")
+        return redirect(url_for("devices.device_detail", device_id=doc["device_id"]))
     return send_from_directory(
         directory, filename, as_attachment=True, download_name=doc["doc_name"],
     )

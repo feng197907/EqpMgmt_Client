@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, render_template, request
 from flask_login import current_user, login_required
 from werkzeug.security import check_password_hash
 
-from database import get_db
+from database import DB_TYPE, get_db
 from models.electronic_signature import SIGN_MEANINGS, RECORD_TYPES, ElectronicSignature
 from utils.audit import log_action_with_cursor
 from utils.db_utils import commit_with_retry, execute_with_retry
@@ -50,18 +50,29 @@ def _get_lockout(username):
 
 
 def _set_lockout(username, fail_count, locked_until):
-    """更新用户的锁定状态到数据库"""
+    """更新用户的锁定状态到数据库（按数据库方言选择 UPSERT 语法）"""
     _init_lockout_table()
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO esign_lockouts (username, fail_count, locked_until, updated_at)
-        VALUES (%s, %s, %s, NOW())
-        ON DUPLICATE KEY UPDATE
-            fail_count = VALUES(fail_count),
-            locked_until = VALUES(locked_until),
-            updated_at = NOW()
-    """, (username, fail_count, locked_until))
+    if DB_TYPE == "mysql":
+        cur.execute("""
+            INSERT INTO esign_lockouts (username, fail_count, locked_until, updated_at)
+            VALUES (%s, %s, %s, NOW())
+            ON DUPLICATE KEY UPDATE
+                fail_count = VALUES(fail_count),
+                locked_until = VALUES(locked_until),
+                updated_at = NOW()
+        """, (username, fail_count, locked_until))
+    else:
+        # SQLite 不支持 ON DUPLICATE KEY，使用 ON CONFLICT (SQLite >= 3.24)
+        cur.execute("""
+            INSERT INTO esign_lockouts (username, fail_count, locked_until, updated_at)
+            VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
+            ON CONFLICT(username) DO UPDATE SET
+                fail_count = excluded.fail_count,
+                locked_until = excluded.locked_until,
+                updated_at = CURRENT_TIMESTAMP
+        """, (username, fail_count, locked_until))
     commit_with_retry(conn)
     conn.close()
 

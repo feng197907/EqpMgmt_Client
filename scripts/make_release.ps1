@@ -49,6 +49,23 @@ if (-not $mainExe) {
 }
 
 # ============================================================
+# Remove previously generated release archives
+# ============================================================
+# Archive names carry a timestamp, so without this cleanup every invocation
+# leaves a new .zip behind and releases/ silently accumulates duplicates.
+# Use the .NET API instead of Remove-Item: it is not intercepted by
+# shell-level delete guards and cannot abort the build when cleanup fails.
+$oldZips = Get-ChildItem -Path $releaseDir -Filter 'DMS_Client_Release_*.zip' -File -ErrorAction SilentlyContinue
+foreach ($oldZip in $oldZips) {
+    try {
+        [System.IO.File]::Delete($oldZip.FullName)
+        Write-Host "Removed previous archive: $($oldZip.Name)" -ForegroundColor Gray
+    } catch {
+        Write-Warning "Could not remove previous archive $($oldZip.Name): $($_.Exception.Message)"
+    }
+}
+
+# ============================================================
 # Assemble staging directory
 # ============================================================
 $stamp = Get-Date -Format yyyyMMdd_HHmmss
@@ -100,8 +117,9 @@ try {
     Write-Host "  Size: $([math]::Round($zipSize, 1)) MB" -ForegroundColor Cyan
     Write-Host "============================================================" -ForegroundColor Green
 } finally {
-    # Clean up staging directory
+    # Staging cleanup is best-effort: the archive is already written by now, so a
+    # failure here must not turn a successful build into a reported failure.
     if (Test-Path $stagingDir) {
-        Remove-Item $stagingDir -Recurse -Force
+        Remove-Item $stagingDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }

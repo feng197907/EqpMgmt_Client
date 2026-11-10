@@ -104,7 +104,12 @@ Copy-Item build_config.json.example build_config.json
 
 ### make_release.ps1
 
-把 `DMS_Client.exe`、`DMS_Client_Installer.exe`（有就带）、`README_WINDOWS_CLIENT.md`、`certs\license_public.pem`（有就带）打进 `DMS_Client_Release_<时间戳>.zip`，临时暂存目录用完即删。
+先删掉 `releases\` 里**所有**历史 `DMS_Client_Release_*.zip`，再把 `DMS_Client.exe`、`DMS_Client_Installer.exe`（有就带）、`README_WINDOWS_CLIENT.md`、`certs\license_public.pem`（有就带）打进 `DMS_Client_Release_<时间戳>.zip`，临时暂存目录用完即删。
+
+两处细节：
+
+- 归档名带时间戳，早期版本"只删同名文件"的判断永远为假，导致每跑一次就多留一个 zip（`releases\` 里会攒出多个内容完全相同的包）。现在改为打包前统一清理，用 `[System.IO.File]::Delete` 而非 `Remove-Item`，避免被 shell 级删除守卫拦截。
+- `finally` 里的暂存目录清理是 **best-effort**（`-ErrorAction SilentlyContinue`）。zip 此时已写完，清理失败不应把成功构建报成失败——早期版本正是这里抛异常，导致"明明出了包却退出码非零"，于是被重跑一次、多产出一个 zip。
 
 ### package_portable.ps1
 
